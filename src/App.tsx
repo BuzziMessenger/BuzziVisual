@@ -230,7 +230,7 @@ export default function App() {
   };
 
   // Sending a message
-  const handleSendMessage = async (text: string, isBuzz: boolean = false) => {
+  const handleSendMessage = async (text: string, isBuzz: boolean = false, isWink: boolean = false, winkId?: string) => {
     const newMessage: Message = {
       id: `m-${Date.now()}`,
       senderId: "me",
@@ -238,7 +238,9 @@ export default function App() {
       senderAvatar: userAvatar,
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isBuzz: isBuzz
+      isBuzz: isBuzz,
+      isWink: isWink,
+      winkId: winkId
     };
 
     // Append user message immediately
@@ -252,6 +254,40 @@ export default function App() {
     const isConversingWithAI = activeId === "queen";
 
     if (isConversingWithAI) {
+      // If it's a Wink!
+      if (isWink) {
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          const winksPool = ["pig", "crazy", "water", "guitar", "heart"];
+          const randomWink = winksPool[Math.floor(Math.random() * winksPool.length)];
+          const winkNames: Record<string, string> = {
+            pig: "Knipogend Varken 🐷",
+            crazy: "Gekke Lachebek 🤪",
+            water: "Waterballon 🎈",
+            guitar: "Luchtgitaar 🎸",
+            heart: "Hartjes Explosie 💖"
+          };
+
+          const winkReply: Message = {
+            id: `mq-${Date.now()}`,
+            senderId: "queen",
+            senderName: "🤖 Gemini Bot (H)",
+            senderAvatar: "🤖",
+            text: `*Stuurt een Wink terug: ${winkNames[randomWink]}*`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isWink: true,
+            winkId: randomWink
+          };
+
+          setMessages(prev => ({
+            ...prev,
+            [activeId]: [...(prev[activeId] || []), winkReply]
+          }));
+        }, 1500);
+        return;
+      }
+
       // If it's a nudge, have Gemini react appropriately!
       if (isBuzz) {
         setIsTyping(true);
@@ -336,6 +372,42 @@ export default function App() {
       }
     } else {
       // Simulate reply from other classmates to make channels alive
+      if (isWink) {
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          const friendName = contacts.find(c => c.id === activeId)?.name || "Vriend";
+          const friendAvatar = contacts.find(c => c.id === activeId)?.avatar || "🐝";
+          
+          const winksPool = ["pig", "crazy", "water", "guitar", "heart"];
+          const randomWink = winksPool[Math.floor(Math.random() * winksPool.length)];
+          const winkNames: Record<string, string> = {
+            pig: "Knipogend Varken 🐷",
+            crazy: "Gekke Lachebek 🤪",
+            water: "Waterballon 🎈",
+            guitar: "Luchtgitaar 🎸",
+            heart: "Hartjes Explosie 💖"
+          };
+
+          const winkReply: Message = {
+            id: `mt-${Date.now()}`,
+            senderId: activeId,
+            senderName: friendName,
+            senderAvatar: friendAvatar,
+            text: `Ooooh een Wink! 😍 Check deze retro animatie van mij:`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isWink: true,
+            winkId: randomWink
+          };
+
+          setMessages(prev => ({
+            ...prev,
+            [activeId]: [...(prev[activeId] || []), winkReply]
+          }));
+        }, 1600);
+        return;
+      }
+
       if (isBuzz) {
         // If classmate gets nudge, they will nudge back or complain!
         setIsTyping(true);

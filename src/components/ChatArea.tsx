@@ -28,7 +28,7 @@ interface ChatAreaProps {
   activeContact?: Contact;
   messages: Message[];
   isTyping: boolean;
-  onSendMessage: (text: string, isBuzz?: boolean) => void;
+  onSendMessage: (text: string, isBuzz?: boolean, isWink?: boolean, winkId?: string) => void;
   onBuzzIncoming: () => void;
   myDisplayName: string;
   myAvatar: string;
@@ -51,6 +51,14 @@ const MSN_EMOTICONS = [
   { code: "(N)", char: "👎", name: "Duim neer" },
 ];
 
+const WINKS_LIST = [
+  { id: "pig", title: "Knipogend Varken", icon: "🐷", desc: "Een vrolijk roze msn-varkentje met een vette knipoog!" },
+  { id: "crazy", title: "Gekke Lachebek", icon: "🤪", desc: "Een gigantische gele smiley die onbedaarlijk lacht en rammelt." },
+  { id: "water", title: "Waterballon", icon: "🎈", desc: "Gooi een waterballon tegen het scherm en laat het druipen!" },
+  { id: "guitar", title: "Luchtgitaar", icon: "🎸", desc: "Scheur op een vette elektrische gitaar met bliksem en sterren!" },
+  { id: "heart", title: "Hartjes Explosie", icon: "💖", desc: "Een groot kloppend hart dat kapot schiet in tientallen harten." }
+];
+
 export const ChatArea: React.FC<ChatAreaProps> = ({
   activeId,
   activeType,
@@ -66,6 +74,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
+  const [showWinksPicker, setShowWinksPicker] = useState(false);
+  const [activeWink, setActiveWink] = useState<string | null>(null);
   
   // Custom font styling for retro MSN customization
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // MSN classic blue text
@@ -79,6 +89,33 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
+  // Monitor incoming messages for Winks to trigger the full screen play and synth sound!
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.isWink && lastMsg.winkId) {
+      setActiveWink(lastMsg.winkId);
+
+      // Play matching synth sound
+      if (lastMsg.winkId === "pig") {
+        hiveAudio.playPigWink();
+      } else if (lastMsg.winkId === "crazy") {
+        hiveAudio.playCrazyWink();
+      } else if (lastMsg.winkId === "water") {
+        hiveAudio.playWaterWink();
+      } else if (lastMsg.winkId === "guitar") {
+        hiveAudio.playGuitarWink();
+      } else if (lastMsg.winkId === "heart") {
+        hiveAudio.playHeartWink();
+      }
+
+      const timer = setTimeout(() => {
+        setActiveWink(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
+
   const handleSend = () => {
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim(), false);
@@ -87,6 +124,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     hiveAudio.playNotification();
     setInputText("");
     setShowEmoticonPicker(false);
+    setShowWinksPicker(false);
+  };
+
+  const handleSendWink = (winkId: string, title: string) => {
+    onSendMessage(`*Stuurt knipoog: ${title}*`, false, true, winkId);
+    setShowWinksPicker(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -235,35 +278,80 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         {/* Emoticon list trigger */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowEmoticonPicker(!showEmoticonPicker);
-              hiveAudio.playHoneyPop();
-            }}
-            className="hover:bg-[#cfe1f5] text-[#1d5c8a] px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer border border-[#bad0e3]/40"
-          >
-            <Smile className="w-3.5 h-3.5 text-amber-500" />
-            <span>Emoticons :-D</span>
-          </button>
+        <div className="flex items-center gap-1.5 relative">
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowEmoticonPicker(!showEmoticonPicker);
+                setShowWinksPicker(false);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:bg-[#cfe1f5] text-[#1d5c8a] px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer border border-[#bad0e3]/40"
+            >
+              <Smile className="w-3.5 h-3.5 text-amber-500" />
+              <span>Emoticons :-D</span>
+            </button>
 
-          {showEmoticonPicker && (
-            <div className="absolute right-0 top-full mt-1.5 bg-white border border-[#8da7c1] rounded-md shadow-xl p-2.5 grid grid-cols-5 gap-1.5 w-48 z-50 animate-fade-in">
-              <div className="col-span-5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-1 mb-1">
-                Kies retro Emoticon:
+            {showEmoticonPicker && (
+              <div className="absolute right-0 top-full mt-1.5 bg-white border border-[#8da7c1] rounded-md shadow-xl p-2.5 grid grid-cols-5 gap-1.5 w-48 z-50 animate-fade-in">
+                <div className="col-span-5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-1 mb-1">
+                  Kies retro Emoticon:
+                </div>
+                {MSN_EMOTICONS.map((em) => (
+                  <button
+                    key={em.code}
+                    onClick={() => handleEmoticonClick(em.code)}
+                    className="p-1 text-center hover:bg-[#e4ecf7] rounded text-lg transition-transform active:scale-90 cursor-pointer"
+                    title={`${em.name} (${em.code})`}
+                  >
+                    {em.char}
+                  </button>
+                ))}
               </div>
-              {MSN_EMOTICONS.map((em) => (
-                <button
-                  key={em.code}
-                  onClick={() => handleEmoticonClick(em.code)}
-                  className="p-1 text-center hover:bg-[#e4ecf7] rounded text-lg transition-transform active:scale-90 cursor-pointer"
-                  title={`${em.name} (${em.code})`}
-                >
-                  {em.char}
-                </button>
-              ))}
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Winks list trigger */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowWinksPicker(!showWinksPicker);
+                setShowEmoticonPicker(false);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:bg-[#cfe1f5] text-[#1d5c8a] px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer border border-[#bad0e3]/40 bg-gradient-to-r from-pink-50 to-white"
+              title="Kies een geanimeerde Wink (Knipoog) over het hele scherm!"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-pink-500 animate-pulse" />
+              <span className="text-pink-700">Knipogen 😉</span>
+            </button>
+
+            {showWinksPicker && (
+              <div className="absolute right-0 top-full mt-1.5 bg-white border border-[#8da7c1] rounded-md shadow-xl p-3 w-64 z-50 animate-fade-in text-left">
+                <div className="text-[10.5px] text-pink-600 font-extrabold border-b border-slate-100 pb-1.5 mb-2 uppercase tracking-wide flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Kies retro Wink (Knipoog):</span>
+                </div>
+                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                  {WINKS_LIST.map((wink) => (
+                    <button
+                      key={wink.id}
+                      onClick={() => handleSendWink(wink.id, wink.title)}
+                      className="w-full flex items-center gap-2.5 p-1.5 text-left hover:bg-pink-50 rounded transition-all group cursor-pointer border border-transparent hover:border-pink-200"
+                    >
+                      <span className="text-2xl filter drop-shadow group-hover:scale-115 transition-transform select-none">
+                        {wink.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-800 group-hover:text-pink-700">{wink.title}</div>
+                        <div className="text-[9px] text-slate-400 truncate mt-0.5">{wink.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -386,6 +474,254 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         </div>
 
+        {/* Full-screen retro MSN Winks Overlays */}
+        {activeWink && (
+          <div className="absolute inset-0 z-50 pointer-events-none">
+            {/* Authentic MSN Close Button for Winks */}
+            <button
+              onClick={() => setActiveWink(null)}
+              className="absolute top-4 right-4 bg-white/95 hover:bg-white text-slate-800 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center font-bold font-sans text-sm border border-slate-300 shadow-md z-50 pointer-events-auto cursor-pointer transition-all active:scale-90"
+              title="Sluit knipoog"
+            >
+              ✕
+            </button>
+
+            {/* Pink Pig Wink */}
+            {activeWink === "pig" && (
+              <div className="absolute inset-0 bg-pink-100/30 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <div className="absolute top-10 left-10 text-xl animate-pulse opacity-40">🎈</div>
+                <div className="absolute bottom-16 right-12 text-2xl animate-pulse opacity-40">🎈</div>
+
+                <motion.div
+                  initial={{ y: 200, scale: 0.3, rotate: -45 }}
+                  animate={{ 
+                    y: [150, -20, 10, -5, 0], 
+                    scale: [0.3, 1.4, 1.4, 1.2, 1.2],
+                    rotate: [0, 15, -15, 10, 0]
+                  }}
+                  transition={{ duration: 1.8, ease: "easeOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <motion.div 
+                    animate={{ rotate: [0, -5, 5, -5, 0] }}
+                    transition={{ delay: 1, duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
+                    className="text-[120px] sm:text-[160px] filter drop-shadow-xl select-none"
+                  >
+                    🐷
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: [0, 1, 1, 0], scale: [0, 1.5, 2, 0.5], y: [-20, -120, -180, -200] }}
+                    transition={{ delay: 1.5, duration: 2 }}
+                    className="text-4xl absolute pointer-events-none"
+                  >
+                    💖
+                  </motion.div>
+
+                  <div className="text-pink-700 font-extrabold text-xs font-sans tracking-wide bg-white/95 border border-pink-200 shadow-md px-4 py-2 rounded-full mt-4 animate-bounce">
+                    *OINK OINK!* 🐽 *Knipoog!*
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Crazy Laugh Wink */}
+            {activeWink === "crazy" && (
+              <div className="absolute inset-0 bg-yellow-50/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.2, 1, 0.5] }}
+                  transition={{ delay: 0.5, duration: 1.5 }}
+                  className="absolute top-1/4 left-10 bg-amber-400 ring-4 ring-white text-stone-900 font-extrabold text-xs px-3 py-1.5 rounded-lg -rotate-12 shadow-lg"
+                >
+                  HA HA HA! 😂
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.2, 1, 0.5] }}
+                  transition={{ delay: 1.2, duration: 1.5 }}
+                  className="absolute bottom-1/4 right-8 bg-[#e31e24] ring-4 ring-white text-white font-extrabold text-xs px-3 py-1.5 rounded-lg rotate-12 shadow-lg"
+                >
+                  W00T! XD
+                </motion.div>
+
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ 
+                    scale: [0, 1.6, 1.6, 1.4, 0], 
+                    rotate: [0, 20, -20, 20, -720] 
+                  }}
+                  transition={{ duration: 3.5, ease: "easeInOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="text-[130px] sm:text-[180px] filter drop-shadow-2xl animate-bounce">
+                    🤪
+                  </div>
+                  <div className="bg-amber-400 font-bold border-2 border-stone-800 text-stone-900 text-xs shadow-md px-4 py-1.5 rounded-xl mt-2 animate-pulse">
+                    Lachen is gezond! :-P
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Water Balloon Wink */}
+            {activeWink === "water" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1.1, 1], opacity: [0, 1, 1, 1] }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                  className="absolute inset-0 bg-[#00aeef]/20 flex flex-col items-center justify-center"
+                >
+                  <div className="text-sky-500 text-[180px] sm:text-[250px] font-extrabold filter drop-shadow opacity-95 animate-pulse">
+                    💦
+                  </div>
+                  <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#00aeef]/25 via-[#00aeef]/10 to-transparent blur-xs pointer-events-none" />
+
+                  <motion.div
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: [0, 100, 250], opacity: [0, 0.8, 0] }}
+                    transition={{ delay: 0.7, duration: 3.5 }}
+                    className="text-4xl absolute font-bold text-sky-600/80"
+                  >
+                    💧
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: [0, 80, 200], opacity: [0, 0.8, 0] }}
+                    transition={{ delay: 1, duration: 4 }}
+                    className="text-4xl absolute font-bold text-sky-600/80 left-[15%]"
+                  >
+                    💧
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: [0, 120, 280], opacity: [0, 0.8, 0] }}
+                    transition={{ delay: 0.5, duration: 3 }}
+                    className="text-5xl absolute font-bold text-sky-600/80 right-[20%]"
+                  >
+                    💧
+                  </motion.div>
+
+                  <div className="absolute bottom-16 bg-white/95 border-2 border-sky-400 shadow-md px-4 py-2 rounded-xl text-sky-800 font-extrabold text-xs animate-bounce">
+                    *SPLASSHHH!* 🎈💦 Je scherm is nat!
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Air Guitar Wink */}
+            {activeWink === "guitar" && (
+              <div className="absolute inset-0 bg-indigo-950/30 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <div className="absolute top-8 left-1/4 text-4xl animate-bounce">⚡</div>
+                <div className="absolute top-1/2 right-1/4 text-5xl animate-pulse">⚡</div>
+                <div className="absolute bottom-12 left-12 text-3xl animate-bounce">⚡</div>
+
+                <div className="absolute top-12 right-12 text-3xl animate-pulse text-indigo-300">🎵</div>
+                <div className="absolute bottom-20 right-20 text-4xl animate-bounce text-indigo-300">🎶</div>
+
+                <motion.div
+                  initial={{ scale: 0, rotate: 0 }}
+                  animate={{ 
+                    scale: [0, 1.4, 1.5, 1.3, 0],
+                    rotate: [0, 360, 340, 380, 720]
+                  }}
+                  transition={{ duration: 4.5, ease: "easeInOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="text-[130px] sm:text-[180px] filter drop-shadow-2xl animate-bounce">
+                    🎸
+                  </div>
+                  <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-stone-900 font-black border-2 border-stone-900 shadow-lg px-5 py-2 rounded-xl mt-4 text-xs tracking-widest uppercase animate-pulse">
+                    🎸 *ROCK ON!* 🤘⚡
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Heartburst Wink */}
+            {activeWink === "heart" && (
+              <div className="absolute inset-0 bg-red-50/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 1, 0], 
+                    scale: [0.2, 1.5, 1.5, 0.4],
+                    x: [-20, -180, -250],
+                    y: [0, -100, -150]
+                  }}
+                  transition={{ duration: 3 }}
+                  className="absolute text-3xl pointer-events-none"
+                >
+                  💖
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 1, 0], 
+                    scale: [0.2, 1.5, 1.5, 0.4],
+                    x: [20, 180, 250],
+                    y: [0, -120, -160]
+                  }}
+                  transition={{ duration: 2.8 }}
+                  className="absolute text-3xl pointer-events-none"
+                >
+                  💕
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 1, 0], 
+                    scale: [0.2, 1.5, 1.5, 0.4],
+                    x: [-30, -130, -180],
+                    y: [0, 120, 180]
+                  }}
+                  transition={{ duration: 3.2 }}
+                  className="absolute text-3xl pointer-events-none"
+                >
+                  💓
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 1, 0], 
+                    scale: [0.2, 1.5, 1.5, 0.4],
+                    x: [30, 130, 180],
+                    y: [0, 140, 200]
+                  }}
+                  transition={{ duration: 2.9 }}
+                  className="absolute text-3xl pointer-events-none"
+                >
+                  💝
+                </motion.div>
+
+                <motion.div
+                  initial={{ scale: 0.3 }}
+                  animate={{ 
+                    scale: [0.3, 1.4, 1.4, 0],
+                  }}
+                  transition={{ duration: 4.5, ease: "easeOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <motion.div
+                    animate={{ scale: [1, 1.15, 1, 1.15, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
+                    className="text-[130px] sm:text-[180px] filter drop-shadow-2xl"
+                  >
+                    ❤️
+                  </motion.div>
+                  <div className="bg-red-500 text-white font-extrabold border-2 border-red-200 shadow-md px-4 py-2 rounded-full mt-4 text-xs tracking-wide animate-bounce">
+                    *KABOOM!* ❤️ Hartjes Liefde!
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* Input Action Panel (Separated into rich area text in MSI clone) */}
@@ -436,15 +772,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           >
             <Send className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Retro Dutch ad banner block (the ultimate nostalgic addition!) */}
-        <div className="max-w-4xl mx-auto mt-3 bg-gradient-to-r from-yellow-100 via-amber-50 to-yellow-100 border border-yellow-200 rounded p-1.5 text-center text-[10px] text-slate-600 font-sans flex items-center justify-between shadow-sm select-none relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-[#e31e24] text-white font-extrabold text-[8px] px-1 tracking-widest uppercase">JAMBA!</div>
-          <div className="flex-1 text-center font-medium truncate">
-            🔥 <strong>NIEUWE RINGTONE:</strong> sms <em className="text-red-600 font-bold">FROG</em> naar <em className="text-blue-600 font-bold">4040</em> voor de Crazy Frog Ringtone op je Nokia 3310! (€1.50 p/b) 🔥
-          </div>
-          <a href="#" onClick={(e) => { e.preventDefault(); triggerNudge(); }} className="text-sky-600 hover:underline font-bold text-[9px] pr-8 ml-2">Klik hier!</a>
         </div>
       </div>
     </motion.div>

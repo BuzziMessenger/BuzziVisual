@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-[11px] font-bold tracking-tight text-white flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-[#8cc63f] inline-block filter drop-shadow"></span>
               <span className="w-2.5 h-2.5 rounded-full bg-[#00aeef] inline-block filter drop-shadow"></span>
-              <span>MSN</span>
+              <span>Buzzi</span>
             </span>
           </div>
           <span className="text-xs font-semibold tracking-wide uppercase font-sans drop-shadow-sm text-sky-50">

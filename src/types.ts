@@ -11,6 +11,8 @@ export interface Message {
   text: string;
   timestamp: string;
   isBuzz?: boolean; // True if it is a Nudge/Duwtje
+  isWink?: boolean; // True if a fullscreen Wink
+  winkId?: string; // e.g. "pig", "crazy", "water", "guitar", "heart"
   customFontColor?: string; // MSN custom text color
   customFontFamily?: string; // MSN custom font
 }
