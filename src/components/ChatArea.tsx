@@ -35,7 +35,7 @@ interface ChatAreaProps {
   myUserId?: string;
 }
 
-const MSN_EMOTICONS = [
+const BUZZI_EMOTICONS = [
   { code: ":-D", char: "😃", name: "Blij" },
   { code: "(H)", char: "😎", name: "Cool" },
   { code: "(A)", char: "😇", name: "Engeltje" },
@@ -53,7 +53,7 @@ const MSN_EMOTICONS = [
 ];
 
 const WINKS_LIST = [
-  { id: "pig", title: "Knipogend Varken", icon: "🐷", desc: "Een vrolijk roze msn-varkentje met een vette knipoog!" },
+  { id: "pig", title: "Knipogend Varken", icon: "🐷", desc: "Een vrolijk roze Buzzi-varkentje met een vette knipoog!" },
   { id: "crazy", title: "Gekke Lachebek", icon: "🤪", desc: "Een gigantische gele smiley die onbedaarlijk lacht en rammelt." },
   { id: "water", title: "Waterballon", icon: "🎈", desc: "Gooi een waterballon tegen het scherm en laat het druipen!" },
   { id: "guitar", title: "Luchtgitaar", icon: "🎸", desc: "Scheur op een vette elektrische gitaar met bliksem en sterren!" },
@@ -79,8 +79,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showWinksPicker, setShowWinksPicker] = useState(false);
   const [activeWink, setActiveWink] = useState<string | null>(null);
   
-  // Custom font styling for retro MSN customization
-  const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // MSN classic blue text
+  // Custom font styling for retro Buzzi customization
+  const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
   const [mmsFont, setMmsFont] = useState<string>("Comic Sans MS"); // Comic Sans default lol
   const [isBold, setIsBold] = useState(true);
 
@@ -162,8 +162,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const renderMessageContent = (text: string) => {
     let result: React.ReactNode = text;
     
-    // Simple inline matching of MSN emoticons
-    MSN_EMOTICONS.forEach(em => {
+    // Simple inline matching of Buzzi emoticons
+    BUZZI_EMOTICONS.forEach(em => {
       // Escape for regex safe
       const escapedCode = em.code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const parts = text.split(new RegExp(`(${escapedCode})`, 'g'));
@@ -199,7 +199,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       } : {}}
       transition={{ duration: 0.65, ease: "linear" }}
     >
-      {/* MSN Active Conversation Header Info */}
+      {/* Buzzi Active Conversation Header Info */}
       <div className="bg-[#cbdcf0] border-b border-[#9ebcd1] px-5 py-3 flex items-center justify-between shadow-inner">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
-      {/* MSN Action Toolbar (Buttons directly below header for tools) */}
+      {/* Buzzi Action Toolbar (Buttons directly below header for tools) */}
       <div className="bg-[#e9f2fc] border-b border-[#bad0e3] px-3 py-1 flex items-center justify-between select-none">
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Nudge! (Duwtje) */}
@@ -299,7 +299,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <div className="col-span-5 text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-1 mb-1">
                   Kies retro Emoticon:
                 </div>
-                {MSN_EMOTICONS.map((em) => (
+                {BUZZI_EMOTICONS.map((em) => (
                   <button
                     key={em.code}
                     onClick={() => handleEmoticonClick(em.code)}
@@ -372,7 +372,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               const isQueen = msg.senderId === "queen";
               const isBuzz = msg.isBuzz;
 
-              // Classic MSN inline Nudge rendering
+              // Classic Buzzi inline Nudge rendering
               if (isBuzz) {
                 return (
                   <motion.div
@@ -400,7 +400,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   transition={{ duration: 0.18 }}
                   className="space-y-0.5 leading-relaxed font-sans"
                 >
-                  {/* MSN style message header: "Robbin zegt (12:04):" */}
+                  {/* Buzzi style message header: "Robbin zegt (12:04):" */}
                   <div className="text-xs select-none flex items-center gap-1.5 pt-1">
                     <span className={`font-bold ${isMe ? "text-slate-500" : isQueen ? "text-sky-700" : "text-emerald-700"}`}>
                       {msg.senderName} zegt:
@@ -408,7 +408,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span className="text-[10px] text-slate-400 font-mono">({msg.timestamp})</span>
                   </div>
 
-                  {/* MSN style message content text inside window */}
+                  {/* Buzzi style message content text inside window */}
                   <div 
                     className="text-sm pl-4 pr-1 break-words whitespace-pre-wrap selection:bg-amber-200"
                     style={{ 
@@ -423,7 +423,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
             })}
 
-            {/* MSN Ticker indicator "Gemini is typing a message..." */}
+            {/* Buzzi Ticker indicator "Gemini is typing a message..." */}
             {isTyping && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -445,7 +445,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Column 2: Side Display Pictures (The iconic huge MSN avatars on the right) */}
+        {/* Column 2: Side Display Pictures (The iconic huge Buzzi avatars on the right) */}
         <div className="w-[105px] border-l border-[#bad0e3]/60 bg-[#edf3f9] p-3 flex flex-col justify-between items-center select-none flex-shrink-0">
           
           {/* Active Contact Avatar */}
@@ -476,10 +476,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         </div>
 
-        {/* Full-screen retro MSN Winks Overlays */}
+        {/* Full-screen retro Buzzi Winks Overlays */}
         {activeWink && (
           <div className="absolute inset-0 z-50 pointer-events-none">
-            {/* Authentic MSN Close Button for Winks */}
+            {/* Authentic Buzzi Close Button for Winks */}
             <button
               onClick={() => setActiveWink(null)}
               className="absolute top-4 right-4 bg-white/95 hover:bg-white text-slate-800 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center font-bold font-sans text-sm border border-slate-300 shadow-md z-50 pointer-events-auto cursor-pointer transition-all active:scale-90"
@@ -749,7 +749,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onKeyDown={handleKeyPress}
               placeholder={
                 activeId === "queen"
-                  ? "Vraag deze retro Gemini MSN-bot alles over 2004..."
+                  ? "Vraag deze retro Gemini Buzzi-bot alles over 2004..."
                   : `Schrijf een nostalgisch bericht... (typ emoticons zoals :-D of (H))`
               }
               className="w-full bg-stone-50 text-stone-900 border border-slate-300 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d5c8a]/50 focus:border-[#1d5c8a] placeholder-stone-400 font-sans shadow-inner"

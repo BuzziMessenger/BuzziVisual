@@ -1,6 +1,6 @@
 {
   "name": "Buzzi Messenger",
-  "description": "An interactive, elegant chat workspace themed around a collaborative bee colony. Meet AI-powered insect personas, configure honeycombs, and trigger real haptic synthesizer buzzes.",
+  "description": "Een interactieve retro chat-app genaamd Buzzi Messenger, met vette nudges, glinsterende schermnamen, knipogen (winks) en een nostalgische chat-buddy op basis van Gemini AI in de stijl van 2004.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

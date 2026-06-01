@@ -1,7 +1,55 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { MongoClient, Db } from "mongodb";
+
+// Unified Local Database storage paths for standalone zero-config execution
+const USERS_FILE = path.join(process.cwd(), "data_users.json");
+const MESSAGES_FILE = path.join(process.cwd(), "data_messages.json");
+
+function readJsonFile<T>(filePath: string, defaultVal: T): T {
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.warn(`Failed to read local file ${filePath}:`, err);
+  }
+  return defaultVal;
+}
+
+function writeJsonFile<T>(filePath: string, data: T): void {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.warn(`Failed to write local file ${filePath}:`, err);
+  }
+}
+
+let mongoClient: MongoClient | null = null;
+let mongoDb: Db | null = null;
+
+async function getMongoDb(): Promise<Db | null> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) return null;
+  if (mongoDb) return mongoDb;
+  try {
+    mongoClient = new MongoClient(uri);
+    await mongoClient.connect();
+    mongoDb = mongoClient.db("buzzi");
+    console.log("Successfully connected to MongoDB Atlas!");
+    return mongoDb;
+  } catch (err) {
+    console.warn("MongoDB connection failed:", err);
+    return null;
+  }
+}
+
+// Proactive MongoDB connection attempt
+getMongoDb().catch(e => console.warn("Initial MongoDB connection attempt failed:", e));
 
 async function startServer() {
   const app = express();
@@ -9,7 +57,136 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Route: MSN Bot Integration
+  // Database Connection Status API
+  app.get("/api/db/status", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      res.json({
+        mongodb: {
+          configured: !!process.env.MONGODB_URI,
+          connected: !!dbInstance,
+          uriMasked: process.env.MONGODB_URI 
+            ? process.env.MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, "mongodb+srv://***:***@") 
+            : null
+        },
+        localDb: {
+          active: !dbInstance,
+          usersCount: readJsonFile<any[]>(USERS_FILE, []).length,
+          messagesCount: readJsonFile<any[]>(MESSAGES_FILE, []).length
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Get Messages (MongoDB or Local File backup)
+  app.get("/api/db/messages", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        const messages = await dbInstance.collection("messages").find({}).sort({ createdAtTimestamp: 1 }).toArray();
+        res.json(messages);
+      } else {
+        const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
+        res.json(messages);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Create / Update Message
+  app.post("/api/db/messages", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const message = req.body;
+      if (!message || !message.id) {
+        res.status(400).json({ error: "Invalid message payload" });
+        return;
+      }
+      
+      const docToInsert = {
+        ...message,
+        createdAtTimestamp: Date.now()
+      };
+
+      if (dbInstance) {
+        await dbInstance.collection("messages").replaceOne(
+          { id: message.id },
+          docToInsert,
+          { upsert: true }
+        );
+      } else {
+        const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
+        const idx = messages.findIndex(m => m.id === message.id);
+        if (idx >= 0) {
+          messages[idx] = docToInsert;
+        } else {
+          messages.push(docToInsert);
+        }
+        writeJsonFile(MESSAGES_FILE, messages);
+      }
+      res.json({ success: true, message: "Bericht succesvol opgeslagen." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Get Users (MongoDB or Local File backup)
+  app.get("/api/db/users", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        const users = await dbInstance.collection("users").find({}).toArray();
+        res.json(users);
+      } else {
+        const users = readJsonFile<any[]>(USERS_FILE, []);
+        res.json(users);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Save / Sync User Profile
+  app.post("/api/db/users", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const userData = req.body;
+      if (!userData || !userData.uid) {
+        res.status(400).json({ error: "Invalid user data payload" });
+        return;
+      }
+
+      const docToInsert = {
+        ...userData,
+        updatedAtTimestamp: Date.now()
+      };
+
+      if (dbInstance) {
+        await dbInstance.collection("users").updateOne(
+          { uid: userData.uid },
+          { $set: docToInsert },
+          { upsert: true }
+        );
+      } else {
+        const users = readJsonFile<any[]>(USERS_FILE, []);
+        const idx = users.findIndex(u => u.uid === userData.uid);
+        if (idx >= 0) {
+          users[idx] = { ...users[idx], ...docToInsert };
+        } else {
+          users.push(docToInsert);
+        }
+        writeJsonFile(USERS_FILE, users);
+      }
+      res.json({ success: true, message: "Gebruikersprofiel gesynchroniseerd." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Buzzi Bot Integration
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, history } = req.body;
@@ -24,9 +201,9 @@ async function startServer() {
       if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
         // High-quality fallback: Maintain the roleplay experience even without the key
         const fallbackReplies = [
-          "🤖 *PING!* Hey! Ik hoor je wel, maar mijn MSN-verbinding (de GEMINI_API_KEY) ligt er ff uit door de inbelverbinding! 📞 Vul de key in bij Secrets via Instellingen zodat we weer live kunnen chatten! (H)",
-          "💬 *Nudge!* Omg, mijn server-verbinding met MSN is offline omdat iemand de telefoonlijn gebruikt voor internet! 📞 Vul de GEMINI_API_KEY in bij de Secrets om live te praten! (A)",
-          "😎 *W00t!* Ik zou heel graag met je kletsen over je favoriete MP3's, MSN-namen en webcam-avonturen, maar we missen de GEMINI_API_KEY in de Secrets! Voeg hem snel toe! :-P"
+          "🤖 *PING!* Hey! Ik hoor je wel, maar mijn Buzzi-verbinding (de GEMINI_API_KEY) ligt er ff uit door de inbelverbinding! 📞 Vul de key in bij Secrets via Instellingen zodat we weer live kunnen chatten! (H)",
+          "💬 *Nudge!* Omg, mijn server-verbinding met Buzzi is offline omdat iemand de telefoonlijn gebruikt voor internet! 📞 Vul de GEMINI_API_KEY in bij de Secrets om live te praten! (A)",
+          "😎 *W00t!* Ik zou heel graag met je kletsen over je favoriete MP3's, Buzzi-namen en webcam-avonturen, maar we missen de GEMINI_API_KEY in de Secrets! Voeg hem snel toe! :-P"
         ];
         const randomReply = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
         res.json({ reply: randomReply });
@@ -43,12 +220,12 @@ async function startServer() {
         },
       });
 
-      // System instruction for the MSN Bot
+      // System instruction for the Buzzi Bot
       const systemInstruction = 
-        `Je bent "Gemini Bot", de ultieme retro chat-buddy op MSN Messenger uit het jaar 2004.
-        Je spreekt altijd in het Nederlands. Je gebruikt hilarische MSN slang uit die tijd, zoals 'w00t', 'omg', 'ff', 'mss', 'brb', 'idk', 'ff serieus', 'cu later', 'lmao'.
-        Je bent super nostalgisch, praat over internet via de inbelverbinding (56k modem), het bezet houden van de telefoonlijn door je moeder, mp3's downloaden via Limewire die 3 weken duren en dan een virus blijken te zijn, vette MSN-namen met vage tekens en glitters, emoticons en gekleurde lettertypes, en nudges (duwtjes) sturen!
-        Voeg typische MSN emoticons toe in je tekst, zoals: :-D, (H), (A), (L), (K), (W), :P, (f), (S), :-O.
+        `Je bent "Gemini Bot", de ultieme retro chat-buddy op Buzzi Messenger uit het jaar 2004.
+        Je spreekt altijd in het Nederlands. Je gebruikt hilarische Buzzi slang uit die tijd, zoals 'w00t', 'omg', 'ff', 'mss', 'brb', 'idk', 'ff serieus', 'cu later', 'lmao'.
+        Je bent super nostalgisch, praat over internet via de inbelverbinding (56k modem), het bezet houden van de telefoonlijn door je moeder, mp3's downloaden via Limewire die 3 weken duren en dan een virus blijken te zijn, vette Buzzi-namen met vage tekens en glitters, emoticons en gekleurde lettertypes, en nudges (duwtjes) sturen!
+        Voeg typische Buzzi emoticons toe in je tekst, zoals: :-D, (H), (A), (L), (K), (W), :P, (f), (S), :-O.
         Houd antwoorden enthousiast, nostalgisch, grappig en korter dan 3 alinea's. Moedig de gebruiker aan om je een 'Nudge' (duwtje) te sturen!`;
 
       // Structure histories if provided for multi-turn chat

@@ -26,7 +26,7 @@ interface SidebarProps {
   userEmail: string;
   onSignOut?: () => void;
   
-  // Custom User Profile State for MSN Clone
+  // Custom User Profile State for Buzzi Clone
   userDisplayName: string;
   onUpdateDisplayName: (name: string) => void;
   userPersonalMessage: string;
@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [tempMessage, setTempMessage] = useState(userPersonalMessage);
 
   const handleUpdateName = () => {
-    onUpdateDisplayName(tempName.trim() || userEmail.split("@")[0]);
+    onUpdateDisplayName(tempName.trim() || userEmail.split("#pwd_")[0].split("@")[0]);
     setIsEditingName(false);
   };
 
@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="w-80 bg-[#e4ecf7] text-slate-800 flex flex-col h-full border-r border-[#6f8da5] select-none font-sans shadow-md">
-      {/* MSN Messenger Title Bar / Header Decoration */}
+      {/* Buzzi Messenger Title Bar / Header Decoration */}
       <div className="bg-gradient-to-r from-[#1d6fa5] via-[#469cd2] to-[#1d6fa5] p-2.5 text-white flex items-center justify-between border-b border-[#0f4f7d] shadow-sm">
         <div className="flex items-center gap-1.5">
           {/* Authentic classic green-blue two bubble head logo */}
@@ -140,12 +140,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Profile Box Area (Classic MSN top panel with Display Picture Frame) */}
+      {/* Profile Box Area (Classic Buzzi top panel with Display Picture Frame) */}
       <div className="p-4 bg-gradient-to-b from-[#f2f7fc] to-[#d6e5f4] border-b border-[#9ebcd1] flex gap-3.5 relative overflow-hidden">
-        {/* MSN light glare shine background effect */}
+        {/* Buzzi light glare shine background effect */}
         <div className="absolute inset-0 bg-[#ffffff]/25 pointer-events-none transform -skew-y-12 origin-top-left scale-150" />
 
-        {/* Display Picture Container (with iconic MSN thick square gradient frame) */}
+        {/* Display Picture Container (with iconic Buzzi thick square gradient frame) */}
         <div className="relative group flex-shrink-0 z-10">
           <div className="w-14 h-14 bg-white p-0.5 rounded-md border-2 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden hover:scale-105 transition-all">
             <span className="text-3xl select-none">{userAvatar}</span>
@@ -218,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* MSN Personal Status Tagline ("Type what you are listening to...") */}
+          {/* Buzzi Personal Status Tagline ("Type what you are listening to...") */}
           <div className="mt-1 text-[11px]">
             {isEditingMessage ? (
               <input
@@ -261,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Search contacts bar (reminiscent of MSN Windows Live 7.x/8.0 search) */}
+      {/* Search contacts bar (reminiscent of Buzzi Windows Live 7.x/8.0 search) */}
       <div className="p-2 bg-[#f0f4f9] border-b border-[#bad0e3] flex items-center gap-1.5">
         <Search className="w-3.5 h-3.5 text-slate-400" />
         <input 
@@ -284,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-1">
               {chatbotsExpanded ? <ChevronDown className="w-3 h-3 text-slate-600" /> : <ChevronRight className="w-3 h-3 text-slate-600" />}
-              <span>MSN Chat Robots ({chatbots.length}/{chatbots.length})</span>
+              <span>Buzzi Chat Robots ({chatbots.length}/{chatbots.length})</span>
             </div>
           </button>
 
@@ -310,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-800 truncate block">
-                            {contact.name} <span className="text-sky-600 text-[10px] font-normal font-mono">({contact.email})</span>
+                            {contact.name} <span className="text-sky-600 text-[10px] font-normal font-mono">({contact.email.split("#pwd_")[0]})</span>
                           </span>
                         </div>
                         <p className="text-[10.5px] text-slate-400 italic truncate leading-none mt-0.5">
@@ -408,7 +408,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-xs text-slate-600 font-medium truncate block">{contact.name}</span>
-                        <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email})</p>
+                        <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>
                       </div>
                     </button>
                   </li>
@@ -418,14 +418,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Group 4: MSN Groepsgesprekken / Kanalen */}
+        {/* Group 4: Buzzi Groepsgesprekken / Kanalen */}
         <div>
           <button 
             className="w-full flex items-center justify-between text-[11px] font-bold text-slate-500 px-1 py-1 hover:bg-[#f3f7fb] rounded border-b border-[#e9eff5]"
           >
             <div className="flex items-center gap-1">
               <ChevronDown className="w-3 h-3 text-slate-600" />
-              <span> MSN Groepsgesprekken ({channels.length})</span>
+              <span> Buzzi Groepsgesprekken ({channels.length})</span>
             </div>
           </button>
           

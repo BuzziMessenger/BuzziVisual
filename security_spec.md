@@ -1,4 +1,4 @@
-# Security Specification for Buzzi Messenger (MSN Clone)
+# Security Specification for Buzzi Messenger (Classic Retro Chat)
 
 ## 1. Data Invariants
 *   Each **User** is identified by their authenticated Firestore UID (`request.auth.uid`). Users can only update their own profile document (`/users/{userId}`).

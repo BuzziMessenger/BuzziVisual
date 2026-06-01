@@ -13,8 +13,8 @@ export interface Message {
   isBuzz?: boolean; // True if it is a Nudge/Duwtje
   isWink?: boolean; // True if a fullscreen Wink
   winkId?: string; // e.g. "pig", "crazy", "water", "guitar", "heart"
-  customFontColor?: string; // MSN custom text color
-  customFontFamily?: string; // MSN custom font
+  customFontColor?: string; // Buzzi custom text color
+  customFontFamily?: string; // Buzzi custom font
 }
 
 export type StatusType = "online" | "bezet" | "afwezig" | "offline";
@@ -26,7 +26,7 @@ export interface Contact {
   avatar: string;
   status: StatusType;
   personalMessage: string;
-  listeningTo?: string; // MSN Music feature: "Nu luistert naar: ..."
+  listeningTo?: string; // Buzzi Music feature: "Nu luistert naar: ..."
 }
 
 export interface Channel {

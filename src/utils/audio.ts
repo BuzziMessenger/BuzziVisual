@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Native synthesizer utilizing browser's Web Audio API for nostalgic early-2000s MSN Messenger sounds
-class MsnAudioSynthesizer {
+// Native synthesizer utilizing browser's Web Audio API for nostalgic early-2000s Buzzi Messenger sounds
+class BuzziAudioSynthesizer {
   private ctx: AudioContext | null = null;
 
   private initCtx() {
@@ -20,7 +20,7 @@ class MsnAudioSynthesizer {
     }
   }
 
-  // Authentic retro MSN notification/message chime: a gorgeous "ba-ding!" bell ring
+  // Authentic retro Buzzi notification/message chime: a gorgeous "ba-ding!" bell ring
   public playHoneyPop() {
     this.playNotification();
   }
@@ -63,11 +63,11 @@ class MsnAudioSynthesizer {
       osc2.start(now + 0.05);
       osc2.stop(now + 0.35);
     } catch (e) {
-      console.warn("MSN notification sound failed:", e);
+      console.warn("Buzzi notification sound failed:", e);
     }
   }
 
-  // MSN Nudge Sound: A mechanical vibration sound mixed with a rapid warning frequency
+  // Buzzi Nudge Sound: A mechanical vibration sound mixed with a rapid warning frequency
   public playWorkerBuzz(duration = 0.6) {
     this.playNudge(duration);
   }
@@ -128,11 +128,11 @@ class MsnAudioSynthesizer {
       lfo.stop(now + duration);
       warningOsc.stop(now + duration);
     } catch (e) {
-      console.warn("MSN nudge sound failed to synthesize:", e);
+      console.warn("Buzzi nudge sound failed to synthesize:", e);
     }
   }
 
-  // Dramatic MSN crown buzz - we can alias to an extra loud Nudge!
+  // Dramatic Buzzi crown buzz - we can alias to an extra loud Nudge!
   public playCrownBuzz() {
     this.playNudge(0.8);
   }
@@ -346,4 +346,4 @@ class MsnAudioSynthesizer {
   }
 }
 
-export const hiveAudio = new MsnAudioSynthesizer();
+export const hiveAudio = new BuzziAudioSynthesizer();
