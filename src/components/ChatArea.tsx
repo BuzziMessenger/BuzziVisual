@@ -50,6 +50,14 @@ const BUZZI_EMOTICONS = [
   { code: "(S)", char: "⭐", name: "Ster" },
   { code: "(Y)", char: "👍", name: "Duim op" },
   { code: "(N)", char: "👎", name: "Duim neer" },
+  { code: ":-O", char: "😲", name: "Verrast" },
+  { code: ";-)", char: "😉", name: "Knipoog" },
+  { code: ":-(", char: "😢", name: "Verdrietig" },
+  { code: "(8)", char: "🎵", name: "Muziek" },
+  { code: "(pl)", char: "🛹", name: "Skateboard" },
+  { code: "(pi)", char: "🍕", name: "Pizza" },
+  { code: "(beer)", char: "🍺", name: "Bier" },
+  { code: "(v)", char: "✌️", name: "Peace" },
 ];
 
 const WINKS_LIST = [
@@ -78,6 +86,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [showWinksPicker, setShowWinksPicker] = useState(false);
   const [activeWink, setActiveWink] = useState<string | null>(null);
+  const lastProcessedWinkId = useRef<string | null>(null);
   
   // Custom font styling for retro Buzzi customization
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
@@ -96,6 +105,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     if (lastMsg && lastMsg.isWink && lastMsg.winkId) {
+      if (lastProcessedWinkId.current === lastMsg.id) {
+        return;
+      }
+      lastProcessedWinkId.current = lastMsg.id;
       setActiveWink(lastMsg.winkId);
 
       // Play matching synth sound
@@ -221,9 +234,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-shrink-0">
-          <div className="bg-white/80 border border-sky-200 rounded px-2.5 py-1 flex items-center gap-1 text-[10px] text-slate-600 font-mono">
-            <Wifi className="w-3 h-3 text-emerald-600 animate-pulse" />
-            <span>56K MODEM</span>
+          <div className="bg-white/80 border border-emerald-200 rounded px-2.5 py-1 flex items-center gap-1 text-[10px] text-emerald-700 font-bold font-mono">
+            <Wifi className="w-3 h-3 text-emerald-600" />
+            <span>BUZZI SECURE DIRECT</span>
           </div>
         </div>
       </div>
@@ -244,19 +257,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="w-px h-4 bg-slate-300 mx-1" />
 
           {/* Letters customization */}
-          <button
-            onClick={() => {
-              const colors = ["#1d5fb0", "#15a13c", "#d11f25", "#ef7c00", "#7d1b8c", "#121212"];
-              const curIdx = colors.indexOf(mmsColor);
-              setMmsColor(colors[(curIdx + 1) % colors.length]);
-              hiveAudio.playHoneyPop();
-            }}
-            className="hover:bg-[#cfe1f5] text-slate-700 p-1.5 rounded cursor-pointer flex items-center gap-1"
-            title="Verander letterkleur"
-          >
-            <Palette className="w-3.5 h-3.5 text-blue-600" />
-            <span className="w-2.5 h-2.5 rounded-full inline-block border border-slate-400" style={{ backgroundColor: mmsColor }} />
-          </button>
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/60 border border-slate-300 rounded-lg shadow-sm">
+            <Palette className="w-3.5 h-3.5 text-slate-500 mr-1" />
+            <div className="flex items-center gap-1">
+              {[
+                { hex: "#121212", name: "Zwart" },
+                { hex: "#1d5fb0", name: "Blauw" },
+                { hex: "#00a8e8", name: "Lichtblauw" },
+                { hex: "#d11f25", name: "Rood" },
+                { hex: "#e5097f", name: "Roze" },
+                { hex: "#15a13c", name: "Groen" },
+                { hex: "#ef7c00", name: "Oranje" },
+                { hex: "#fbc531", name: "Geel" },
+                { hex: "#7d1b8c", name: "Paars" },
+              ].map((c) => (
+                <button
+                  key={c.hex}
+                  onClick={() => {
+                    setMmsColor(c.hex);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer active:scale-90 border flex items-center justify-center ${
+                    mmsColor === c.hex 
+                      ? "border-slate-800 scale-110 shadow-sm ring-1 ring-slate-400" 
+                      : "border-slate-200 hover:scale-105"
+                  }`}
+                  title={c.name}
+                  style={{ backgroundColor: c.hex }}
+                >
+                  {mmsColor === c.hex && (
+                    <span className="w-1 h-1 rounded-full bg-white shadow-xs" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <button
             onClick={() => {
@@ -363,7 +398,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         {/* Column 1: Messaging Feed */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           <div className="text-[10px] text-slate-400 text-center select-none font-sans py-1 border-b border-dashed border-slate-100">
-            Gespreksbeveiliging is actief. Je praat over een 56k inbelverbinding.
+            Gespreksbeveiliging is actief. Je chats worden beveiligd bewaard.
           </div>
 
           <AnimatePresence initial={false}>
@@ -423,7 +458,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
             })}
 
-            {/* Buzzi Ticker indicator "Gemini is typing a message..." */}
+            {/* Buzzi Ticker indicator "Buzzi Bot is typing a message..." */}
             {isTyping && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -749,7 +784,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onKeyDown={handleKeyPress}
               placeholder={
                 activeId === "queen"
-                  ? "Vraag deze retro Gemini Buzzi-bot alles over 2004..."
+                  ? "Vraag deze retro Buzzi-bot alles over 2004..."
                   : `Schrijf een nostalgisch bericht... (typ emoticons zoals :-D of (H))`
               }
               className="w-full bg-stone-50 text-stone-900 border border-slate-300 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d5c8a]/50 focus:border-[#1d5c8a] placeholder-stone-400 font-sans shadow-inner"

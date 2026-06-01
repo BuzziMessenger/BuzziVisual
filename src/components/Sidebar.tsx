@@ -13,7 +13,8 @@ import {
   ChevronDown as DropdownIcon,
   Search,
   MessageSquare,
-  Bot
+  Bot,
+  Trash2
 } from "lucide-react";
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ interface SidebarProps {
   onSelectDM: (contactId: string) => void;
   userEmail: string;
   onSignOut?: () => void;
+  onDeleteContact?: (contactId: string) => void;
   
   // Custom User Profile State for Buzzi Clone
   userDisplayName: string;
@@ -46,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectDM,
   userEmail,
   onSignOut,
+  onDeleteContact,
   userDisplayName,
   onUpdateDisplayName,
   userPersonalMessage,
@@ -65,6 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isEditingMessage, setIsEditingMessage] = useState(false);
   const [tempName, setTempName] = useState(userDisplayName);
   const [tempMessage, setTempMessage] = useState(userPersonalMessage);
+
+  // Live Contact Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleUpdateName = () => {
     onUpdateDisplayName(tempName.trim() || userEmail.split("#pwd_")[0].split("@")[0]);
@@ -110,10 +116,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // Categorize Contacts
-  const chatbots = contacts.filter(c => c.id === "queen"); // Gemini AI Bot
-  const onlineContacts = contacts.filter(c => c.id !== "queen" && c.status !== "offline");
-  const offlineContacts = contacts.filter(c => c.id !== "queen" && c.status === "offline");
+  // Filter and Categorize Contacts based on live search
+  const filteredContacts = contacts.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const chatbots = filteredContacts.filter(c => c.id === "queen"); // Buzzi AI Bot
+  const onlineContacts = filteredContacts.filter(c => c.id !== "queen" && c.status !== "offline");
+  const offlineContacts = filteredContacts.filter(c => c.id !== "queen" && c.status === "offline");
 
   return (
     <div className="w-80 bg-[#e4ecf7] text-slate-800 flex flex-col h-full border-r border-[#6f8da5] select-none font-sans shadow-md">
@@ -255,22 +266,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onSignOut}
               className="mt-1.5 self-start text-[10px] text-[#2c659e] hover:text-red-700 font-bold hover:underline cursor-pointer uppercase tracking-wider flex items-center gap-1"
             >
-              <span>🚪 Afmelden (Sign Out)</span>
+              <span>🚪 Afmelden</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Search contacts bar (reminiscent of Buzzi Windows Live 7.x/8.0 search) */}
-      <div className="p-2 bg-[#f0f4f9] border-b border-[#bad0e3] flex items-center gap-1.5">
+      <div className="p-2 bg-[#f0f4f9] border-b border-[#bad0e3] flex items-center gap-1.5 align-middle justify-start">
         <Search className="w-3.5 h-3.5 text-slate-400" />
         <input 
           type="text"
           placeholder="Zoeken naar contacten..."
-          className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-slate-400"
-          disabled
+          className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-slate-400 select-text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <span className="text-[9px] bg-slate-200 text-slate-500 px-1 py-0.2 rounded">56kb/s</span>
       </div>
 
       {/* Buddy List (Collapsible Groups with Classic Arrows) */}
@@ -346,13 +357,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {onlineContacts.map((contact) => {
                 const isActive = activeType === "dm" && activeId === contact.id;
                 return (
-                  <li key={contact.id}>
+                  <li key={contact.id} className="group/buddy relative flex items-center justify-between hover:bg-[#f0f4f9] rounded transition-all">
                     <button
                       onClick={() => onSelectDM(contact.id)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all text-left relative group ${
+                      className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded text-left ${
                         isActive
                           ? "bg-[#cfe1f5] border border-[#a2bfdb]"
-                          : "hover:bg-[#f0f4f9]"
+                          : ""
                       }`}
                     >
                       <div className="relative">
@@ -373,6 +384,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <Music className="w-3 h-3 text-sky-600 flex-shrink-0" title={`Luistert naar: ${contact.listeningTo}`} />
                       )}
                     </button>
+
+                    {onDeleteContact && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteContact(contact.id);
+                        }}
+                        className="opacity-0 group-hover/buddy:opacity-100 hover:text-red-600 p-1.5 text-slate-400 rounded-md transition-all mr-1 cursor-pointer hover:bg-red-50"
+                        title="Vriend Verwijderen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -397,9 +421,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {offlineContacts.map((contact) => {
                 const isActive = activeType === "dm" && activeId === contact.id;
                 return (
-                  <li key={contact.id}>
+                  <li key={contact.id} className="group/buddy relative flex items-center justify-between hover:bg-[#f9f9F9] rounded text-left opacity-70 hover:opacity-100 transition-all">
                     <button
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left opacity-60 hover:bg-[#f9f9F9]"
+                      className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded text-left"
                       onClick={() => onSelectDM(contact.id)}
                     >
                       <div className="relative">
@@ -411,6 +435,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>
                       </div>
                     </button>
+
+                    {onDeleteContact && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteContact(contact.id);
+                        }}
+                        className="opacity-0 group-hover/buddy:opacity-100 hover:text-red-600 p-1.5 text-slate-400 rounded-md transition-all mr-1 cursor-pointer hover:bg-red-50"
+                        title="Vriend Verwijderen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </li>
                 );
               })}

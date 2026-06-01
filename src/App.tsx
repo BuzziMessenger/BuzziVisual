@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
 import { hiveAudio } from "./utils/audio";
-import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2 } from "lucide-react";
+import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send } from "lucide-react";
 import { LoginScreen } from "./components/LoginScreen";
+import { Minesweeper } from "./components/Minesweeper";
 
 function simpleHash(str: string): string {
   let hash = 0;
@@ -37,8 +38,8 @@ const INITIAL_CHANNELS: Channel[] = [
 const INITIAL_CONTACTS: Contact[] = [
   {
     id: "queen",
-    name: "🤖 Gemini Bot (H)",
-    email: "gemini_bot@live.nl",
+    name: "🤖 Buzzi Bot (H)",
+    email: "buzzi_bot@live.nl",
     avatar: "🤖",
     status: "online",
     personalMessage: "bbrrrr... inbellen gelukt! Vraag me alles over 2004! [ Now listening to: Linkin Park - In The End ]"
@@ -112,9 +113,9 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
     {
       id: "q1",
       senderId: "queen",
-      senderName: "🤖 Gemini Bot (H)",
+      senderName: "🤖 Buzzi Bot (H)",
       senderAvatar: "🤖",
-      text: "🤖 *PING!* W00t! Welkom op mijn Buzzi Messenger-kanaal! Ik ben aangedreven door Gemini AI en spreek vloeiend 2004 Buzzi Messenger-slang! Vraag me over inbelverbindingen, retro-muziek of stuur me een 'Nudge' (duwtje) met de rode knop! :-D",
+      text: "🤖 *PING!* W00t! Welkom op mijn Buzzi Messenger-kanaal! Ik ben aangedreven door Buzzi AI en spreek vloeiend 2004 Buzzi Messenger-slang! Vraag me over inbelverbindingen, retro-muziek of stuur me een 'Nudge' (duwtje) met de rode knop! :-D",
       timestamp: "16:15"
     }
   ],
@@ -178,6 +179,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string>("queen");
   const [activeType, setActiveType] = useState<"channel" | "dm">("dm");
   const [channels] = useState<Channel[]>(INITIAL_CHANNELS);
+  const [mobileActiveTab, setMobileActiveTab] = useState<"sidebar" | "chat" | "tools">("sidebar");
   
   // App-status
   const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
@@ -186,7 +188,7 @@ export default function App() {
 
   // Custom User Profile configuration for Buzzi Clone
   const [userDisplayName, setUserDisplayName] = useState("Robbin (H)");
-  const [userPersonalMessage, setUserPersonalMessage] = useState("Lekker chatten op Buzzi met Gemini! B-)");
+  const [userPersonalMessage, setUserPersonalMessage] = useState("Lekker chatten op Buzzi met Buzzi Bot! B-)");
   const [userStatus, setUserStatus] = useState<StatusType>("online");
   const [userAvatar, setUserAvatar] = useState("🧑‍🚀");
 
@@ -196,6 +198,7 @@ export default function App() {
   const [registeredUsers, setRegisteredUsers] = useState<Contact[]>([]);
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
+  const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
 
   // Buzzi Clone interactive tools state
   const [generatedName, setGeneratedName] = useState("");
@@ -203,40 +206,129 @@ export default function App() {
   const [checkedContact, setCheckedContact] = useState("");
   const [checking, setChecking] = useState(false);
 
-  // Initial user fetch/setup from DB
-  const initUserProfile = async (user: any, preferredName?: string) => {
-    const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "Buzzi Gebruiker";
-    const initialProfile = {
-      uid: user.uid,
-      name: defaultName,
-      email: user.email || "",
-      avatar: "🧑‍🚀",
-      status: "online",
-      personalMessage: "Lekker chatten op Buzzi met Gemini! B-)"
+  // Copy Link State
+  const [copyLinkStatus, setCopyLinkStatus] = useState(false);
+  const handleCopyInviteLink = () => {
+    const shareDomain = "https://v0-buzzi-messenger-0o.vercel.app";
+    const inviteLink = `${shareDomain}/?invitedBy=${encodeURIComponent(userDisplayName)}&inviteEmail=${encodeURIComponent(currentUser?.email || "")}`;
+    navigator.clipboard.writeText(inviteLink);
+    hiveAudio.playNotification();
+    setCopyLinkStatus(true);
+    setTimeout(() => {
+      setCopyLinkStatus(false);
+    }, 2500);
+  };
+
+  // Add Contact Form State
+  const [addName, setAddName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addAvatar, setAddAvatar] = useState("🧑‍🚀");
+  const [addStatus, setAddStatus] = useState<StatusType>("online");
+  const [addQuote, setAddQuote] = useState("Lekker chatten op Buzzi! [B-)]");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addMsg, setAddMsg] = useState("");
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName.trim() || !addEmail.trim()) return;
+
+    setAddLoading(true);
+    setAddMsg("");
+    hiveAudio.playHoneyPop();
+
+    const cleanEmail = addEmail.trim().toLowerCase();
+    const mockUserUid = `u_${simpleHash(cleanEmail)}`;
+
+    const newContactProfile = {
+      uid: mockUserUid,
+      name: addName.trim(),
+      email: cleanEmail,
+      avatar: addAvatar,
+      status: addStatus,
+      personalMessage: addQuote.trim()
     };
 
     try {
-      await fetch("/api/db/users", {
+      const res = await fetch("/api/db/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(initialProfile)
+        body: JSON.stringify(newContactProfile)
       });
-      
+
+      if (!res.ok) {
+        throw new Error("Kon contactpersoon niet opslaan in database");
+      }
+
+      hiveAudio.playNotification();
+      setAddMsg("Vriend succesvol toegevoegd aan de Buzzi-lijst! 🎉");
+      setAddName("");
+      setAddEmail("");
+      setAddAvatar("🧑‍🚀");
+      setAddStatus("online");
+      setAddQuote("Lekker chatten op Buzzi! [B-)]");
+
+      // Trigger immediate reload of list
+      const syncRes = await fetch("/api/db/users");
+      if (syncRes.status === 200) {
+        const list = await syncRes.json();
+        const filtered = list
+          .filter((data: any) => data.uid !== currentUser?.uid)
+          .map((data: any) => ({
+            id: data.uid,
+            name: data.name || "Buzzi Gebruiker",
+            email: data.email || "",
+            avatar: data.avatar || "🧑‍🚀",
+            status: (data.status as StatusType) || "online",
+            personalMessage: data.personalMessage || "",
+          }));
+        setRegisteredUsers(filtered);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setAddMsg("Fout: " + (err.message || "Probeer het later opnieuw"));
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  // Initial user fetch/setup from DB (check-first to avoid race overwrites!)
+  const initUserProfile = async (user: any, preferredName?: string) => {
+    const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "Buzzi Gebruiker";
+
+    try {
       const res = await fetch("/api/db/users");
+      let currentProfile = null;
       if (res.status === 200) {
         const list = await res.json();
-        const currentProfile = list.find((u: any) => u.uid === user.uid);
-        if (currentProfile) {
-          setUserDisplayName(currentProfile.name || defaultName);
-          setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Gemini! B-)");
-          setUserAvatar(currentProfile.avatar || "🧑‍🚀");
-          setUserStatus((currentProfile.status as StatusType) || "online");
-        } else {
-          setUserDisplayName(defaultName);
-          setUserPersonalMessage("Lekker chatten op Buzzi met Gemini! B-)");
-          setUserAvatar("🧑‍🚀");
-          setUserStatus("online");
-        }
+        currentProfile = list.find((u: any) => u.uid === user.uid);
+      }
+
+      if (!currentProfile) {
+        // Only if user profile does not exist do we create and write the initial default profile!
+        const initialProfile = {
+          uid: user.uid,
+          name: defaultName,
+          email: user.email || "",
+          avatar: "🧑‍🚀",
+          status: "online",
+          personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)"
+        };
+        await fetch("/api/db/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(initialProfile)
+        });
+        
+        setUserDisplayName(defaultName);
+        setUserPersonalMessage("Lekker chatten op Buzzi met Buzzi Bot! B-)");
+        setUserAvatar("🧑‍🚀");
+        setUserStatus("online");
+      } else {
+        // Load existing saved profile details securely!
+        setUserDisplayName(currentProfile.name || defaultName);
+        setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)");
+        setUserAvatar(currentProfile.avatar || "🧑‍🚀");
+        setUserStatus((currentProfile.status as StatusType) || "online");
       }
     } catch (err) {
       console.warn("User profile init failed, falling back to state:", err);
@@ -290,6 +382,38 @@ export default function App() {
   }, []);
 
   // Authentication State / Local Session Restorer
+  const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (currentUser) {
+      const savedDeleted = localStorage.getItem("buzzi_deleted_contacts_" + currentUser.uid);
+      if (savedDeleted) {
+        try {
+          setDeletedContactIds(JSON.parse(savedDeleted));
+        } catch (e) {
+          console.warn("Failed to parse saved deleted contacts:", e);
+        }
+      } else {
+        setDeletedContactIds([]);
+      }
+    } else {
+      setDeletedContactIds([]);
+    }
+  }, [currentUser]);
+
+  const handleDeleteContact = (contactId: string) => {
+    if (!currentUser) return;
+    const updated = [...deletedContactIds, contactId];
+    setDeletedContactIds(updated);
+    localStorage.setItem("buzzi_deleted_contacts_" + currentUser.uid, JSON.stringify(updated));
+    
+    hiveAudio.playNotification();
+    if (activeId === contactId) {
+      setActiveId("queen");
+      setActiveType("dm");
+    }
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("buzzi_user");
     if (savedUser) {
@@ -335,11 +459,19 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Combine buddy lists
-  const currentBuddies = [
-    ...INITIAL_CONTACTS,
-    ...registeredUsers
-  ];
+  // Combine buddy lists: if gast@buzzi.nl, show full static initial buddies. If custom email, start fresh with Buzzi Bot and real registered database contacts!
+  const isDemoUser = currentUser?.email === "gast@buzzi.nl";
+  const currentBuddies = (isDemoUser
+    ? [
+        ...INITIAL_CONTACTS,
+        ...registeredUsers.filter(u => !INITIAL_CONTACTS.some(ic => ic.email === u.email))
+      ]
+    : [
+        INITIAL_CONTACTS[0], // Keep Buzzi Bot!
+        ...registeredUsers.filter(u => u.id !== "queen" && u.email !== "buzzi_bot@live.nl" && !INITIAL_CONTACTS.some(ic => ic.id !== "queen" && ic.email === u.email))
+      ]).filter(c => !deletedContactIds.includes(c.id));
+
+  const visibleChannels = isDemoUser ? channels : [];
 
   // Sync Messages with Database / Local Storage (Polling)
   useEffect(() => {
@@ -463,7 +595,7 @@ export default function App() {
 
   const applyGeneratedName = () => {
     if (generatedName) {
-      setUserDisplayName(generatedName);
+      handleUpdateDisplayName(generatedName);
       hiveAudio.playNotification();
     }
   };
@@ -591,7 +723,7 @@ export default function App() {
 
           await writeSimulatedReply(
             `*Stuurt een Wink terug: ${winkNames[randomWink]}*`,
-            "🤖 Gemini Bot (H)",
+            "🤖 Buzzi Bot (H)",
             "🤖",
             "queen",
             { isWink: true, winkId: randomWink }
@@ -609,7 +741,7 @@ export default function App() {
 
           await writeSimulatedReply(
             "🚨 *SHAKE-SHAKESS* Omg!! Je hebt me een nudge gestuurd! Mijn hele computer trilt en mijn speakers knarsen! 😂 Super vet! Wat wil je kletsen? :-D",
-            "🤖 Gemini Bot (H)",
+            "🤖 Buzzi Bot (H)",
             "🤖",
             "queen"
           );
@@ -644,7 +776,7 @@ export default function App() {
 
         await writeSimulatedReply(
           data.reply || "🤖 *static* Oeps... Internetverbinding viel even weg! :-P",
-          "🤖 Gemini Bot (H)",
+          "🤖 Buzzi Bot (H)",
           "🤖",
           "queen"
         );
@@ -654,7 +786,7 @@ export default function App() {
         
         await writeSimulatedReply(
           "🤖 *PING!* Mijn inbelverbinding kraakt een beetje! Zorg dat de juiste GEMINI_API_KEY in je Secrets-instellingen staat om live te praten! brb mss... (A)",
-          "🤖 Gemini Bot (H)",
+          "🤖 Buzzi Bot (H)",
           "🤖",
           "queen"
         );
@@ -749,7 +881,7 @@ export default function App() {
             <span className="w-8 h-8 rounded-full bg-[#00aeef] inline-block border-2 border-white shadow-md"></span>
           </div>
           <div className="text-sm font-bold text-[#1d5c8a]">Buzzi Messenger aan het opstarten...</div>
-          <div className="text-[10px] text-slate-400 font-mono">Maakt verbinding met Buzzi server via modem...</div>
+          <div className="text-[10px] text-slate-400 font-mono">Beveiligde database initialiseren...</div>
         </div>
       </div>
     );
@@ -761,7 +893,7 @@ export default function App() {
 
   return (
     <div 
-      className={`flex h-screen w-screen overflow-hidden bg-slate-100 relative transition-transform duration-100 ${
+      className={`flex h-screen w-screen overflow-hidden bg-slate-100 relative transition-transform duration-100 pb-14 md:pb-0 ${
         isBuzzingFlash ? "bg-red-50 animate-pulse scale-[0.99]" : ""
       }`}
       id="buzzi_workspace"
@@ -772,52 +904,59 @@ export default function App() {
       )}
 
       {/* 1. Sidebar Panel (Authentic Buzzi List) */}
-      <Sidebar
-        channels={channels}
-        contacts={currentBuddies}
-        activeId={activeId}
-        activeType={activeType}
-        onSelectChannel={(cid) => {
-          setActiveId(cid);
-          setActiveType("channel");
-          hiveAudio.playHoneyPop();
-        }}
-        onSelectDM={(cmid) => {
-          setActiveId(cmid);
-          setActiveType("dm");
-          hiveAudio.playHoneyPop();
-        }}
-        userEmail={currentUser.email || "prinsrobbin@gmail.com"}
-        onSignOut={handleSignOut}
-        
-        // Custom interactive profile properties for Buzzi
-        userDisplayName={userDisplayName}
-        onUpdateDisplayName={handleUpdateDisplayName}
-        userPersonalMessage={userPersonalMessage}
-        onUpdatePersonalMessage={handleUpdatePersonalMessage}
-        userStatus={userStatus}
-        onUpdateStatus={handleUpdateStatus}
-        userAvatar={userAvatar}
-        onUpdateAvatar={handleUpdateAvatar}
-      />
+      <div className={`h-full shrink-0 w-full md:w-80 ${mobileActiveTab === "sidebar" ? "flex" : "hidden md:flex"}`}>
+        <Sidebar
+          channels={visibleChannels}
+          contacts={currentBuddies}
+          activeId={activeId}
+          activeType={activeType}
+          onSelectChannel={(cid) => {
+            setActiveId(cid);
+            setActiveType("channel");
+            setMobileActiveTab("chat");
+            hiveAudio.playHoneyPop();
+          }}
+          onSelectDM={(cmid) => {
+            setActiveId(cmid);
+            setActiveType("dm");
+            setMobileActiveTab("chat");
+            hiveAudio.playHoneyPop();
+          }}
+          userEmail={currentUser.email || "prinsrobbin@gmail.com"}
+          onSignOut={handleSignOut}
+          onDeleteContact={handleDeleteContact}
+          
+          // Custom interactive profile properties for Buzzi
+          userDisplayName={userDisplayName}
+          onUpdateDisplayName={handleUpdateDisplayName}
+          userPersonalMessage={userPersonalMessage}
+          onUpdatePersonalMessage={handleUpdatePersonalMessage}
+          userStatus={userStatus}
+          onUpdateStatus={handleUpdateStatus}
+          userAvatar={userAvatar}
+          onUpdateAvatar={handleUpdateAvatar}
+        />
+      </div>
 
       {/* 2. Chat Area Window (Buzzi Conversation box) */}
-      <ChatArea
-        activeId={activeId}
-        activeType={activeType}
-        activeChannel={activeChannel}
-        activeContact={activeContact}
-        messages={messages[activeId] || []}
-        isTyping={isTyping}
-        onSendMessage={handleSendMessage}
-        onBuzzIncoming={handleBuzzIncoming}
-        myDisplayName={userDisplayName}
-        myAvatar={userAvatar}
-        myUserId={currentUser.uid}
-      />
+      <div className={`h-full flex-1 ${mobileActiveTab === "chat" ? "flex" : "hidden md:flex"} flex-col min-w-0`}>
+        <ChatArea
+          activeId={activeId}
+          activeType={activeType}
+          activeChannel={activeChannel}
+          activeContact={activeContact}
+          messages={messages[activeId] || []}
+          isTyping={isTyping}
+          onSendMessage={handleSendMessage}
+          onBuzzIncoming={handleBuzzIncoming}
+          myDisplayName={userDisplayName}
+          myAvatar={userAvatar}
+          myUserId={currentUser.uid}
+        />
+      </div>
 
       {/* 3. Retro Buzzi Side Utility Panel (Instead of HiveStats) */}
-      <div className="w-80 bg-gradient-to-b from-[#eef4fb] to-[#cbdcf0] border-l border-[#9ebcd1] flex flex-col h-full p-4 justify-between select-none overflow-y-auto font-sans">
+      <div className={`h-full w-full md:w-80 ${mobileActiveTab === "tools" ? "flex" : "hidden md:flex"} bg-gradient-to-b from-[#eef4fb] to-[#cbdcf0] border-l border-[#9ebcd1] flex-col p-4 justify-between select-none overflow-y-auto font-sans`}>
         <div className="space-y-4">
           
           {/* Box 1: Buzzi Retro Customizer Tool */}
@@ -903,81 +1042,76 @@ export default function App() {
             )}
           </div>
 
-          {/* Box 4: Database & Verbindingsbeheer (Real-time dynamic control console) */}
-          <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-[#469cd2]"></div>
+          {/* Box 4: Contacten Uitnodigen */}
+          <div className="bg-gradient-to-b from-emerald-50 to-[#edf7e7] border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-[#8cc63f]"></div>
             
-            <h3 className="font-sans font-extrabold text-[#1d5c8a] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
-              <Database className="w-4 h-4 text-sky-600 animate-pulse" />
-              <span>Verbindingen & Database</span>
+            <h3 className="font-sans font-extrabold text-[#235817] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
+              <Share2 className="w-4 h-4 text-[#8cc63f]" />
+              <span>Contacten Uitnodigen 💬</span>
             </h3>
             
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              Beheer de actieve verbindingsmodus van je Buzzi Messenger. We gebruiken een supersnelle <strong>Local File DB</strong> of je eigen <strong>MongoDB database</strong>!
+            <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+              Deel deze retrograde Buzzi Messenger met je vrienden of klasgenoten om direct live samen te kletsen via WhatsApp of Facebook!
             </p>
 
-            <div className="mt-3 space-y-2">
-              {/* Connection Status Row */}
-              <div className="text-[10.5px] border border-slate-100 rounded p-2 bg-[#f8fbfe] space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-bold">Actieve database:</span>
-                  <span className="flex items-center gap-1 font-extrabold">
-                    {activeDbMode === "mongodb" ? (
-                      <span className="text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> MongoDB Atlas
-                      </span>
-                    ) : (
-                      <span className="text-[#1d5c8a] flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-sky-500" /> Local File Storage
-                      </span>
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-bold">Server status:</span>
-                  <span className="font-mono text-[9.5px] text-emerald-700 font-extrabold bg-emerald-50 px-1 border border-emerald-200 rounded">
-                    Volledig operationeel 🚀
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-bold">MongoDB status:</span>
-                  <span className={`font-mono text-[9.5px] ${dbStatus?.mongodb?.connected ? 'text-emerald-600 font-extrabold border border-emerald-300 px-1 rounded bg-emerald-50/50' : 'text-slate-400 font-medium'}`}>
-                    {dbStatus?.mongodb?.connected ? 'Gekoppeld! 🎉' : 'Geen URI (Lokaal actief)'}
-                  </span>
+            <div className="mt-4 space-y-3">
+              {/* Unieke link copy field */}
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wide block">Jouw unieke uitnodigingslink:</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`}
+                    className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
+                  />
+                  <button
+                    onClick={handleCopyInviteLink}
+                    className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10.5px] px-2.5 py-1.5 rounded font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                    <span>{copyLinkStatus ? "Gekopieerd! ✓" : "Kopieer 🔗"}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Explanatory instruction list for setup */}
-              <div className="bg-slate-50 border border-slate-200/50 rounded p-2.5 text-[10px] text-slate-600 leading-normal space-y-2 max-h-48 overflow-y-auto">
-                <div className="font-extrabold text-[#1d5c8a] flex items-center gap-1 mb-1 border-b border-slate-200/40 pb-1">
-                  <span>💡 Database Instellen Handleiding</span>
-                </div>
-                
-                {/* MongoDB instruction */}
-                <div className="space-y-1">
-                  <div className="font-bold text-emerald-850 text-[10px]">🍃 Liever MongoDB gebruiken?</div>
-                  <p className="text-[10px] text-slate-500 leading-snug">
-                    Omdat je MongoDB fijner vindt, bewaart de Express-server chats direct in je MongoDB-database! Sla de URI op in de Secrets als:
-                  </p>
-                  <div className="bg-stone-100 p-1.5 rounded font-mono text-[9.5px] text-stone-700 break-all select-all leading-tight border border-stone-200/60">
-                    MONGODB_URI="mongodb+srv://..."
-                  </div>
-                  <p className="text-[9px] text-slate-400 font-medium italic mt-1">
-                    * Zonder URI slaat de server de chats automatisch op in jouw lokale data bestanden. Firebase is volledig verwijderd! 😊
-                  </p>
-                </div>
+              {/* Direct share platforms */}
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => hiveAudio.playNotification()}
+                  className="bg-[#25D366] hover:bg-[#20ba59] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#1ca34e] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                >
+                  <Send className="w-3.5 h-3.5 fill-current" />
+                  <span>WhatsApp 🟢</span>
+                </a>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                    `https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => hiveAudio.playNotification()}
+                  className="bg-[#1877F2] hover:bg-[#1465cf] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#0e5bc5] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                >
+                  <span>👥 Facebook 🔵</span>
+                </a>
               </div>
 
-              {/* Force status check button */}
-              <button
-                onClick={checkDbStatus}
-                className="w-full bg-[#f0f4f9] hover:bg-sky-100 text-[#1d5c8a] border border-slate-200 text-[10px] font-extrabold py-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              <a
+                href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
+                  `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
+                )}`}
+                onClick={() => hiveAudio.playNotification()}
+                className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
               >
-                <RefreshCw className="w-3 h-3 text-sky-600 animate-spin duration-3000" />
-                <span>Database Verbindingen Verversen</span>
-              </button>
+                <span>✉️ Uitnodigen via E-mail</span>
+              </a>
             </div>
           </div>
 
@@ -994,13 +1128,13 @@ export default function App() {
               </p>
               <button
                 onClick={() => {
-                  hiveAudio.playCrownBuzz();
-                  alert("🎮 BUZZI GAMES: Deze service is tijdelijk niet beschikbaar op het 56k modem wegens downloadsnelheid limieten! Vraag Gemini Bot in de chat om een spel te spelen! :-D");
+                  hiveAudio.playNotification();
+                  setIsMinesweeperOpen(true);
                 }}
-                className="w-full bg-[#8cc63f] hover:bg-[#a6d854] text-stone-950 text-xs font-extrabold py-1.5 rounded shadow cursor-pointer flex items-center justify-center gap-1 transition-all"
+                className="w-full bg-[#8cc63f] hover:bg-[#a6d854] text-stone-950 text-xs font-black py-2 rounded-xl shadow border-2 border-[#5c8229] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
               >
                 <Play className="w-3 h-3 fill-stone-950" />
-                <span>Mijnenveger Spelen !</span>
+                <span>Mijnenveger Spelen ! 💣</span>
               </button>
             </div>
           </div>
@@ -1016,6 +1150,56 @@ export default function App() {
         </div>
 
       </div>
+
+      {/* Sticky Bottom Navigation Bar for Mobile viewports */}
+      <div className="absolute bottom-0 left-0 right-0 h-14 bg-[#1d6fa5] border-t border-[#0f4f7d] flex items-center justify-around md:hidden z-40 px-2 shadow-lg select-none">
+        <button
+          type="button"
+          onClick={() => {
+            setMobileActiveTab("sidebar");
+            hiveAudio.playHoneyPop();
+          }}
+          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all h-full ${
+            mobileActiveTab === "sidebar" ? "bg-white/10 text-white font-extrabold" : "text-sky-100/70 hover:text-white"
+          }`}
+        >
+          <span className="text-base text-white">👥</span>
+          <span className="text-[9px] uppercase font-bold tracking-wider mt-0.5">Vrienden</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMobileActiveTab("chat");
+            hiveAudio.playHoneyPop();
+          }}
+          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all h-full relative ${
+            mobileActiveTab === "chat" ? "bg-white/10 text-white font-extrabold" : "text-sky-100/70 hover:text-white"
+          }`}
+        >
+          <span className="text-base text-white">💬</span>
+          <span className="text-[9px] uppercase font-bold tracking-wider mt-0.5">Gesprek</span>
+          <span className="absolute top-2.5 right-6 w-2 h-2 rounded-full bg-emerald-400 pointer-events-none" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMobileActiveTab("tools");
+            hiveAudio.playHoneyPop();
+          }}
+          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all h-full ${
+            mobileActiveTab === "tools" ? "bg-white/10 text-white font-extrabold" : "text-sky-100/70 hover:text-white"
+          }`}
+        >
+          <span className="text-base text-white">✨</span>
+          <span className="text-[9px] uppercase font-bold tracking-wider mt-0.5">Extra's</span>
+        </button>
+      </div>
+
+      {isMinesweeperOpen && (
+        <Minesweeper onClose={() => setIsMinesweeperOpen(false)} />
+      )}
     </div>
   );
 }

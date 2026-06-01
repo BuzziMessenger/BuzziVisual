@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -31,19 +32,32 @@ function writeJsonFile<T>(filePath: string, data: T): void {
 
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
+let lastConnectAttempt = 0;
+let connectFailed = false;
 
 async function getMongoDb(): Promise<Db | null> {
   const uri = process.env.MONGODB_URI;
   if (!uri) return null;
   if (mongoDb) return mongoDb;
+  
+  if (connectFailed && Date.now() - lastConnectAttempt < 20000) {
+    return null;
+  }
+  
   try {
-    mongoClient = new MongoClient(uri);
+    lastConnectAttempt = Date.now();
+    mongoClient = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 2000,
+      connectTimeoutMS: 2000
+    });
     await mongoClient.connect();
     mongoDb = mongoClient.db("buzzi");
     console.log("Successfully connected to MongoDB Atlas!");
+    connectFailed = false;
     return mongoDb;
   } catch (err) {
-    console.warn("MongoDB connection failed:", err);
+    console.warn("MongoDB connection failed, falling back to local JSON files instantly:", err);
+    connectFailed = true;
     return null;
   }
 }
@@ -85,12 +99,16 @@ async function startServer() {
     try {
       const dbInstance = await getMongoDb();
       if (dbInstance) {
-        const messages = await dbInstance.collection("messages").find({}).sort({ createdAtTimestamp: 1 }).toArray();
-        res.json(messages);
-      } else {
-        const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
-        res.json(messages);
+        try {
+          const messages = await dbInstance.collection("messages").find({}).sort({ createdAtTimestamp: 1 }).toArray();
+          res.json(messages);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB messages query failed, falling back to local storage:", mongoErr);
+        }
       }
+      const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
+      res.json(messages);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -111,13 +129,21 @@ async function startServer() {
         createdAtTimestamp: Date.now()
       };
 
+      let savedOk = false;
       if (dbInstance) {
-        await dbInstance.collection("messages").replaceOne(
-          { id: message.id },
-          docToInsert,
-          { upsert: true }
-        );
-      } else {
+        try {
+          await dbInstance.collection("messages").replaceOne(
+            { id: message.id },
+            docToInsert,
+            { upsert: true }
+          );
+          savedOk = true;
+        } catch (mongoErr) {
+          console.warn("MongoDB message save failed, falling back to local storage:", mongoErr);
+        }
+      }
+
+      if (!savedOk) {
         const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
         const idx = messages.findIndex(m => m.id === message.id);
         if (idx >= 0) {
@@ -138,12 +164,16 @@ async function startServer() {
     try {
       const dbInstance = await getMongoDb();
       if (dbInstance) {
-        const users = await dbInstance.collection("users").find({}).toArray();
-        res.json(users);
-      } else {
-        const users = readJsonFile<any[]>(USERS_FILE, []);
-        res.json(users);
+        try {
+          const users = await dbInstance.collection("users").find({}).toArray();
+          res.json(users);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB users query failed, falling back to local storage:", mongoErr);
+        }
       }
+      const users = readJsonFile<any[]>(USERS_FILE, []);
+      res.json(users);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -164,13 +194,21 @@ async function startServer() {
         updatedAtTimestamp: Date.now()
       };
 
+      let savedOk = false;
       if (dbInstance) {
-        await dbInstance.collection("users").updateOne(
-          { uid: userData.uid },
-          { $set: docToInsert },
-          { upsert: true }
-        );
-      } else {
+        try {
+          await dbInstance.collection("users").updateOne(
+            { uid: userData.uid },
+            { $set: docToInsert },
+            { upsert: true }
+          );
+          savedOk = true;
+        } catch (mongoErr) {
+          console.warn("MongoDB save user failed, falling back to local storage:", mongoErr);
+        }
+      }
+
+      if (!savedOk) {
         const users = readJsonFile<any[]>(USERS_FILE, []);
         const idx = users.findIndex(u => u.uid === userData.uid);
         if (idx >= 0) {
@@ -222,7 +260,7 @@ async function startServer() {
 
       // System instruction for the Buzzi Bot
       const systemInstruction = 
-        `Je bent "Gemini Bot", de ultieme retro chat-buddy op Buzzi Messenger uit het jaar 2004.
+        `Je bent "Buzzi Bot", de ultieme retro chat-buddy op Buzzi Messenger uit het jaar 2004.
         Je spreekt altijd in het Nederlands. Je gebruikt hilarische Buzzi slang uit die tijd, zoals 'w00t', 'omg', 'ff', 'mss', 'brb', 'idk', 'ff serieus', 'cu later', 'lmao'.
         Je bent super nostalgisch, praat over internet via de inbelverbinding (56k modem), het bezet houden van de telefoonlijn door je moeder, mp3's downloaden via Limewire die 3 weken duren en dan een virus blijken te zijn, vette Buzzi-namen met vage tekens en glitters, emoticons en gekleurde lettertypes, en nudges (duwtjes) sturen!
         Voeg typische Buzzi emoticons toe in je tekst, zoals: :-D, (H), (A), (L), (K), (W), :P, (f), (S), :-O.
