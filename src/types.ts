@@ -1,0 +1,35 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  timestamp: string;
+  isBuzz?: boolean; // True if it is a Nudge/Duwtje
+  customFontColor?: string; // MSN custom text color
+  customFontFamily?: string; // MSN custom font
+}
+
+export type StatusType = "online" | "bezet" | "afwezig" | "offline";
+
+export interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  status: StatusType;
+  personalMessage: string;
+  listeningTo?: string; // MSN Music feature: "Nu luistert naar: ..."
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  description: string;
+  unreadCount?: number;
+}
