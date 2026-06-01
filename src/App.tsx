@@ -3,12 +3,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
 import { hiveAudio } from "./utils/audio";
 import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play } from "lucide-react";
+
+// Firebase imports
+import { 
+  onAuthStateChanged, 
+  signOut, 
+  User 
+} from "firebase/auth";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  addDoc, 
+  serverTimestamp, 
+  onSnapshot, 
+  query, 
+  orderBy 
+} from "firebase/firestore";
+import { auth, db, handleFirestoreError, OperationType } from "./utils/firebase";
+import { LoginScreen } from "./components/LoginScreen";
 
 const INITIAL_CHANNELS: Channel[] = [
   {
@@ -167,7 +187,6 @@ export default function App() {
   const [activeId, setActiveId] = useState<string>("queen");
   const [activeType, setActiveType] = useState<"channel" | "dm">("dm");
   const [channels] = useState<Channel[]>(INITIAL_CHANNELS);
-  const [contacts] = useState<Contact[]>(INITIAL_CONTACTS);
   
   // App-status
   const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
@@ -180,11 +199,200 @@ export default function App() {
   const [userStatus, setUserStatus] = useState<StatusType>("online");
   const [userAvatar, setUserAvatar] = useState("🧑‍🚀");
 
+  // Firebase Auth states
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [registeredUsers, setRegisteredUsers] = useState<Contact[]>([]);
+
   // MSN Clone interactive tools state
   const [generatedName, setGeneratedName] = useState("");
   const [checkResult, setCheckResult] = useState<string | null>(null);
   const [checkedContact, setCheckedContact] = useState("");
   const [checking, setChecking] = useState(false);
+
+  // Initial user fetch/setup from DB
+  const initUserProfile = async (user: User, preferredName?: string) => {
+    const userRef = doc(db, "users", user.uid);
+    try {
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserDisplayName(data.name || preferredName || user.displayName || user.email?.split("@")[0] || "MSN Gebruiker");
+        setUserPersonalMessage(data.personalMessage || "Lekker MSN'en met Gemini! B-)");
+        setUserAvatar(data.avatar || "🧑‍🚀");
+        setUserStatus((data.status as StatusType) || "online");
+      } else {
+        const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "MSN Gebruiker";
+        const initialProfile = {
+          uid: user.uid,
+          name: defaultName,
+          email: user.email || "",
+          avatar: "🧑‍🚀",
+          status: "online",
+          personalMessage: "Lekker MSN'en met Gemini! B-)",
+          updatedAt: serverTimestamp()
+        };
+        await setDoc(userRef, initialProfile);
+        setUserDisplayName(defaultName);
+        setUserPersonalMessage(initialProfile.personalMessage);
+        setUserAvatar(initialProfile.avatar);
+        setUserStatus("online");
+      }
+    } catch (err) {
+      console.error("Init User Profile failed", err);
+    }
+  };
+
+  // Sync profile edits to Firestore database
+  const updateProfileInFirestore = async (fields: Partial<any>) => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    try {
+      await setDoc(userRef, {
+        ...fields,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error("Sync profile to database failed", err);
+    }
+  };
+
+  // Authentication State Subscriber
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        await initUserProfile(user);
+      }
+      setAuthInitialized(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to other registered users in real-time
+  useEffect(() => {
+    if (!currentUser) return;
+    const usersRef = collection(db, "users");
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+      const list: Contact[] = [];
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.uid !== currentUser.uid) {
+          list.push({
+            id: data.uid,
+            name: data.name || "MSN Gebruiker",
+            email: data.email || "",
+            avatar: data.avatar || "🧑‍🚀",
+            status: (data.status as StatusType) || "online",
+            personalMessage: data.personalMessage || "",
+          });
+        }
+      });
+      setRegisteredUsers(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "users");
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Combine buddy lists
+  const currentBuddies = [
+    ...INITIAL_CONTACTS,
+    ...registeredUsers
+  ];
+
+  // Listen to Messages in Firestore in real-time
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const msgsQuery = query(
+      collection(db, "messages"),
+      orderBy("createdAt", "asc")
+    );
+    
+    const unsubscribe = onSnapshot(msgsQuery, (snapshot) => {
+      const freshMessages: Record<string, Message[]> = {
+        "mensen-van-toen": [],
+        "breezer-groep": [],
+        "queen": [],
+        "wouter": [],
+        "kelly": [],
+        "danny": [],
+        "sanne": []
+      };
+
+      snapshot.docs.forEach((snapDoc) => {
+        const data = snapDoc.data();
+        const recId = data.receiverId;
+        if (!freshMessages[recId]) {
+          freshMessages[recId] = [];
+        }
+        freshMessages[recId].push({
+          id: snapDoc.id,
+          senderId: data.senderId,
+          senderName: data.senderName,
+          senderAvatar: data.senderAvatar,
+          text: data.text,
+          timestamp: data.timestamp,
+          isBuzz: data.isBuzz || false,
+          isWink: data.isWink || false,
+          winkId: data.winkId
+        });
+      });
+
+      const merged: Record<string, Message[]> = {};
+      const keys = Array.from(new Set([
+        ...Object.keys(INITIAL_MESSAGES),
+        ...Object.keys(freshMessages)
+      ]));
+
+      keys.forEach(k => {
+        const dbMsgs = freshMessages[k] || [];
+        if (dbMsgs.length === 0 && INITIAL_MESSAGES[k]) {
+          merged[k] = INITIAL_MESSAGES[k];
+        } else {
+          merged[k] = dbMsgs;
+        }
+      });
+
+      setMessages(merged);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "messages");
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Sync methods
+  const handleUpdateDisplayName = (val: string) => {
+    setUserDisplayName(val);
+    updateProfileInFirestore({ name: val });
+  };
+  const handleUpdatePersonalMessage = (val: string) => {
+    setUserPersonalMessage(val);
+    updateProfileInFirestore({ personalMessage: val });
+  };
+  const handleUpdateStatus = (val: StatusType) => {
+    setUserStatus(val);
+    updateProfileInFirestore({ status: val });
+  };
+  const handleUpdateAvatar = (val: string) => {
+    setUserAvatar(val);
+    updateProfileInFirestore({ avatar: val });
+  };
+
+  const handleSignOut = async () => {
+    hiveAudio.playHoneyPop();
+    await signOut(auth);
+    setCurrentUser(null);
+  };
+
+  const handleLoginSuccess = async (name: string, email: string) => {
+    const user = auth.currentUser;
+    if (user) {
+      await initUserProfile(user, name);
+    }
+  };
 
   // Sound and Visual screen shake triggers
   const handleBuzzIncoming = () => {
@@ -229,35 +437,71 @@ export default function App() {
     }, 1500);
   };
 
+  const saveMessageToFirestore = async (msg: Partial<Message>) => {
+    if (!currentUser) return;
+    const msgId = `m-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const msgDoc = {
+      id: msgId,
+      senderId: msg.senderId || currentUser.uid,
+      senderName: msg.senderName || userDisplayName,
+      senderAvatar: msg.senderAvatar || userAvatar,
+      text: msg.text || "",
+      timestamp: msg.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isBuzz: msg.isBuzz || false,
+      isWink: msg.isWink || false,
+      winkId: msg.winkId || "",
+      receiverId: activeId,
+      createdAt: serverTimestamp()
+    };
+    try {
+      const messagesRef = collection(db, "messages");
+      await setDoc(doc(messagesRef, msgId), msgDoc);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `messages/${msgId}`);
+    }
+  };
+
+  const writeSimulatedReply = async (simText: string, simName: string, simAvatar: string, simId: string, additional: Partial<Message> = {}) => {
+    if (!currentUser) return;
+    const msgId = `m-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const msgDoc = {
+      id: msgId,
+      senderId: currentUser.uid, // Required by security rules validation
+      senderName: simName,
+      senderAvatar: simAvatar,
+      text: simText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isBuzz: additional.isBuzz || false,
+      isWink: additional.isWink || false,
+      winkId: additional.winkId || "",
+      receiverId: activeId,
+      createdAt: serverTimestamp()
+    };
+    try {
+      await setDoc(doc(collection(db, "messages"), msgId), msgDoc);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `messages/${msgId}`);
+    }
+  };
+
   // Sending a message
   const handleSendMessage = async (text: string, isBuzz: boolean = false, isWink: boolean = false, winkId?: string) => {
-    const newMessage: Message = {
-      id: `m-${Date.now()}`,
-      senderId: "me",
-      senderName: userDisplayName,
-      senderAvatar: userAvatar,
+    if (!currentUser) return;
+
+    // Save to Firestore first
+    await saveMessageToFirestore({
       text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isBuzz: isBuzz,
       isWink: isWink,
       winkId: winkId
-    };
+    });
 
-    // Append user message immediately
-    const updatedChamberMsgs = [...(messages[activeId] || []), newMessage];
-    setMessages(prev => ({
-      ...prev,
-      [activeId]: updatedChamberMsgs
-    }));
-
-    // If it's a DM to the Gemini AI Bot
     const isConversingWithAI = activeId === "queen";
 
     if (isConversingWithAI) {
-      // If it's a Wink!
       if (isWink) {
         setIsTyping(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setIsTyping(false);
           const winksPool = ["pig", "crazy", "water", "guitar", "heart"];
           const randomWink = winksPool[Math.floor(Math.random() * winksPool.length)];
@@ -269,46 +513,30 @@ export default function App() {
             heart: "Hartjes Explosie 💖"
           };
 
-          const winkReply: Message = {
-            id: `mq-${Date.now()}`,
-            senderId: "queen",
-            senderName: "🤖 Gemini Bot (H)",
-            senderAvatar: "🤖",
-            text: `*Stuurt een Wink terug: ${winkNames[randomWink]}*`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isWink: true,
-            winkId: randomWink
-          };
-
-          setMessages(prev => ({
-            ...prev,
-            [activeId]: [...(prev[activeId] || []), winkReply]
-          }));
+          await writeSimulatedReply(
+            `*Stuurt een Wink terug: ${winkNames[randomWink]}*`,
+            "🤖 Gemini Bot (H)",
+            "🤖",
+            "queen",
+            { isWink: true, winkId: randomWink }
+          );
         }, 1500);
         return;
       }
 
-      // If it's a nudge, have Gemini react appropriately!
       if (isBuzz) {
         setIsTyping(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setIsTyping(false);
           hiveAudio.playNudge();
           handleBuzzIncoming();
 
-          const nudgeReply: Message = {
-            id: `mq-${Date.now()}`,
-            senderId: "queen",
-            senderName: "🤖 Gemini Bot (H)",
-            senderAvatar: "🤖",
-            text: "🚨 *SHAKE-SHAKESS* Omg!! Je hebt me een nudge gestuurd! Mijn hele computer trilt en mijn speakers knarsen! 😂 Super vet! Wat wil je kletsen? :-D",
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-
-          setMessages(prev => ({
-            ...prev,
-            [activeId]: [...(prev[activeId] || []), nudgeReply]
-          }));
+          await writeSimulatedReply(
+            "🚨 *SHAKE-SHAKESS* Omg!! Je hebt me een nudge gestuurd! Mijn hele computer trilt en mijn speakers knarsen! 😂 Super vet! Wat wil je kletsen? :-D",
+            "🤖 Gemini Bot (H)",
+            "🤖",
+            "queen"
+          );
         }, 1200);
         return;
       }
@@ -316,9 +544,9 @@ export default function App() {
       setIsTyping(true);
 
       try {
-        // Map current message thread for API history to support conversation context
-        const threadHistory = updatedChamberMsgs.map(msg => ({
-          role: msg.senderId === "me" ? "user" : "model",
+        const conversations = messages[activeId] || [];
+        const threadHistory = conversations.map(msg => ({
+          role: msg.senderName === userDisplayName ? "user" : "model",
           text: msg.text
         }));
 
@@ -329,113 +557,77 @@ export default function App() {
           },
           body: JSON.stringify({
             message: text,
-            history: threadHistory.slice(-10) // Limit context to last 10 turns
+            history: threadHistory.slice(-10)
           })
         });
 
         const data = await response.json();
         setIsTyping(false);
 
-        // Play incoming retro message chime
         hiveAudio.playNotification();
 
-        const aiReply: Message = {
-          id: `mq-${Date.now()}`,
-          senderId: "queen",
-          senderName: "🤖 Gemini Bot (H)",
-          senderAvatar: "🤖",
-          text: data.reply || "🤖 *static* Oeps... Internetverbinding viel even weg! :-P",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages(prev => ({
-          ...prev,
-          [activeId]: [...(prev[activeId] || []), aiReply]
-        }));
+        await writeSimulatedReply(
+          data.reply || "🤖 *static* Oeps... Internetverbinding viel even weg! :-P",
+          "🤖 Gemini Bot (H)",
+          "🤖",
+          "queen"
+        );
       } catch (err) {
         console.error("AI Chat Failure:", err);
         setIsTyping(false);
         
-        // Add offline-fallback msg gracefully
-        const errorReply: Message = {
-          id: `mq-${Date.now()}`,
-          senderId: "queen",
-          senderName: "🤖 Gemini Bot (H)",
-          senderAvatar: "🤖",
-          text: "🤖 *PING!* Mijn inbelverbinding kraakt een beetje! Zorg dat de juiste GEMINI_API_KEY in je Secrets-instellingen staat om live te praten! brb mss... (A)",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setMessages(prev => ({
-          ...prev,
-          [activeId]: [...(prev[activeId] || []), errorReply]
-        }));
+        await writeSimulatedReply(
+          "🤖 *PING!* Mijn inbelverbinding kraakt een beetje! Zorg dat de juiste GEMINI_API_KEY in je Secrets-instellingen staat om live te praten! brb mss... (A)",
+          "🤖 Gemini Bot (H)",
+          "🤖",
+          "queen"
+        );
       }
     } else {
-      // Simulate reply from other classmates to make channels alive
       if (isWink) {
         setIsTyping(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setIsTyping(false);
-          const friendName = contacts.find(c => c.id === activeId)?.name || "Vriend";
-          const friendAvatar = contacts.find(c => c.id === activeId)?.avatar || "🐝";
+          const friendName = currentBuddies.find(c => c.id === activeId)?.name || "Vriend";
+          const friendAvatar = currentBuddies.find(c => c.id === activeId)?.avatar || "🐝";
           
           const winksPool = ["pig", "crazy", "water", "guitar", "heart"];
           const randomWink = winksPool[Math.floor(Math.random() * winksPool.length)];
-          const winkNames: Record<string, string> = {
-            pig: "Knipogend Varken 🐷",
-            crazy: "Gekke Lachebek 🤪",
-            water: "Waterballon 🎈",
-            guitar: "Luchtgitaar 🎸",
-            heart: "Hartjes Explosie 💖"
-          };
 
-          const winkReply: Message = {
-            id: `mt-${Date.now()}`,
-            senderId: activeId,
-            senderName: friendName,
-            senderAvatar: friendAvatar,
-            text: `Ooooh een Wink! 😍 Check deze retro animatie van mij:`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isWink: true,
-            winkId: randomWink
-          };
-
-          setMessages(prev => ({
-            ...prev,
-            [activeId]: [...(prev[activeId] || []), winkReply]
-          }));
+          await writeSimulatedReply(
+            "Ooooh een Wink! 😍 Check deze retro animatie van mij:",
+            friendName,
+            friendAvatar,
+            activeId,
+            { isWink: true, winkId: randomWink }
+          );
         }, 1600);
         return;
       }
 
       if (isBuzz) {
-        // If classmate gets nudge, they will nudge back or complain!
         setIsTyping(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setIsTyping(false);
           hiveAudio.playNudge();
           handleBuzzIncoming();
 
-          const nudgeComplaint: Message = {
-            id: `mt-${Date.now()}`,
-            senderId: activeId,
-            senderName: contacts.find(c => c.id === activeId)?.name || "Vriend",
-            senderAvatar: contacts.find(c => c.id === activeId)?.avatar || "🐝",
-            text: "omg!! Stop met die rot irritante nudges sturen!! Mijn boxen trillen helemaal kapot hier en mn hele kamerscherm rammelt!! 😂 Here is one back: *NUDGE TRILT*",
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
+          const friendName = currentBuddies.find(c => c.id === activeId)?.name || "Vriend";
+          const friendAvatar = currentBuddies.find(c => c.id === activeId)?.avatar || "🐝";
 
-          setMessages(prev => ({
-            ...prev,
-            [activeId]: [...(prev[activeId] || []), nudgeComplaint]
-          }));
+          await writeSimulatedReply(
+            "omg!! Stop met die rot irritante nudges sturen!! Mijn boxen trillen helemaal kapot hier en mn hele kamerscherm rammelt!! 😂 Here is one back: *NUDGE TRILT*",
+            friendName,
+            friendAvatar,
+            activeId
+          );
         }, 1200);
         return;
       }
 
       setIsTyping(true);
       const activeContactId = activeId;
-      setTimeout(() => {
+      setTimeout(async () => {
         setIsTyping(false);
         hiveAudio.playNotification();
 
@@ -444,10 +636,9 @@ export default function App() {
         let phrase = "Haha, vet cool! brb mss!";
 
         if (activeType === "channel") {
-          // Channel answer pool
           const pool = ["wouter", "kelly", "danny"];
           const randomCo = pool[Math.floor(Math.random() * pool.length)];
-          const matchingContact = contacts.find(c => c.id === randomCo);
+          const matchingContact = currentBuddies.find(c => c.id === randomCo);
           if (matchingContact) {
             senderName = matchingContact.name;
             senderAvatar = matchingContact.avatar;
@@ -455,8 +646,7 @@ export default function App() {
             phrase = replies[Math.floor(Math.random() * replies.length)];
           }
         } else {
-          // Direct message answer
-          const matchingContact = contacts.find(c => c.id === activeContactId);
+          const matchingContact = currentBuddies.find(c => c.id === activeContactId);
           if (matchingContact) {
             senderName = matchingContact.name;
             senderAvatar = matchingContact.avatar;
@@ -465,25 +655,33 @@ export default function App() {
           }
         }
 
-        const teammateReply: Message = {
-          id: `mt-${Date.now()}`,
-          senderId: activeContactId,
-          senderName: senderName,
-          senderAvatar: senderAvatar,
-          text: phrase,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages(prev => ({
-          ...prev,
-          [activeId]: [...(prev[activeId] || []), teammateReply]
-        }));
+        await writeSimulatedReply(phrase, senderName, senderAvatar, activeContactId);
       }, 1100 + Math.random() * 800);
     }
   };
 
   const activeChannel = channels.find(c => c.id === activeId);
-  const activeContact = contacts.find(c => c.id === activeId);
+  const activeContact = currentBuddies.find(c => c.id === activeId);
+
+  // Authentication & session routing
+  if (!authInitialized) {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[#e4ecf7] items-center justify-center font-sans select-none" id="msn_loader">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex -space-x-2 items-center justify-center animate-bounce">
+            <span className="w-8 h-8 rounded-full bg-[#8cc63f] inline-block border-2 border-white shadow-md"></span>
+            <span className="w-8 h-8 rounded-full bg-[#00aeef] inline-block border-2 border-white shadow-md"></span>
+          </div>
+          <div className="text-sm font-bold text-[#1d5c8a]">Buzzi Messenger aan het opstarten...</div>
+          <div className="text-[10px] text-slate-400 font-mono">Maakt verbinding met MSN server via modem...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div 
@@ -500,7 +698,7 @@ export default function App() {
       {/* 1. Sidebar Panel (Authentic MSN List) */}
       <Sidebar
         channels={channels}
-        contacts={contacts}
+        contacts={currentBuddies}
         activeId={activeId}
         activeType={activeType}
         onSelectChannel={(cid) => {
@@ -513,17 +711,18 @@ export default function App() {
           setActiveType("dm");
           hiveAudio.playHoneyPop();
         }}
-        userEmail="prinsrobbin@gmail.com"
+        userEmail={currentUser.email || "prinsrobbin@gmail.com"}
+        onSignOut={handleSignOut}
         
         // Custom interactive profile properties for MSN
         userDisplayName={userDisplayName}
-        onUpdateDisplayName={setUserDisplayName}
+        onUpdateDisplayName={handleUpdateDisplayName}
         userPersonalMessage={userPersonalMessage}
-        onUpdatePersonalMessage={setUserPersonalMessage}
+        onUpdatePersonalMessage={handleUpdatePersonalMessage}
         userStatus={userStatus}
-        onUpdateStatus={setUserStatus}
+        onUpdateStatus={handleUpdateStatus}
         userAvatar={userAvatar}
-        onUpdateAvatar={setUserAvatar}
+        onUpdateAvatar={handleUpdateAvatar}
       />
 
       {/* 2. Chat Area Window (MSN Conversation box) */}
@@ -538,6 +737,7 @@ export default function App() {
         onBuzzIncoming={handleBuzzIncoming}
         myDisplayName={userDisplayName}
         myAvatar={userAvatar}
+        myUserId={currentUser.uid}
       />
 
       {/* 3. Retro MSN Side Utility Panel (Instead of HiveStats) */}
@@ -596,7 +796,7 @@ export default function App() {
             <div className="mt-3.5 space-y-1.5">
               <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
               <div className="grid grid-cols-2 gap-1.5">
-                {contacts.filter(c => c.id !== "queen").map(c => (
+                {currentBuddies.filter(c => c.id !== "queen").map(c => (
                   <button
                     key={c.id}
                     onClick={() => testBlockStatus(c.name)}

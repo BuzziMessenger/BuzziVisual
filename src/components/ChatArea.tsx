@@ -32,6 +32,7 @@ interface ChatAreaProps {
   onBuzzIncoming: () => void;
   myDisplayName: string;
   myAvatar: string;
+  myUserId?: string;
 }
 
 const MSN_EMOTICONS = [
@@ -69,7 +70,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSendMessage,
   onBuzzIncoming,
   myDisplayName,
-  myAvatar
+  myAvatar,
+  myUserId
 }) => {
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
@@ -366,7 +368,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
-              const isMe = msg.senderId === "me";
+              const isMe = msg.senderId === "me" || (myUserId && msg.senderId === myUserId && msg.senderName === myDisplayName);
               const isQueen = msg.senderId === "queen";
               const isBuzz = msg.isBuzz;
 

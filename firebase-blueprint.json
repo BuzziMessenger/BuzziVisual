@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "user": {
+      "title": "User Profile",
+      "description": "Represents a retro MSN profile stored in Firestore.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique Firebase Authentication UID of the user."
+        },
+        "name": {
+          "type": "string",
+          "description": "The custom status pseudonym or MSN display name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The Hotmail or live.nl email of the user."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "The MSN display picture (emoji or character)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["online", "bezet", "afwezig", "offline"],
+          "description": "The current retro MSN status of the user."
+        },
+        "personalMessage": {
+          "type": "string",
+          "description": "The subtext MSN personal note (e.g., [ Now listening to: Linkin Park ])."
+        },
+        "listeningTo": {
+          "type": "string",
+          "description": "Optional MSN song or MP3 player description currently playing."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server clock update timestamp."
+        }
+      },
+      "required": ["uid", "name", "email", "avatar", "status", "personalMessage", "updatedAt"]
+    },
+    "message": {
+      "title": "Chat Message",
+      "description": "Represents an individual message, nudge, or wink within MSN.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique message ID."
+        },
+        "senderId": {
+          "type": "string",
+          "description": "The UID of the sending user."
+        },
+        "senderName": {
+          "type": "string",
+          "description": "The MSN display name of the sender at the moment of transport."
+        },
+        "senderAvatar": {
+          "type": "string",
+          "description": "The avatar of the sending user."
+        },
+        "text": {
+          "type": "string",
+          "description": "The actual text body content."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Simple friendly human-readable time string (e.g., 14:15)."
+        },
+        "isBuzz": {
+          "type": "boolean",
+          "description": "Determines if this event is an MSN Nudge."
+        },
+        "isWink": {
+          "type": "boolean",
+          "description": "Determines if this event is a fullscreen Wink."
+        },
+        "winkId": {
+          "type": "string",
+          "description": "Which Wink graphic to display (e.g. pig, crazy)."
+        },
+        "receiverId": {
+          "type": "string",
+          "description": "Target ID. Can be channel ID like 'mensen-van-toen' or user ID for DM."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-side transaction timestamp used for chronological sorting."
+        }
+      },
+      "required": ["id", "senderId", "senderName", "senderAvatar", "text", "timestamp", "receiverId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "The document referencing each individual's profile."
+    },
+    "/messages/{messageId}": {
+      "schema": "message",
+      "description": "The document store representing all messages shared across groups and direct dialogues."
+    }
+  }
+}

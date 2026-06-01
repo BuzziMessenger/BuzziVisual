@@ -24,6 +24,7 @@ interface SidebarProps {
   onSelectChannel: (channelId: string) => void;
   onSelectDM: (contactId: string) => void;
   userEmail: string;
+  onSignOut?: () => void;
   
   // Custom User Profile State for MSN Clone
   userDisplayName: string;
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectChannel,
   onSelectDM,
   userEmail,
+  onSignOut,
   userDisplayName,
   onUpdateDisplayName,
   userPersonalMessage,
@@ -245,8 +247,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-500 truncate">
             <Music className="w-3 h-3 text-sky-600 flex-shrink-0 animate-pulse" />
-            <span className="truncate">Nu luistert naar: <em className="text-sky-800">My Chemical Romance - Helena (v2)</em></span>
+            <span className="truncate">Nu luistert naar: <em className="text-sky-800">My Chemical Romance - Helena (v1)</em></span>
           </div>
+
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="mt-1.5 self-start text-[10px] text-[#2c659e] hover:text-red-700 font-bold hover:underline cursor-pointer uppercase tracking-wider flex items-center gap-1"
+            >
+              <span>🚪 Afmelden (Sign Out)</span>
+            </button>
+          )}
         </div>
       </div>
 

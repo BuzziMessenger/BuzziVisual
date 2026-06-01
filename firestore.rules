@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE SECURITY PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- ENTITY SCHEMA VALIDATORS ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid
+        && data.name is string && data.name.size() <= 200
+        && data.email is string && data.email.size() <= 150
+        && data.avatar is string && data.avatar.size() <= 50
+        && data.status is string && data.status in ['online', 'bezet', 'afwezig', 'offline']
+        && data.personalMessage is string && data.personalMessage.size() <= 500
+        && (!('listeningTo' in data) || (data.listeningTo is string && data.listeningTo.size() <= 250));
+    }
+
+    function isValidMessage(data) {
+      return data.senderId == request.auth.uid
+        && data.id is string && data.id.size() <= 128
+        && data.senderName is string && data.senderName.size() <= 200
+        && data.senderAvatar is string && data.senderAvatar.size() <= 50
+        && data.text is string && data.text.size() <= 10000
+        && data.timestamp is string && data.timestamp.size() <= 20
+        && data.receiverId is string && data.receiverId.size() <= 128
+        && (!('isBuzz' in data) || data.isBuzz is bool)
+        && (!('isWink' in data) || data.isWink is bool)
+        && (!('winkId' in data) || (data.winkId is string && data.winkId.size() <= 50));
+    }
+
+    // --- COLLECTION GATES ---
+    
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn()
+        && userId == request.auth.uid
+        && isValidId(userId)
+        && incoming().keys().hasAll(['uid', 'name', 'email', 'avatar', 'status', 'personalMessage', 'updatedAt'])
+        && incoming().keys().size() <= 8
+        && isValidUser(incoming())
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isSignedIn()
+        && userId == request.auth.uid
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'status', 'personalMessage', 'avatar', 'listeningTo', 'updatedAt']);
+        
+      allow delete: if false;
+    }
+
+    match /messages/{messageId} {
+      allow list: if isSignedIn();
+      
+      allow get: if isSignedIn();
+      
+      allow create: if isSignedIn()
+        && isValidId(messageId)
+        && incoming().keys().hasAll(['id', 'senderId', 'senderName', 'senderAvatar', 'text', 'timestamp', 'receiverId', 'createdAt'])
+        && incoming().keys().size() <= 11
+        && isValidMessage(incoming())
+        && incoming().createdAt == request.time;
+        
+      allow update, delete: if false;
+    }
+  }
+}
