@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Channel, Contact, StatusType } from "../types";
+import { hiveAudio } from "../utils/audio";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -140,6 +141,8 @@ interface SidebarProps {
   userEmail: string;
   onSignOut?: () => void;
   onDeleteContact?: (contactId: string) => void;
+  onCreateChannel?: (name: string, description: string) => Promise<boolean>;
+  onAddContact?: (name: string, email: string, avatar: string) => Promise<boolean>;
   
   // Custom User Profile State for Buzzi Clone
   userDisplayName: string;
@@ -164,6 +167,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userEmail,
   onSignOut,
   onDeleteContact,
+  onCreateChannel,
+  onAddContact,
   userDisplayName,
   onUpdateDisplayName,
   userPersonalMessage,
@@ -179,6 +184,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [onlineExpanded, setOnlineExpanded] = useState(true);
   const [offlineExpanded, setOfflineExpanded] = useState(true);
   const [chatbotsExpanded, setChatbotsExpanded] = useState(true);
+
+  // Avatar Selection & Create Group Modals state
+  const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDesc, setNewGroupDesc] = useState("");
+  const [createGroupError, setCreateGroupError] = useState("");
+  const [createGroupSuccess, setCreateGroupSuccess] = useState(false);
+
+  // Add Contact Modal state
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
+  const [addContactName, setAddContactName] = useState("");
+  const [addContactEmail, setAddContactEmail] = useState("");
+  const [addContactAvatar, setAddContactAvatar] = useState("🧑‍🚀");
+  const [addContactError, setAddContactError] = useState("");
+  const [addContactSuccess, setAddContactSuccess] = useState(false);
+  const [isAddingContact, setIsAddingContact] = useState(false);
 
   // Edit fields visibility
   const [isEditingName, setIsEditingName] = useState(false);
@@ -378,19 +400,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Display Picture Container (with iconic Buzzi thick square gradient frame) */}
         <div className="relative group flex-shrink-0 z-10">
-          <div className="w-14 h-14 bg-white p-0.5 rounded-md border-2 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden hover:scale-105 transition-all">
+          <div 
+            onClick={() => {
+              setIsAvatarSelectorOpen(true);
+              hiveAudio.playHoneyPop();
+            }}
+            className="w-14 h-14 bg-white p-0.5 rounded-md border-2 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden hover:scale-105 transition-all cursor-pointer"
+            title="Klik om weergaveafbeelding te selecteren of te dobbelen"
+          >
             <span className="text-3xl select-none">{userAvatar}</span>
           </div>
-          {/* Custom Avatar quick picker popup (click to rotate smileys) */}
+          {/* Custom Avatar quick picker popup (click to open avatar manager dialog) */}
           <button 
             onClick={() => {
-              const avatars = ["🧑‍🚀", "⚡", "🛹", "🤘", "🎮", "🎸", "🎧", "🍕", "🐶"];
-              const curIdx = avatars.indexOf(userAvatar);
-              const nextAvatar = avatars[(curIdx + 1) % avatars.length];
-              onUpdateAvatar(nextAvatar);
+              setIsAvatarSelectorOpen(true);
+              hiveAudio.playHoneyPop();
             }} 
-            className="absolute -bottom-1 -right-1 bg-[#1d5c8a] text-white p-1 rounded-full text-[8px] border border-white/60 shadow hover:bg-sky-600 cursor-pointer"
-            title="Klik om weergaveafbeelding te wijzigen"
+            className="absolute -bottom-1 -right-1 bg-[#1d5c8a] text-white p-1 rounded-full text-[8px] border border-white/60 shadow hover:bg-sky-600 cursor-pointer active:scale-95 transition-all"
+            title="Weergaveafbeelding wijzigen"
           >
             🔄
           </button>
@@ -543,15 +570,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Search contacts bar (reminiscent of Buzzi Windows Live 7.x/8.0 search) */}
-      <div className="p-2 bg-[#f0f4f9] border-b border-[#bad0e3] flex items-center gap-1.5 align-middle justify-start">
-        <Search className="w-3.5 h-3.5 text-slate-400" />
-        <input 
-          type="text"
-          placeholder="Zoeken naar contacten..."
-          className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-slate-400 select-text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+      <div className="p-2 bg-[#f0f4f9] border-b border-[#bad0e3] flex items-center justify-between gap-1.5 align-middle">
+        <div className="flex items-center gap-1.5 flex-1 bg-white border border-[#b8cedf] rounded px-2 py-1">
+          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <input 
+            type="text"
+            placeholder="Zoeken..."
+            className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-slate-400 select-text text-left"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={() => {
+            setIsAddContactOpen(true);
+            setAddContactName("");
+            setAddContactEmail("");
+            setAddContactError("");
+            setAddContactSuccess(false);
+            hiveAudio.playHoneyPop();
+          }}
+          className="bg-[#1d5c8a] hover:bg-sky-700 text-white font-extrabold text-[10px] px-2 py-1.5 rounded flex items-center gap-0.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0 uppercase tracking-wide"
+          title="Voeg een nieuwe vriend toe"
+        >
+          <span>👤+ Vriend</span>
+        </button>
       </div>
 
       {/* 📻 Winamp 2004 Buzzi Stereo Player */}
@@ -833,14 +876,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Group 4: Buzzi Groepsgesprekken / Kanalen */}
         <div>
-          <button 
-            className="w-full flex items-center justify-between text-[11px] font-bold text-slate-500 px-1 py-1 hover:bg-[#f3f7fb] rounded border-b border-[#e9eff5]"
+          <div 
+            className="w-full flex items-center justify-between text-[11px] font-bold text-slate-500 px-1 py-1 border-b border-[#e9eff5]"
           >
             <div className="flex items-center gap-1">
               <ChevronDown className="w-3 h-3 text-slate-600" />
               <span> Buzzi Groepsgesprekken ({channels.length})</span>
             </div>
-          </button>
+            <button
+              onClick={() => {
+                setIsCreateGroupOpen(true);
+                setNewGroupName("");
+                setNewGroupDesc("");
+                setCreateGroupError("");
+                setCreateGroupSuccess(false);
+                hiveAudio.playHoneyPop();
+              }}
+              className="text-[9px] font-black px-1.5 py-0.5 bg-sky-100/80 hover:bg-[#1d5c8a] hover:text-white rounded border border-[#a2bfdb] text-[#1d5c8a] transition-all cursor-pointer active:scale-95"
+              title="Maak een nieuw groepsgesprek aan"
+            >
+              + Groep aanmaken
+            </button>
+          </div>
           
           <ul className="mt-1 space-y-0.5 pl-2">
             {channels.map((channel) => {
@@ -881,6 +938,371 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <span className="text-[10px] font-mono font-medium text-slate-500">v7.5.0311</span>
       </div>
+
+      {/* Avatar Picker Modal */}
+      {isAvatarSelectorOpen && (
+        <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
+          <div className="bg-gradient-to-b from-[#f2f6fb] via-[#e2eef9] to-[#d3e5f4] w-full max-w-[340px] rounded-t-xl rounded-b-lg border-2 border-[#1c5c8a] shadow-2xl flex flex-col overflow-hidden animate-fade-in font-sans">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#1d5c8a] via-[#3a8bca] to-[#1d5c8a] px-3 py-2 flex items-center justify-between text-white border-b border-[#0f3c5e] shrink-0">
+              <div className="flex items-center gap-1.5 select-none text-xs font-black uppercase tracking-wide">
+                <span>🧩</span>
+                <span>Kies je Buzzi Afbeelding</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsAvatarSelectorOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="w-5 h-5 rounded bg-[#e43a3a] hover:bg-[#ff5555] active:scale-95 border border-[#8b1a1a] flex items-center justify-center text-white font-extrabold text-[10px] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Menu options help bar */}
+            <div className="px-3 py-1 bg-[#efebd8]/30 border-b border-[#bad0e3] flex justify-between items-center text-[10px] font-bold text-[#1C427F]">
+              <span>Typische retro-plaatjes</span>
+              <button 
+                onClick={() => {
+                  const fullAvatars = [
+                    "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
+                    "🍟", "🍦", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "🎈", "💎", "👑", "🍀", "🎃", "💩", "👻",
+                    "🦁", "🐯", "🐼", "🐨", "🐸", "🐵", "🦖", "🍩", "🧁", "🍿", "🚗", "🚀", "💡", "🔮", "🛎️", "🔑"
+                  ];
+                  const randomEmoji = fullAvatars[Math.floor(Math.random() * fullAvatars.length)];
+                  onUpdateAvatar(randomEmoji);
+                  hiveAudio.playNotification();
+                }}
+                className="text-[9.5px] hover:underline bg-[#1d5c8a] hover:bg-sky-700 text-white px-2 py-0.5 rounded flex items-center gap-0.5 shadow-sm font-black transition-all"
+              >
+                🎲 Dobbelen!
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 flex flex-col items-center">
+              {/* Current Preview */}
+              <div className="w-16 h-16 bg-white p-1 rounded-md border-3 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden mb-3 animate-[pulse_3s_infinite]">
+                <span className="text-4xl">{userAvatar}</span>
+              </div>
+
+              {/* Grid of 48 Emojis */}
+              <div className="bg-[#DCE7F3] p-2 rounded-lg border border-[#bad0e3] grid grid-cols-8 gap-1.5 w-full max-h-[170px] overflow-y-auto custom-scrollbar">
+                {[
+                  "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
+                  "🍟", "🍦", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "🎈", "💎", "👑", "🍀", "🎃", "💩", "👻"
+                ].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => {
+                      onUpdateAvatar(emoji);
+                      hiveAudio.playHoneyPop();
+                    }}
+                    className={`aspect-square text-lg rounded bg-white hover:bg-sky-100 border flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                      userAvatar === emoji
+                        ? "border-[#1C427F] bg-[#CFE1F5] outline-none ring-2 ring-sky-500 scale-110"
+                        : "border-slate-300"
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 bg-[#cbdcf0] border-t border-[#bad0e3] flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAvatarSelectorOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="px-4 py-1.5 rounded bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[11px] font-extrabold shadow-sm active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
+              >
+                Opslaan ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Group Modal */}
+      {isCreateGroupOpen && (
+        <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newGroupName.trim()) {
+                setCreateGroupError("Vul een groepsnaam in.");
+                return;
+              }
+              setCreateGroupError("");
+              
+              if (onCreateChannel) {
+                const success = await onCreateChannel(newGroupName, newGroupDesc);
+                if (success) {
+                  setCreateGroupSuccess(true);
+                  setTimeout(() => {
+                    setIsCreateGroupOpen(false);
+                    setCreateGroupSuccess(false);
+                  }, 1200);
+                } else {
+                  setCreateGroupError("Aanmaken mislukt. Probeer het opnieuw.");
+                }
+              }
+            }}
+            className="bg-gradient-to-b from-[#f2f6fb] via-[#e2eef9] to-[#d3e5f4] w-full max-w-[340px] rounded-t-xl rounded-b-lg border-2 border-[#1c5c8a] shadow-2xl flex flex-col overflow-hidden animate-fade-in font-sans"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#1d5c8a] via-[#3a8bca] to-[#1d5c8a] px-3 py-2 flex items-center justify-between text-white border-b border-[#0f3c5e] shrink-0">
+              <div className="flex items-center gap-1.5 select-none text-xs font-black uppercase tracking-wide">
+                <span>👥</span>
+                <span>Nieuw Buzzi Groepsgesprek</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsCreateGroupOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="w-5 h-5 rounded bg-[#e43a3a] hover:bg-[#ff5555] active:scale-95 border border-[#8b1a1a] flex items-center justify-center text-white font-extrabold text-[10px] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Menu Info Bar */}
+            <div className="px-3 py-1 bg-[#efebd8]/30 border-b border-[#bad0e3] text-[10px] font-bold text-[#1C427F]">
+              Groepsgesprekken zijn direct zichtbaar voor iedereen!
+            </div>
+
+            {/* Body */}
+            <div className="p-4 flex flex-col gap-3 text-left">
+              {createGroupSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-300 rounded p-4 text-center text-emerald-950 font-bold text-xs space-y-1 my-4">
+                  <div>🎉 Hoera! Groepsgesprek gemaakt!</div>
+                  <div className="text-[10px] font-normal text-emerald-850">Direct open voor al je contactpersonen...</div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                      ★ Groepsnaam
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="bijv: huiswerk-reiskol"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      maxLength={25}
+                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                      Uitleg / Beschrijving
+                    </label>
+                    <textarea
+                      placeholder="Waar gaat dit groepsgesprek over?"
+                      value={newGroupDesc}
+                      onChange={(e) => setNewGroupDesc(e.target.value)}
+                      maxLength={80}
+                      rows={2}
+                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text resize-none font-medium"
+                    />
+                  </div>
+
+                  {createGroupError && (
+                    <div className="text-[10px] font-black text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                      ⚠️ {createGroupError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 bg-[#cbdcf0] border-t border-[#bad0e3] flex justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateGroupOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="px-3 py-1.5 rounded bg-[#bdbdbd] border border-[#7b7b7b] hover:bg-white text-slate-800 font-bold text-[10px] active:scale-95 transition-all cursor-pointer shadow-sm"
+              >
+                Annuleren
+              </button>
+
+              {!createGroupSuccess && (
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded bg-[#2C629E] hover:bg-[#1f4a7c] text-white font-extrabold shadow-sm active:scale-95 transition-all cursor-pointer text-[10.5px] uppercase tracking-wide"
+                >
+                  Maak Groep Aan 👥
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 4. MODAL: Vriend Toevoegen */}
+      {isAddContactOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-[9999] backdrop-blur-xs">
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!addContactName.trim() || !addContactEmail.trim()) {
+                setAddContactError("Naam en e-mailadres zijn verplicht.");
+                return;
+              }
+              setIsAddingContact(true);
+              setAddContactError("");
+              
+              if (onAddContact) {
+                const ok = await onAddContact(
+                  addContactName.trim(),
+                  addContactEmail.trim(),
+                  addContactAvatar
+                );
+                if (ok) {
+                  setAddContactSuccess(true);
+                  setTimeout(() => {
+                    setAddContactSuccess(false);
+                    setIsAddContactOpen(false);
+                  }, 2000);
+                } else {
+                  setAddContactError("Kon contactpersoon niet toevoegen. Mogelijk bestaat deze al.");
+                }
+              } else {
+                setAddContactError("Voeg contact handeling is niet beschikbaar.");
+              }
+              setIsAddingContact(false);
+            }}
+            className="w-full max-w-sm bg-[#eef4fb] border border-[#769abb] rounded-2xl shadow-2xl p-0 overflow-hidden font-sans select-none flex flex-col"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#2c77b0] to-[#1e5881] text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0">
+              <span className="font-extrabold text-sm uppercase tracking-wide flex items-center gap-1.5">
+                <span>👤</span> MSN Vriend Toevoegen
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddContactOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="text-white hover:text-red-200 transition-colors cursor-pointer text-xs font-bold"
+              >
+                Sluiten ✕
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-5 space-y-4 flex-1">
+              {addContactSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 text-center text-emerald-950 font-bold text-xs space-y-1 my-4 animate-bounce">
+                  <div>🎉 Joehoe! Vriend succesvol toegevoegd!</div>
+                  <div className="text-[10px] font-normal text-emerald-850">Hij of zij staat nu in de lijst!</div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                      Naam van je vriend
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="bijv: Kelly / Wouter"
+                      value={addContactName}
+                      onChange={(e) => setAddContactName(e.target.value)}
+                      maxLength={25}
+                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text text-left"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                      Zijn/haar e-mailadres
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="bijv: kelly@live.nl"
+                      value={addContactEmail}
+                      onChange={(e) => setAddContactEmail(e.target.value)}
+                      maxLength={80}
+                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text text-left font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                      Selecteer een retro Buzzi avatar status
+                    </label>
+                    <div className="grid grid-cols-5 gap-2 bg-white/80 p-2 border border-[#bad0e3] rounded-lg">
+                      {["🧑‍🚀", "👸", "👾", "🦊", "🐯", "🐼", "🕶️", "🎩", "🍕", "🎸"].map((av) => (
+                        <button
+                          key={av}
+                          type="button"
+                          onClick={() => {
+                            setAddContactAvatar(av);
+                            hiveAudio.playHoneyPop();
+                          }}
+                          className={`text-xl p-1.5 rounded transition-transform active:scale-95 text-center cursor-pointer ${
+                            addContactAvatar === av
+                              ? "bg-sky-200 ring-2 ring-sky-500 scale-110"
+                              : "hover:bg-slate-100"
+                          }`}
+                        >
+                          {av}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {addContactError && (
+                    <div className="text-[10px] font-black text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                      ⚠️ {addContactError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 bg-[#cbdcf0] border-t border-[#bad0e3] flex justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddContactOpen(false);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="px-3 py-1.5 rounded bg-[#bdbdbd] border border-[#7b7b7b] hover:bg-white text-slate-800 font-bold text-[10px] active:scale-95 transition-all cursor-pointer shadow-sm"
+              >
+                Annuleren
+              </button>
+
+              {!addContactSuccess && (
+                <button
+                  type="submit"
+                  disabled={isAddingContact}
+                  className="px-4 py-1.5 rounded bg-[#2C629E] hover:bg-[#1f4a7c] text-white font-extrabold shadow-sm active:scale-95 transition-all cursor-pointer text-[10.5px] uppercase tracking-wide disabled:opacity-50"
+                >
+                  {isAddingContact ? "Bezig met toevoegen..." : "Toevoegen 👤"}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

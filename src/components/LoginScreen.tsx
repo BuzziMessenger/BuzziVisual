@@ -118,7 +118,34 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       if (emailFlow === "login") {
         if (!existingUserDoc) {
-          setErrorMsg("Dit e-mailadres is nog niet geregistreerd op Buzzi Messenger! Klik hierboven op 'Registreren' om een nieuw account aan te maken.");
+          // AUTO-RECOVER LOGIC
+          // The local database was cleared (standard during container redeploys or branch updates), so we restore them on the fly!
+          const rememberedName = localStorage.getItem("buzzi_remembered_name") || targetCleanEmail.split("@")[0];
+          
+          const newUserProfile = {
+            uid: userUid,
+            name: rememberedName,
+            email: finalizedEmail,
+            avatar: selectedAvatar || "🧑‍🚀",
+            status: "online",
+            personalMessage: personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)"
+          };
+
+          try {
+            await fetch("/api/db/users", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newUserProfile)
+            });
+            
+            localStorage.setItem("buzzi_remembered_email", targetCleanEmail);
+            localStorage.setItem("buzzi_remembered_name", rememberedName);
+          } catch (recoveryErr) {
+            console.error("Auto-recovery of user profile failed:", recoveryErr);
+          }
+
+          hiveAudio.playNotification();
+          onLoginSuccess(rememberedName, finalizedEmail);
           setLoading(false);
           return;
         }
@@ -377,12 +404,33 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
                     {/* Choose Emoji Avatar */}
                     <div className="flex flex-col gap-1 text-left animate-fade-in">
-                      <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
-                        <span>🧩</span>
-                        <span>Kies je Buzzi Avatar</span>
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
+                          <span>🧩</span>
+                          <span>Kies je Buzzi Avatar (24 favorieten)</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fullAvatars = [
+                              "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
+                              "🍟", "🍦", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "🎈", "💎", "👑", "🍀", "🎃", "💩", "👻",
+                              "🦁", "🐯", "🐼", "🐨", "🐸", "🐵", "🦖", "🍩", "🧁", "🍿", "🚗", "🚀", "💡", "🔮", "🛎️", "🔑"
+                            ];
+                            const randomEmoji = fullAvatars[Math.floor(Math.random() * fullAvatars.length)];
+                            setSelectedAvatar(randomEmoji);
+                            hiveAudio.playNotification();
+                          }}
+                          className="text-[9.5px] font-black text-[#1C427F] hover:text-[#4A86E8] bg-white border border-[#B9CEDF] rounded px-1.5 py-0.5 shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-0.5"
+                        >
+                          <span>🎲 Dobbelen!</span>
+                        </button>
+                      </div>
                       <div className="bg-[#DCE7F3] p-1.5 rounded-lg border border-[#B9CEDF] grid grid-cols-8 gap-1.5 justify-center">
-                        {["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕"].map((emoji) => (
+                        {[
+                          "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾",
+                          "🐻", "🦄", "🎮", "🍕", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "👑"
+                        ].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -400,6 +448,13 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                           </button>
                         ))}
                       </div>
+                      {/* Show current selection if it is a rolled custom one from the deep list of 48 */}
+                      {!["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "👑"].includes(selectedAvatar) && (
+                        <div className="mt-1 flex items-center gap-1.5 bg-[#CFE1F5] p-1 rounded border border-[#16427E] text-[10px] text-slate-800 font-bold self-start">
+                          <span>Gedobbeld:</span>
+                          <span className="text-sm bg-white aspect-square h-5 rounded flex items-center justify-center border">{selectedAvatar}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Choose Personal Status message preset */}

@@ -11,6 +11,8 @@ import http from "http";
 // Unified Local Database storage paths for standalone zero-config execution
 const USERS_FILE = path.join(process.cwd(), "data_users.json");
 const MESSAGES_FILE = path.join(process.cwd(), "data_messages.json");
+const CHANNELS_FILE = path.join(process.cwd(), "data_channels.json");
+const BUGS_FILE = path.join(process.cwd(), "data_bugs.json");
 
 function readJsonFile<T>(filePath: string, defaultVal: T): T {
   try {
@@ -233,6 +235,179 @@ async function startServer() {
         writeJsonFile(USERS_FILE, users);
       }
       res.json({ success: true, message: "Gebruikersprofiel gesynchroniseerd." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // INITIAL CHANNELS fallback for first boot
+  const BACKEND_INITIAL_CHANNELS = [
+    {
+      id: "mensen-van-toen",
+      name: "huiswerk-bespreken",
+      description: "Samen stiekem wiskundesommen overschrijven en roddelen over de leraar Frans. (grr)"
+    },
+    {
+      id: "breezer-groep",
+      name: "breezer-gesprek",
+      description: "Wie gaat er vrijdag mee naar de disco en mag ik daarna bij jou blijven slapen?"
+    }
+  ];
+
+  // 1. CHANNELS API: GET all chat groups
+  app.get("/api/channels", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        try {
+          const channels = await dbInstance.collection("channels").find({}).toArray();
+          if (channels && channels.length > 0) {
+            res.json(channels);
+            return;
+          }
+        } catch (mongoErr) {
+          console.warn("MongoDB channels fetch failed, falling back to JSON:", mongoErr);
+        }
+      }
+      const channels = readJsonFile<any[]>(CHANNELS_FILE, []);
+      if (channels.length === 0) {
+        writeJsonFile(CHANNELS_FILE, BACKEND_INITIAL_CHANNELS);
+        res.json(BACKEND_INITIAL_CHANNELS);
+      } else {
+        res.json(channels);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 2. CHANNELS API: POST create a new group chat
+  app.post("/api/channels", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const { name, description } = req.body;
+      if (!name) {
+        res.status(400).json({ error: "Groepsnaam is verplicht." });
+        return;
+      }
+
+      // Sanitize group name to look like classic MSN channels: lowercased, hyphens, no special symbols
+      const sanitizedName = name
+        .toLowerCase()
+        .replace(/[^a-z0-9-_ ]/g, "")
+        .trim()
+        .replace(/\s+/g, "-");
+
+      const newChannel = {
+        id: "ch-" + Math.random().toString(36).substring(2, 11),
+        name: sanitizedName || "leuk-nieuwe-groep",
+        description: description || "Gezellig samen kletsen over van alles!"
+      };
+
+      if (dbInstance) {
+        try {
+          await dbInstance.collection("channels").insertOne(newChannel);
+          const channels = await dbInstance.collection("channels").find({}).toArray();
+          res.json(channels);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB channel insert failed, falling back to JSON:", mongoErr);
+        }
+      }
+
+      const channels = readJsonFile<any[]>(CHANNELS_FILE, []);
+      const currentList = channels.length === 0 ? [...BACKEND_INITIAL_CHANNELS] : channels;
+      currentList.push(newChannel);
+      writeJsonFile(CHANNELS_FILE, currentList);
+      res.json(currentList);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. BUGS API: GET all reported bug entries
+  app.get("/api/bugs", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        try {
+          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          res.json(bugs);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB bugs fetch failed, falling back to JSON:", mongoErr);
+        }
+      }
+      const bugs = readJsonFile<any[]>(BUGS_FILE, []);
+      res.json(bugs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. BUGS API: POST report a new bug
+  app.post("/api/bugs", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const { senderName, senderEmail, reporter, reporterEmail, category, title, description } = req.body;
+      
+      if (!title || !description) {
+        res.status(400).json({ error: "Titel en omschrijving zijn verplicht." });
+        return;
+      }
+
+      const newBug = {
+        id: "bug-" + Math.random().toString(36).substring(2, 11),
+        senderName: senderName || reporter || "Anonieme Buzzi",
+        senderEmail: senderEmail || reporterEmail || "geen@email.nl",
+        category: category || "Technisch",
+        title: title.trim(),
+        description: description.trim(),
+        timestamp: new Date().toISOString(),
+        status: "Open"
+      };
+
+      if (dbInstance) {
+        try {
+          await dbInstance.collection("bugs").insertOne(newBug);
+          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          res.json(bugs);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB bug insert failed, falling back to JSON:", mongoErr);
+        }
+      }
+
+      const bugs = readJsonFile<any[]>(BUGS_FILE, []);
+      bugs.unshift(newBug); // Add most recent first
+      writeJsonFile(BUGS_FILE, bugs);
+      res.json(bugs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 5. BUGS API: DELETE bug entry (for Robbin)
+  app.delete("/api/bugs/:id", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const bugId = req.params.id;
+      
+      if (dbInstance) {
+        try {
+          await dbInstance.collection("bugs").deleteOne({ id: bugId });
+          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          res.json(bugs);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB bug delete failed, falling back to JSON:", mongoErr);
+        }
+      }
+
+      let bugs = readJsonFile<any[]>(BUGS_FILE, []);
+      bugs = bugs.filter((b) => b.id !== bugId);
+      writeJsonFile(BUGS_FILE, bugs);
+      res.json(bugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

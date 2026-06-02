@@ -178,7 +178,7 @@ const NICKNAME_SUFFIXES = [" ~ ★", "__Xx", " ~* ✿ (L)", "_o0o"];
 export default function App() {
   const [activeId, setActiveId] = useState<string>("queen");
   const [activeType, setActiveType] = useState<"channel" | "dm">("dm");
-  const [channels] = useState<Channel[]>(INITIAL_CHANNELS);
+  const [channels, setChannels] = useState<Channel[]>(INITIAL_CHANNELS);
   const [mobileActiveTab, setMobileActiveTab] = useState<"sidebar" | "chat" | "tools">("sidebar");
   
   // App-status
@@ -207,6 +207,15 @@ export default function App() {
   const [checkedContact, setCheckedContact] = useState("");
   const [checking, setChecking] = useState(false);
 
+  // Bug reporting variables
+  const [activeUtilityTab, setActiveUtilityTab] = useState<"tools" | "bugs">("tools");
+  const [bugsList, setBugsList] = useState<any[]>([]);
+  const [bugTitle, setBugTitle] = useState("");
+  const [bugDescription, setBugDescription] = useState("");
+  const [bugCategory, setBugCategory] = useState("Radio");
+  const [bugSuccess, setBugSuccess] = useState(false);
+  const [isSubmittingBug, setIsSubmittingBug] = useState(false);
+
   // Copy Link State
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
   const handleCopyInviteLink = () => {
@@ -220,33 +229,20 @@ export default function App() {
     }, 2500);
   };
 
-  // Add Contact Form State
-  const [addName, setAddName] = useState("");
-  const [addEmail, setAddEmail] = useState("");
-  const [addAvatar, setAddAvatar] = useState("🧑‍🚀");
-  const [addStatus, setAddStatus] = useState<StatusType>("online");
-  const [addQuote, setAddQuote] = useState("Lekker chatten op Buzzi! [B-)]");
-  const [addLoading, setAddLoading] = useState(false);
-  const [addMsg, setAddMsg] = useState("");
+  // Add Contact Handler (triggered from Sidebar modal)
+  const handleAddContact = async (name: string, email: string, avatar: string) => {
+    if (!name.trim() || !email.trim()) return false;
 
-  const handleAddContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addName.trim() || !addEmail.trim()) return;
-
-    setAddLoading(true);
-    setAddMsg("");
-    hiveAudio.playHoneyPop();
-
-    const cleanEmail = addEmail.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
     const mockUserUid = `u_${simpleHash(cleanEmail)}`;
 
     const newContactProfile = {
       uid: mockUserUid,
-      name: addName.trim(),
+      name: name.trim(),
       email: cleanEmail,
-      avatar: addAvatar,
-      status: addStatus,
-      personalMessage: addQuote.trim()
+      avatar: avatar || "🧑‍🚀",
+      status: "online" as StatusType,
+      personalMessage: "Lekker chatten op Buzzi! [B-)]"
     };
 
     try {
@@ -261,12 +257,6 @@ export default function App() {
       }
 
       hiveAudio.playNotification();
-      setAddMsg("Vriend succesvol toegevoegd aan de Buzzi-lijst! 🎉");
-      setAddName("");
-      setAddEmail("");
-      setAddAvatar("🧑‍🚀");
-      setAddStatus("online");
-      setAddQuote("Lekker chatten op Buzzi! [B-)]");
 
       // Trigger immediate reload of list
       const syncRes = await fetch("/api/db/users");
@@ -284,11 +274,10 @@ export default function App() {
           }));
         setRegisteredUsers(filtered);
       }
+      return true;
     } catch (err: any) {
       console.error(err);
-      setAddMsg("Fout: " + (err.message || "Probeer het later opnieuw"));
-    } finally {
-      setAddLoading(false);
+      return false;
     }
   };
 
@@ -487,7 +476,110 @@ export default function App() {
         )
       ]).filter(c => !deletedContactIds.includes(c.id));
 
-  const visibleChannels = isDemoUser ? channels : [];
+  const visibleChannels = channels;
+
+  // Sync channels list dynamically from server JSON database
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchChannels = async () => {
+      try {
+        const res = await fetch("/api/channels");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setChannels(data);
+          }
+        }
+      } catch (err) {
+        console.warn("Fout bij ophalen van kanalen:", err);
+      }
+    };
+
+    fetchChannels();
+    const intervalId = setInterval(fetchChannels, 5000);
+    return () => clearInterval(intervalId);
+  }, [currentUser]);
+
+  // Sync bugs list from server JSON database
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchBugs = async () => {
+      try {
+        const res = await fetch("/api/bugs");
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list)) {
+            setBugsList(list);
+          }
+        }
+      } catch (err) {
+        console.warn("Fout bij ophalen van bug reports:", err);
+      }
+    };
+
+    fetchBugs();
+    const intervalId = setInterval(fetchBugs, 10000);
+    return () => clearInterval(intervalId);
+  }, [currentUser]);
+
+  const handleSendBugReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bugTitle.trim() || !bugDescription.trim()) return;
+
+    setIsSubmittingBug(true);
+    try {
+      const res = await fetch("/api/bugs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: bugTitle.trim(),
+          description: bugDescription.trim(),
+          category: bugCategory,
+          reporter: userDisplayName || "Onbekend",
+          reporterEmail: currentUser?.email || "geen@email.nl"
+        })
+      });
+
+      if (res.ok) {
+        setBugTitle("");
+        setBugDescription("");
+        setBugSuccess(true);
+        hiveAudio.playNotification();
+
+        // Refresh bugs list
+        const freshRes = await fetch("/api/bugs");
+        if (freshRes.ok) {
+          const list = await freshRes.json();
+          setBugsList(list);
+        }
+
+        setTimeout(() => {
+          setBugSuccess(false);
+        }, 3000);
+      }
+    } catch (err) {
+      console.error("Fout bij opslaan bug report:", err);
+    } finally {
+      setIsSubmittingBug(false);
+    }
+  };
+
+  const handleDeleteBug = async (bugId: string) => {
+    try {
+      const res = await fetch(`/api/bugs/${bugId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        const list = await res.json();
+        setBugsList(list);
+        hiveAudio.playNotification();
+      }
+    } catch (err) {
+      console.error("Fout bij verwijderen van bug:", err);
+    }
+  };
 
   // Sync Messages with Database / Local Storage (Polling)
   useEffect(() => {
@@ -574,6 +666,25 @@ export default function App() {
   const handleUpdateListeningTo = (val: string) => {
     setUserListeningTo(val);
     updateProfileInDatabase({ listeningTo: val });
+  };
+
+  const handleCreateChannel = async (name: string, description: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setChannels(updated);
+        hiveAudio.playNotification();
+        return true;
+      }
+    } catch (err) {
+      console.error("Fout bij maken van kanaal:", err);
+    }
+    return false;
   };
 
   const handleSignOut = async () => {
@@ -945,6 +1056,8 @@ export default function App() {
           userEmail={currentUser.email || "prinsrobbin@gmail.com"}
           onSignOut={handleSignOut}
           onDeleteContact={handleDeleteContact}
+          onCreateChannel={handleCreateChannel}
+          onAddContact={handleAddContact}
           
           // Custom interactive profile properties for Buzzi
           userDisplayName={userDisplayName}
@@ -981,185 +1094,354 @@ export default function App() {
       <div className={`h-full w-full md:w-80 ${mobileActiveTab === "tools" ? "flex" : "hidden md:flex"} bg-gradient-to-b from-[#eef4fb] to-[#cbdcf0] border-l border-[#9ebcd1] flex-col p-4 justify-between select-none overflow-y-auto font-sans`}>
         <div className="space-y-4">
           
-          {/* Box 1: Buzzi Retro Customizer Tool */}
-          <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-[#1d5c8a]"></div>
-            
-            <h3 className="font-sans font-extrabold text-[#1d5c8a] text-sm flex items-center gap-1.5 pt-1 uppercase tracking-wide">
-              <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
-              <span>Buzzi Naam Versierder</span>
-            </h3>
-            
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              Verander je statusnaam in een flitsende Buzzi-naam vol met glitters en vette retrotekens!
-            </p>
-
+          {/* Utility Panel Tabs */}
+          <div className="flex bg-[#cbdcf0] p-1 rounded-lg border border-[#bad0e3] shrink-0 gap-1 mb-2">
             <button
-              onClick={generateRetroName}
-              className="mt-3.5 w-full bg-gradient-to-r from-[#2c77b0] to-[#1e5881] hover:from-[#3a8bca] hover:to-[#22679a] text-white text-xs font-bold py-2 rounded-lg shadow-sm border border-sky-900 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={() => {
+                setActiveUtilityTab("tools");
+                hiveAudio.playHoneyPop();
+              }}
+              className={`flex-1 text-center py-1.5 rounded text-[11px] font-black transition-all cursor-pointer ${
+                activeUtilityTab === "tools"
+                  ? "bg-[#1d5c8a] text-white shadow-sm"
+                  : "text-[#1d5c8a] hover:bg-[#cfe1f5]"
+              }`}
             >
-              <span>Genereer vette Buzzi Naam!</span>
+              🧩 Retro Tools
             </button>
-
-            {generatedName && (
-              <div className="mt-3 bg-slate-50 p-2.5 rounded border border-dashed border-[#abc4df] text-center">
-                <span className="text-xs font-bold text-slate-800 font-mono block break-all selection:bg-yellow-200">
-                  {generatedName}
+            <button
+              onClick={() => {
+                setActiveUtilityTab("bugs");
+                hiveAudio.playHoneyPop();
+              }}
+              className={`flex-1 text-center py-1.5 rounded text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 relative ${
+                activeUtilityTab === "bugs"
+                  ? "bg-[#1d5c8a] text-white shadow-sm"
+                  : "text-[#1d5c8a] hover:bg-[#cfe1f5]"
+              }`}
+            >
+              🐞 Bug Melder
+              {bugsList.length > 0 && (
+                <span className="bg-red-500 text-white font-mono rounded-full text-[8.5px] h-4 min-w-4 px-1 flex items-center justify-center animate-bounce leading-none font-bold">
+                  {bugsList.length}
                 </span>
+              )}
+            </button>
+          </div>
+
+          {activeUtilityTab === "tools" ? (
+            <div className="space-y-4">
+              {/* Box 1: Buzzi Retro Customizer Tool */}
+              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#1d5c8a]"></div>
                 
+                <h3 className="font-sans font-extrabold text-[#1d5c8a] text-sm flex items-center gap-1.5 pt-1 uppercase tracking-wide">
+                  <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
+                  <span>Buzzi Naam Versierder</span>
+                </h3>
+                
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                  Verander je statusnaam in een flitsende Buzzi-naam vol met glitters en vette retrotekens!
+                </p>
+
                 <button
-                  onClick={applyGeneratedName}
-                  className="mt-2 text-[10px] text-sky-600 hover:underline font-bold uppercase tracking-wider block mx-auto cursor-pointer"
+                  onClick={generateRetroName}
+                  className="mt-3.5 w-full bg-gradient-to-r from-[#2c77b0] to-[#1e5881] hover:from-[#3a8bca] hover:to-[#22679a] text-white text-xs font-bold py-2 rounded-lg shadow-sm border border-sky-900 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  Toepassen als Buzzi Naam! ✏️
+                  <span>Genereer vette Buzzi Naam!</span>
                 </button>
+
+                {generatedName && (
+                  <div className="mt-3 bg-slate-50 p-2.5 rounded border border-dashed border-[#abc4df] text-center">
+                    <span className="text-xs font-bold text-slate-800 font-mono block break-all selection:bg-yellow-200">
+                      {generatedName}
+                    </span>
+                    
+                    <button
+                      onClick={applyGeneratedName}
+                      className="mt-2 text-[10px] text-sky-600 hover:underline font-bold uppercase tracking-wider block mx-auto cursor-pointer"
+                    >
+                      Toepassen als Buzzi Naam! ✏️
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Box 2: Wie heeft mij geblokkeerd? (Authentic 2004 scam test simulation!) */}
-          <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-[#e31e24]"></div>
-            
-            <h3 className="font-sans font-extrabold text-[#e31e24] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span>Buzzi Block Checker (V2)</span>
-            </h3>
-            
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              Benieuwd of je klasgenoten je stiekem offline hebben geblokkeerd? Voer hier de scan uit!
-            </p>
+              {/* Box 2: Wie heeft mij geblokkeerd? */}
+              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#e31e24]"></div>
+                
+                <h3 className="font-sans font-extrabold text-[#e31e24] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span>Buzzi Block Checker (V2)</span>
+                </h3>
+                
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                  Benieuwd of je klasgenoten je stiekem offline hebben geblokkeerd? Voer hier de scan uit!
+                </p>
 
-            <div className="mt-3.5 space-y-1.5">
-              <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {currentBuddies.filter(c => c.id !== "queen").map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => testBlockStatus(c.name)}
-                    disabled={checking}
-                    className="text-[10px] font-medium bg-[#f0f4f9] hover:bg-sky-100 border border-slate-200 px-2 py-1.5 rounded truncate text-slate-700 active:scale-95 cursor-pointer transition-all disabled:opacity-50"
+                <div className="mt-3.5 space-y-1.5">
+                  <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {currentBuddies.filter(c => c.id !== "queen").map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => testBlockStatus(c.name)}
+                        disabled={checking}
+                        className="text-[10px] font-medium bg-[#f0f4f9] hover:bg-sky-100 border border-slate-200 px-2 py-1.5 rounded truncate text-slate-700 active:scale-95 cursor-pointer transition-all disabled:opacity-50 text-left"
+                      >
+                        🔍 {c.name.split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {checking && (
+                  <div className="mt-3 text-center space-y-1 py-1.5">
+                    <div className="text-[10px] text-slate-500 font-medium animate-pulse">
+                      Checken van block status via Buzzi servers...
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-red-500 h-1.5 rounded-full animate-[progress_1.5s_ease-out_infinite]" style={{ width: "60%" }} />
+                    </div>
+                  </div>
+                )}
+
+                {checkResult && (
+                  <div className="mt-3 bg-red-50 p-2.5 rounded border border-red-200 text-xs text-red-950 font-bold leading-normal">
+                    {checkResult}
+                  </div>
+                )}
+              </div>
+
+              {/* Box 3: Contacten Uitnodigen */}
+              <div className="bg-gradient-to-b from-emerald-50 to-[#edf7e7] border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#8cc63f]"></div>
+                
+                <h3 className="font-sans font-extrabold text-[#235817] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
+                  <Share2 className="w-4 h-4 text-[#8cc63f]" />
+                  <span>Contacten Uitnodigen 💬</span>
+                </h3>
+                
+                <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                  Deel deze retrograde Buzzi Messenger met je vrienden of klasgenoten om direct live samen te kletsen via WhatsApp of Facebook!
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wide block">Jouw unieke uitnodigingslink:</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`}
+                        className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
+                      />
+                      <button
+                        onClick={handleCopyInviteLink}
+                        className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10.5px] px-2.5 py-1.5 rounded font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        <Link className="w-3.5 h-3.5" />
+                        <span>{copyLinkStatus ? "Gekopieerd! ✓" : "Kopieer 🔗"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                        `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => hiveAudio.playNotification()}
+                      className="bg-[#25D366] hover:bg-[#20ba59] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#1ca34e] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                    >
+                      <Send className="w-3.5 h-3.5 fill-current" />
+                      <span>WhatsApp 🟢</span>
+                    </a>
+                    <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                        `https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => hiveAudio.playNotification()}
+                      className="bg-[#1877F2] hover:bg-[#1465cf] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#0e5bc5] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                    >
+                      <span>👥 Facebook 🔵</span>
+                    </a>
+                  </div>
+
+                  <a
+                    href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
+                      `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
+                    )}`}
+                    onClick={() => hiveAudio.playNotification()}
+                    className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    🔍 {c.name.split(" ")[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {checking && (
-              <div className="mt-3 text-center space-y-1 py-1.5">
-                <div className="text-[10px] text-slate-500 font-medium animate-pulse">
-                  Checken van block status via Buzzi servers...
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-red-500 h-1.5 rounded-full animate-[progress_1.5s_ease-out_infinite]" style={{ width: "60%" }} />
+                    <span>✉️ Uitnodigen via E-mail</span>
+                  </a>
                 </div>
               </div>
-            )}
 
-            {checkResult && (
-              <div className="mt-3 bg-red-50 p-2.5 rounded border border-red-200 text-xs text-red-950 font-bold leading-normal">
-                {checkResult}
-              </div>
-            )}
-          </div>
-
-          {/* Box 4: Contacten Uitnodigen */}
-          <div className="bg-gradient-to-b from-emerald-50 to-[#edf7e7] border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-[#8cc63f]"></div>
-            
-            <h3 className="font-sans font-extrabold text-[#235817] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
-              <Share2 className="w-4 h-4 text-[#8cc63f]" />
-              <span>Contacten Uitnodigen 💬</span>
-            </h3>
-            
-            <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
-              Deel deze retrograde Buzzi Messenger met je vrienden of klasgenoten om direct live samen te kletsen via WhatsApp of Facebook!
-            </p>
-
-            <div className="mt-4 space-y-3">
-              {/* Unieke link copy field */}
-              <div className="space-y-1">
-                <label className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wide block">Jouw unieke uitnodigingslink:</label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    readOnly
-                    value={`https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`}
-                    className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
-                  />
+              {/* Classic Games Box */}
+              <div className="bg-stone-900 border border-stone-800 text-stone-100 rounded-xl p-4 shadow-md relative">
+                <div className="flex items-center justify-between border-b border-stone-800 pb-1.5">
+                  <span className="font-mono text-[9px] text-[#8cc63f] tracking-widest font-bold">BUZZI_GAMES_ONLINE</span>
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                </div>
+                
+                <div className="mt-3 space-y-2.5">
+                  <p className="text-[10.5px] italic text-slate-300 leading-normal">
+                    &ldquo;Wil je een potje Mijnenveger of Dammen spelen tegen me? Klik hieronder om me uit te dagen op Buzzi!&rdquo;
+                  </p>
                   <button
-                    onClick={handleCopyInviteLink}
-                    className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10.5px] px-2.5 py-1.5 rounded font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                    onClick={() => {
+                      hiveAudio.playNotification();
+                      setIsMinesweeperOpen(true);
+                    }}
+                    className="w-full bg-[#8cc63f] hover:bg-[#a6d854] text-stone-950 text-xs font-black py-2 rounded-xl shadow border-2 border-[#5c8229] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <Link className="w-3.5 h-3.5" />
-                    <span>{copyLinkStatus ? "Gekopieerd! ✓" : "Kopieer 🔗"}</span>
+                    <Play className="w-3 h-3 fill-stone-950" />
+                    <span>Mijnenveger Spelen ! 💣</span>
                   </button>
                 </div>
               </div>
+            </div>
+          ) : (
+            /* Bug Reporting panel */
+            <div className="space-y-4 font-sans text-xs">
+              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#e43a3a]"></div>
 
-              {/* Direct share platforms */}
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => hiveAudio.playNotification()}
-                  className="bg-[#25D366] hover:bg-[#20ba59] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#1ca34e] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
-                >
-                  <Send className="w-3.5 h-3.5 fill-current" />
-                  <span>WhatsApp 🟢</span>
-                </a>
-                <a
-                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-                    `https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => hiveAudio.playNotification()}
-                  className="bg-[#1877F2] hover:bg-[#1465cf] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#0e5bc5] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
-                >
-                  <span>👥 Facebook 🔵</span>
-                </a>
+                <h3 className="font-sans font-black text-[#e43a3a] text-xs flex items-center gap-1 pt-1 uppercase tracking-wide">
+                  <span>🐞</span>
+                  <span>Buzzi Bug Reporter</span>
+                </h3>
+
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-normal">
+                  Werkt er iets niet (bijv. een radiozender)? Meld het direct! Robbin zal hier melding van krijgen op zijn beeldscherm.
+                </p>
+
+                {bugSuccess ? (
+                  <div className="mt-3.5 bg-emerald-50 border border-emerald-300 rounded p-3 text-center text-emerald-950 font-black text-[11px] animate-bounce">
+                    🎉 Melding verstuurd naar Robbin! Bedankt voor de hulp!
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendBugReport} className="mt-3.5 space-y-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[9.5px] font-black text-[#1C427F] uppercase tracking-wider block text-left"> Wat werkt er niet? </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="bijv: Kink radiozender heeft buffering"
+                        value={bugTitle}
+                        onChange={(e) => setBugTitle(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text text-left"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label className="text-[9.5px] font-black text-[#1C427F] uppercase tracking-wider block text-left font-sans"> Categorie </label>
+                      <select
+                        value={bugCategory}
+                        onChange={(e) => setBugCategory(e.target.value)}
+                        className="w-full px-2 py-1 bg-white border border-[#B9CEDF] rounded font-bold text-slate-700 text-xs focus:outline-none hover:bg-slate-50 cursor-pointer"
+                      >
+                        <option value="Radio">📻 Radiozenders & Muziek</option>
+                        <option value="Chat">💬 Chat en Groepen</option>
+                        <option value="Profiel">👤 Profiel of Avatar</option>
+                        <option value="Minesweeper">💣 Games of Mijnenveger</option>
+                        <option value="Anders">🌀 Anders / Algemeen</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[9.5px] font-black text-[#1C427F] uppercase tracking-wider block text-left"> Leg het kort uit </label>
+                      <textarea
+                        required
+                        placeholder="Wat gaat er precies mis?..."
+                        value={bugDescription}
+                        onChange={(e) => setBugDescription(e.target.value)}
+                        rows={3}
+                        className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text resize-none text-left font-medium"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingBug}
+                      className="w-full bg-gradient-to-r from-red-600 via-rose-700 to-red-800 hover:from-red-500 hover:to-red-700 text-white text-xs font-black py-2 rounded-lg border border-red-950 active:scale-95 transition-all text-center flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <span>Meld Bug aan Robbin 🐞</span>
+                    </button>
+                  </form>
+                )}
               </div>
 
-              <a
-                href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
-                  `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
-                )}`}
-                onClick={() => hiveAudio.playNotification()}
-                className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <span>✉️ Uitnodigen via E-mail</span>
-              </a>
-            </div>
-          </div>
+              {/* Bug List Feed Box */}
+              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                <div className="font-sans font-black text-[#1C427F] text-xs uppercase tracking-wide border-b border-slate-100 pb-1.5 flex items-center justify-between">
+                  <span>Meldingen overzicht ({bugsList.length})</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                </div>
 
-          {/* Box 3: Classic Dutch Buzzi Mini-Games advert panel */}
-          <div className="bg-stone-900 border border-stone-800 text-stone-100 rounded-xl p-4 shadow-md relative">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-1.5">
-              <span className="font-mono text-[9px] text-[#8cc63f] tracking-widest font-bold">BUZZI_GAMES_ONLINE</span>
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <div className="mt-2.5 space-y-2 max-h-[290px] overflow-y-auto custom-scrollbar">
+                  {bugsList.length === 0 ? (
+                    <div className="text-[10.5px] text-slate-400 italic py-4 text-center">
+                      Helemaal gratis van bugs! Geen fouten gemeld. 🥇
+                    </div>
+                  ) : (
+                    bugsList.map((bug: any, idx: number) => {
+                      let catEmoji = "🌀";
+                      if (bug.category === "Radio") catEmoji = "📻";
+                      if (bug.category === "Chat") catEmoji = "💬";
+                      if (bug.category === "Profiel") catEmoji = "👤";
+                      if (bug.category === "Minesweeper") catEmoji = "💣";
+
+                      const isAdmin = currentUser?.email?.toLowerCase() === "prinsrobbin@gmail.com" || 
+                                      userDisplayName.toLowerCase().includes("robbin");
+
+                      return (
+                        <div key={bug.id || idx} className="p-2 bg-[#fdfdfd] border border-slate-200 rounded text-left shadow-xs">
+                          <div className="flex items-start gap-1">
+                            <span className="text-xs shrink-0">{catEmoji}</span>
+                            <div className="flex-1 min-w-0 pr-1">
+                              <span className="text-[11px] font-black text-slate-800 block truncate">
+                                {bug.title}
+                              </span>
+                              <span className="text-[8px] font-black bg-rose-50 border border-rose-200 text-rose-600 rounded px-1 py-0.2 select-none inline-block mt-0.5 uppercase tracking-wide leading-none">
+                                Under review
+                              </span>
+                              <p className="text-[10px] text-slate-600 leading-normal mt-1 whitespace-pre-wrap select-text selection:bg-rose-100">
+                                {bug.description}
+                              </p>
+                              <div className="mt-1.5 border-t border-slate-100 pt-1 flex items-center justify-between text-[8px] text-slate-400 font-bold uppercase tracking-wide">
+                                <span>Door: <span className="text-slate-600 font-black">{bug.senderName || bug.reporter}</span></span>
+                                <div className="flex items-center gap-1.5">
+                                  {isAdmin && (
+                                    <button
+                                      onClick={() => handleDeleteBug(bug.id)}
+                                      className="text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer lowercase flex items-center gap-0.5"
+                                      title="Verwijder deze bugmelding"
+                                    >
+                                      🗑️ verwijderen
+                                    </button>
+                                  )}
+                                  <span>{bug.timestamp ? new Date(bug.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "live"}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
-            
-            <div className="mt-3 space-y-2.5">
-              <p className="text-[10.5px] italic text-slate-300 leading-normal">
-                &ldquo;Wil je een potje Mijnenveger of Dammen spelen tegen me? Klik hieronder om me uit te dagen op Buzzi!&rdquo;
-              </p>
-              <button
-                onClick={() => {
-                  hiveAudio.playNotification();
-                  setIsMinesweeperOpen(true);
-                }}
-                className="w-full bg-[#8cc63f] hover:bg-[#a6d854] text-stone-950 text-xs font-black py-2 rounded-xl shadow border-2 border-[#5c8229] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Play className="w-3 h-3 fill-stone-950" />
-                <span>Mijnenveger Spelen ! 💣</span>
-              </button>
-            </div>
-          </div>
+          )}
 
         </div>
 
