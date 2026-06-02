@@ -5,6 +5,8 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { MongoClient, Db } from "mongodb";
+import https from "https";
+import http from "http";
 
 // Unified Local Database storage paths for standalone zero-config execution
 const USERS_FILE = path.join(process.cwd(), "data_users.json");
@@ -53,6 +55,15 @@ async function getMongoDb(): Promise<Db | null> {
     await mongoClient.connect();
     mongoDb = mongoClient.db("buzzi");
     console.log("Successfully connected to MongoDB Atlas!");
+    
+    // Attempt to drop the restrictive or stale index 'naam_1' to prevent duplicate key errors
+    try {
+      await mongoDb.collection("users").dropIndex("naam_1");
+      console.log("Successfully dropped stale index 'naam_1' from 'users' collection");
+    } catch (indexErr: any) {
+      console.log("Did not drop index 'naam_1' (it may not exist, or permissions are restricted):", indexErr.message);
+    }
+
     connectFailed = false;
     return mongoDb;
   } catch (err) {
@@ -191,6 +202,9 @@ async function startServer() {
 
       const docToInsert = {
         ...userData,
+        // Fallback: set 'naam' (the Dutch term for name) to a unique value (the user's uid)
+        // so that if dropping the unique index 'naam_1' failed, MongoDB encounters no duplicate keys
+        naam: userData.uid,
         updatedAtTimestamp: Date.now()
       };
 
@@ -222,6 +236,88 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // Streaming Audio Proxy to bypass CORS, Referrer, and redirect blocks (e.g., from archive.org)
+  app.get("/api/proxy-audio", (req, res) => {
+    const targetUrl = req.query.url as string;
+    if (!targetUrl) {
+      res.status(400).send("Geen url parameter opgegeven.");
+      return;
+    }
+
+    const proxyRequest = (urlToFetch: string, redirectCount = 0) => {
+      if (redirectCount > 5) {
+        res.status(500).send("Te veel redirects");
+        return;
+      }
+
+      try {
+        const parsedUrl = new URL(urlToFetch);
+        const protocol = parsedUrl.protocol === "https:" ? https : http;
+
+        const headers: Record<string, string> = {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        };
+        
+        // Only set archive.org Referer for archive.org URLs to avoid tracking/hotlink blocks on other sites
+        if (urlToFetch.includes("archive.org")) {
+          headers["Referer"] = "https://archive.org/";
+        } else {
+          headers["Referer"] = parsedUrl.origin;
+        }
+
+        if (req.headers.range) {
+          headers["range"] = req.headers.range;
+        }
+
+        const requestOptions = { 
+          headers,
+          rejectUnauthorized: false // Bypasses self-signed or misconfigured SSL certificates on older Radio servers
+        };
+
+        const targetReq = protocol.get(urlToFetch, requestOptions, (targetRes) => {
+          // Follow redirects (301, 302, 307, 308)
+          if (targetRes.statusCode && targetRes.statusCode >= 300 && targetRes.statusCode < 400 && targetRes.headers.location) {
+            let redirectUrl = targetRes.headers.location;
+            // Resolve relative URLs
+            if (!redirectUrl.startsWith("http:") && !redirectUrl.startsWith("https:")) {
+              redirectUrl = new URL(redirectUrl, urlToFetch).toString();
+            }
+            proxyRequest(redirectUrl, redirectCount + 1);
+            return;
+          }
+
+          // Write headers
+          const responseHeaders: Record<string, string> = {
+            "Content-Type": targetRes.headers["content-type"] || "audio/mpeg",
+            "Content-Length": targetRes.headers["content-length"] || "",
+            "Accept-Ranges": "bytes",
+            "Access-Control-Allow-Origin": "*",
+          };
+          if (targetRes.headers["content-range"]) {
+            responseHeaders["Content-Range"] = targetRes.headers["content-range"];
+          }
+
+          res.writeHead(targetRes.statusCode || 200, responseHeaders);
+          targetRes.pipe(res);
+        });
+
+        targetReq.on("error", (err) => {
+          console.error("Audio proxy request error:", urlToFetch, err);
+          if (!res.headersSent) {
+            res.status(500).send(err.message);
+          }
+        });
+      } catch (err: any) {
+        console.error("Audio proxy parser error:", urlToFetch, err);
+        if (!res.headersSent) {
+          res.status(500).send(err.message);
+        }
+      }
+    };
+
+    proxyRequest(targetUrl);
   });
 
   // API Route: Buzzi Bot Integration

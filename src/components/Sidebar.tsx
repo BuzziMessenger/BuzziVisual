@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Channel, Contact, StatusType } from "../types";
 import { 
   ChevronDown, 
@@ -14,8 +14,121 @@ import {
   Search,
   MessageSquare,
   Bot,
-  Trash2
+  Trash2,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Disc,
+  Radio,
+  Sliders
 } from "lucide-react";
+
+interface TrackItem {
+  title: string;
+  url: string;
+  artist: string;
+  genre: string;
+}
+
+const RETRO_PLAYLIST: TrackItem[] = [
+  {
+    title: "Radio 538 (Live FM) 📻",
+    url: "https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO538.mp3",
+    artist: "TALPA Network",
+    genre: "Pop / Top 40"
+  },
+  {
+    title: "Qmusic NL (Live) 📻",
+    url: "https://stream.qmusic.nl/qmusic/mp3",
+    artist: "DPG Media",
+    genre: "Actuele Pop & Hits"
+  },
+  {
+    title: "Radio 10 (Live) 📻",
+    url: "https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO10.mp3",
+    artist: "TALPA Network",
+    genre: "Classic Hits"
+  },
+  {
+    title: "Sky Radio (Live) 📻",
+    url: "https://playerservices.streamtheworld.com/api/livestream-redirect/SKYRADIO.mp3",
+    artist: "TALPA Network",
+    genre: "Easy Listening"
+  },
+  {
+    title: "Lekker Rocken: Radio Veronica 📻",
+    url: "https://playerservices.streamtheworld.com/api/livestream-redirect/VERONICA.mp3",
+    artist: "TALPA Network",
+    genre: "Pop & Rock Classics"
+  },
+  {
+    title: "KINK (Alternative Rock) 🎸",
+    url: "https://stream.kink.nl/kink.mp3",
+    artist: "KINK",
+    genre: "Alternative Rock"
+  },
+  {
+    title: "Arrow Classic Rock ⚡",
+    url: "https://stream.arrow.nl/arrowrock_mp3",
+    artist: "Arrow Classic",
+    genre: "Classic Rock"
+  },
+  {
+    title: "JOE (Live Retro Hits) 🕺",
+    url: "https://stream.joe.nl/joe_nl/mp3",
+    artist: "DPG Media",
+    genre: "70s, 80s & 90s Hits"
+  },
+  {
+    title: "SLAM! (Live Electronic) 🔊",
+    url: "https://stream.slam.nl/slam_mp3",
+    artist: "Mediahuis",
+    genre: "Dance & House Hits"
+  },
+  {
+    title: "100% NL (Nederpoppunk) 🇳🇱",
+    url: "https://stream.100p.nl/100pctnl.mp3",
+    artist: "Mediahuis",
+    genre: "Nederlandse Muziek"
+  },
+  {
+    title: "NPO Radio 2 (Live) 📻",
+    url: "https://icecast.omroep.nl/radio2-bb-mp3",
+    artist: "Publieke Omroep",
+    genre: "Pop & Classic Rock"
+  },
+  {
+    title: "NPO 3FM (Live & Nieuw) 📻",
+    url: "https://icecast.omroep.nl/3fm-bb-mp3",
+    artist: "Publieke Omroep",
+    genre: "Pop / Rock & Indie"
+  },
+  {
+    title: "Sublime FM (Jazz & Soul) 🎷",
+    url: "https://stream.sublime.nl/sublime_mp3",
+    artist: "Mediahuis",
+    genre: "Funk, Soul & Jazz"
+  },
+  {
+    title: "BNR Nieuwsradio (Live) 📰",
+    url: "https://stream.bnr.nl/bnr_mp3",
+    artist: "FD Mediagroep",
+    genre: "Nieuws & Actualiteiten"
+  },
+  {
+    title: "Radio 10 - 80s Hits 💫",
+    url: "https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO10_80S_HITS.mp3",
+    artist: "TALPA Network",
+    genre: "80s Pop Classics"
+  },
+  {
+    title: "NPO Klassiek (Radio 4) 🎻",
+    url: "https://icecast.omroep.nl/radio4-bb-mp3",
+    artist: "Publieke Omroep",
+    genre: "Klassieke Muziek"
+  }
+];
 
 interface SidebarProps {
   channels: Channel[];
@@ -37,6 +150,8 @@ interface SidebarProps {
   onUpdateStatus: (status: StatusType) => void;
   userAvatar: string;
   onUpdateAvatar: (avatar: string) => void;
+  userListeningTo: string;
+  onUpdateListeningTo: (msg: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -56,7 +171,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userStatus,
   onUpdateStatus,
   userAvatar,
-  onUpdateAvatar
+  onUpdateAvatar,
+  userListeningTo,
+  onUpdateListeningTo
 }) => {
   // Collapsible groups states
   const [onlineExpanded, setOnlineExpanded] = useState(true);
@@ -66,11 +183,109 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Edit fields visibility
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
+  const [isEditingListening, setIsEditingListening] = useState(false);
   const [tempName, setTempName] = useState(userDisplayName);
   const [tempMessage, setTempMessage] = useState(userPersonalMessage);
+  const [tempListening, setTempListening] = useState(userListeningTo);
 
   // Live Contact Search state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Buzzi Retro Player status
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
+  const [volume, setVolume] = useState(40);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [visualizerHeights, setVisualizerHeights] = useState<number[]>([4, 4, 4, 4, 4, 4]);
+
+  // Handle active audio element source and status securely
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    
+    const audio = audioRef.current;
+    audio.volume = volume / 100;
+
+    const streamHandler = () => {
+      // Avoid interrupting state
+    };
+
+    audio.addEventListener("error", streamHandler);
+    
+    if (isPlaying) {
+      const track = RETRO_PLAYLIST[currentTrackIdx];
+      
+      let audioUrl = track.url;
+      if (audioUrl.startsWith("http")) {
+        audioUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
+      }
+      
+      // Resolve to absolute path to guarantee exact comparison with browser's audio.src
+      const absoluteUrl = new URL(audioUrl, window.location.origin).toString();
+      
+      // If the source is different, load the new track
+      if (audio.src !== absoluteUrl) {
+        audio.src = absoluteUrl;
+        audio.load();
+      }
+      
+      // Update Buzzi live messenger listening status
+      onUpdateListeningTo(track.title);
+
+      audio.play().catch((err) => {
+        console.warn("Autoplay or stream initialization blocked:", err);
+      });
+    } else {
+      audio.pause();
+    }
+
+    return () => {
+      audio.removeEventListener("error", streamHandler);
+    };
+  }, [isPlaying, currentTrackIdx]);
+
+  // Adjust volume dynamically
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
+    }
+  }, [volume]);
+
+  // Visualizer bars dynamic bouncing loop
+  useEffect(() => {
+    if (!isPlaying) {
+      setVisualizerHeights([4, 4, 4, 4, 4, 4]);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setVisualizerHeights([
+        Math.floor(Math.random() * 22) + 2,
+        Math.floor(Math.random() * 22) + 2,
+        Math.floor(Math.random() * 22) + 2,
+        Math.floor(Math.random() * 22) + 2,
+        Math.floor(Math.random() * 22) + 2,
+        Math.floor(Math.random() * 22) + 2,
+      ]);
+    }, 150);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isPlaying]);
+
+  useEffect(() => {
+    setTempName(userDisplayName);
+  }, [userDisplayName]);
+
+  useEffect(() => {
+    setTempMessage(userPersonalMessage);
+  }, [userPersonalMessage]);
+
+  useEffect(() => {
+    setTempListening(userListeningTo);
+  }, [userListeningTo]);
 
   const handleUpdateName = () => {
     onUpdateDisplayName(tempName.trim() || userEmail.split("#pwd_")[0].split("@")[0]);
@@ -80,6 +295,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleUpdateMessage = () => {
     onUpdatePersonalMessage(tempMessage.trim() || "Typ hier je weergavenaam of statusbericht...");
     setIsEditingMessage(false);
+  };
+
+  const handleUpdateListening = () => {
+    onUpdateListeningTo(tempListening.trim());
+    setIsEditingListening(false);
   };
 
   // Get status color & label
@@ -256,10 +476,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-500 truncate">
-            <Music className="w-3 h-3 text-sky-600 flex-shrink-0 animate-pulse" />
-            <span className="truncate">Nu luistert naar: <em className="text-sky-800">My Chemical Romance - Helena (v1)</em></span>
-          </div>
+          {isEditingListening ? (
+            <input
+              type="text"
+              value={tempListening}
+              onChange={(e) => setTempListening(e.target.value)}
+              onBlur={handleUpdateListening}
+              onKeyDown={(e) => e.key === "Enter" && handleUpdateListening()}
+              className="w-full mt-1 text-[10px] bg-white border border-sky-400 rounded px-1 py-0.5 focus:outline-none"
+              autoFocus
+              placeholder="Typ status of muziek..."
+              maxLength={60}
+            />
+          ) : (
+            <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-500 truncate group/music">
+              <Music className={`w-3 h-3 flex-shrink-0 ${userListeningTo ? "text-sky-600 animate-pulse" : "text-slate-400"}`} />
+              {userListeningTo ? (
+                <span 
+                  onClick={() => {
+                    setTempListening(userListeningTo);
+                    setIsEditingListening(true);
+                  }}
+                  className="truncate text-slate-600 hover:text-[#1d5c8a] hover:bg-[#cfe1f5]/80 px-1 rounded cursor-pointer font-sans"
+                  title="Klik om muziekstatus te wijzigen"
+                >
+                  Luistert nu naar: <em className="text-sky-800 font-bold font-sans not-italic">{userListeningTo}</em>
+                </span>
+              ) : (
+                <span 
+                  onClick={() => {
+                    setTempListening("");
+                    setIsEditingListening(true);
+                  }}
+                  className="text-slate-400 hover:text-[#1d5c8a] cursor-pointer italic font-sans"
+                  title="Klik om muziek toe te voegen"
+                >
+                  Muziekstatus instellen...
+                </span>
+              )}
+              {userListeningTo && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTempListening("");
+                    onUpdateListeningTo("");
+                  }}
+                  className="text-[9px] text-rose-500 hover:text-rose-800 font-black cursor-pointer px-1 ml-0.5 opacity-40 hover:opacity-100"
+                  title="Muziekstatus leegmaken"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
 
           {onSignOut && (
             <button
@@ -282,6 +552,112 @@ export const Sidebar: React.FC<SidebarProps> = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+      </div>
+
+      {/* 📻 Winamp 2004 Buzzi Stereo Player */}
+      <div className="mx-2 my-2 p-2 bg-[#1b2533] border border-[#2d3a4e] rounded shadow-md text-emerald-400 font-mono text-[11px] select-none">
+        <div className="flex items-center justify-between mb-1 text-slate-400 text-[10px] border-b border-[#2d3a4e] pb-1">
+          <span className="flex items-center gap-1">
+            <Radio className={`w-3 h-3 text-sky-400 ${isPlaying ? "animate-pulse" : ""}`} />
+            <span>BUZZI STEREO (WINAMP v2.82)</span>
+          </span>
+          <span className="text-[9px] bg-sky-950 px-1 py-0.5 rounded text-sky-300 font-bold">STEREO</span>
+        </div>
+
+        {/* LCD-style visualization area */}
+        <div className="bg-[#0c121d] border border-[#2d3a4e] p-1.5 rounded flex items-center justify-between mb-1.5 relative overflow-hidden">
+          <div className="flex-1 min-w-0 pr-2">
+            <div className="text-emerald-500 font-bold truncate tracking-tight text-[11px]">
+              {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].title : "MUTED / IDLE"}
+            </div>
+            <div className="text-[9px] text-[#4d6a85] flex gap-2 mt-0.5">
+              <span>GENRE: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].genre : "NONE"}</span>
+              <span>BY: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].artist : "OFFLINE"}</span>
+            </div>
+          </div>
+
+          {/* Bouncing visualizer vertical frequencies */}
+          <div className="flex items-end gap-0.5 h-6 w-12 justify-end flex-shrink-0">
+            {visualizerHeights.map((h, i) => (
+              <span 
+                key={i} 
+                className="w-1.5 bg-gradient-to-t from-emerald-600 via-emerald-400 to-green-300 transition-all duration-100"
+                style={{ height: `${isPlaying ? h : 2}px` }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Volume controller slider bar */}
+        <div className="flex items-center gap-2 mb-1.5 text-slate-400 text-[9px] px-0.5">
+          <Sliders className="w-3 h-3 text-sky-500 flex-shrink-0" />
+          <span className="w-8">VOL: {volume}%</span>
+          <input 
+            type="range"
+            min="0"
+            max="100"
+            value={volume}
+            onChange={(e) => setVolume(Number(e.target.value))}
+            className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400 focus:outline-none"
+            title="Systeembediening Volume"
+          />
+        </div>
+
+        {/* Buttons & controllers */}
+        <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#1f2b3b]">
+          <div className="flex gap-1">
+            <button
+              onClick={() => {
+                if (currentTrackIdx > 0) {
+                  setCurrentTrackIdx(currentTrackIdx - 1);
+                } else {
+                  setCurrentTrackIdx(RETRO_PLAYLIST.length - 1);
+                }
+                setIsPlaying(true);
+              }}
+              className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
+              title="Vorige nummer"
+            >
+              ◀◀
+            </button>
+
+            {isPlaying ? (
+              <button
+                onClick={() => {
+                  setIsPlaying(false);
+                  onUpdateListeningTo("");
+                }}
+                className="px-2 py-0.5 bg-gradient-to-b from-amber-600 to-amber-900 border border-amber-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
+                title="Pauzeren"
+              >
+                ❚❚
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsPlaying(true)}
+                className="px-2 py-0.5 bg-gradient-to-b from-emerald-600 to-emerald-900 border border-emerald-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
+                title="Afspelen"
+              >
+                ▶
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setCurrentTrackIdx((currentTrackIdx + 1) % RETRO_PLAYLIST.length);
+                setIsPlaying(true);
+              }}
+              className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
+              title="Volgende nummer"
+            >
+              ▶▶
+            </button>
+          </div>
+
+          <div className="text-[9px] text-slate-400 font-bold">
+            {isPlaying ? "📻 ONLINE STREAM" : "📻 PAUSED"}
+          </div>
+        </div>
       </div>
 
       {/* Buddy List (Collapsible Groups with Classic Arrows) */}

@@ -191,6 +191,7 @@ export default function App() {
   const [userPersonalMessage, setUserPersonalMessage] = useState("Lekker chatten op Buzzi met Buzzi Bot! B-)");
   const [userStatus, setUserStatus] = useState<StatusType>("online");
   const [userAvatar, setUserAvatar] = useState("🧑‍🚀");
+  const [userListeningTo, setUserListeningTo] = useState("");
 
   // Account and Database states
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -311,7 +312,8 @@ export default function App() {
           email: user.email || "",
           avatar: "🧑‍🚀",
           status: "online",
-          personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)"
+          personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)",
+          listeningTo: ""
         };
         await fetch("/api/db/users", {
           method: "POST",
@@ -323,12 +325,14 @@ export default function App() {
         setUserPersonalMessage("Lekker chatten op Buzzi met Buzzi Bot! B-)");
         setUserAvatar("🧑‍🚀");
         setUserStatus("online");
+        setUserListeningTo("");
       } else {
         // Load existing saved profile details securely!
         setUserDisplayName(currentProfile.name || defaultName);
         setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)");
         setUserAvatar(currentProfile.avatar || "🧑‍🚀");
         setUserStatus((currentProfile.status as StatusType) || "online");
+        setUserListeningTo(currentProfile.listeningTo || "");
       }
     } catch (err) {
       console.warn("User profile init failed, falling back to state:", err);
@@ -351,6 +355,7 @@ export default function App() {
           avatar: userAvatar,
           status: userStatus,
           personalMessage: userPersonalMessage,
+          listeningTo: userListeningTo,
           ...fields
         })
       });
@@ -446,6 +451,7 @@ export default function App() {
               avatar: data.avatar || "🧑‍🚀",
               status: (data.status as StatusType) || "online",
               personalMessage: data.personalMessage || "",
+              listeningTo: data.listeningTo || "",
             }));
           setRegisteredUsers(filtered);
         }
@@ -464,11 +470,21 @@ export default function App() {
   const currentBuddies = (isDemoUser
     ? [
         ...INITIAL_CONTACTS,
-        ...registeredUsers.filter(u => !INITIAL_CONTACTS.some(ic => ic.email === u.email))
+        ...registeredUsers.filter(u => 
+          !INITIAL_CONTACTS.some(ic => ic.email === u.email) &&
+          u.email !== currentUser?.email &&
+          !u.name?.toLowerCase().includes("robbin") &&
+          !u.email?.toLowerCase().includes("robbin")
+        )
       ]
     : [
         INITIAL_CONTACTS[0], // Keep Buzzi Bot!
-        ...registeredUsers.filter(u => u.id !== "queen" && u.email !== "buzzi_bot@live.nl" && !INITIAL_CONTACTS.some(ic => ic.id !== "queen" && ic.email === u.email))
+        ...registeredUsers.filter(u => 
+          u.id !== "queen" && 
+          u.email !== "buzzi_bot@live.nl" && 
+          u.email !== currentUser?.email &&
+          !INITIAL_CONTACTS.some(ic => ic.id !== "queen" && ic.email === u.email)
+        )
       ]).filter(c => !deletedContactIds.includes(c.id));
 
   const visibleChannels = isDemoUser ? channels : [];
@@ -554,6 +570,10 @@ export default function App() {
   const handleUpdateAvatar = (val: string) => {
     setUserAvatar(val);
     updateProfileInDatabase({ avatar: val });
+  };
+  const handleUpdateListeningTo = (val: string) => {
+    setUserListeningTo(val);
+    updateProfileInDatabase({ listeningTo: val });
   };
 
   const handleSignOut = async () => {
@@ -935,6 +955,8 @@ export default function App() {
           onUpdateStatus={handleUpdateStatus}
           userAvatar={userAvatar}
           onUpdateAvatar={handleUpdateAvatar}
+          userListeningTo={userListeningTo}
+          onUpdateListeningTo={handleUpdateListeningTo}
         />
       </div>
 

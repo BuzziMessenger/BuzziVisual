@@ -18,7 +18,7 @@ function simpleHash(str: string): string {
 }
 
 export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
-  const [activeTab, setActiveTab ] = useState<"google" | "custom">("custom");
+  const [activeTab, setActiveTab ] = useState<"custom" | "guest">("custom");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +31,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [typedName, setTypedName] = useState("");
   const [typedPassword, setTypedPassword] = useState("");
   const [emailFlow, setEmailFlow] = useState<"login" | "register">("login");
+  const [selectedAvatar, setSelectedAvatar] = useState("🧑‍🚀");
+  const [personalMessage, setPersonalMessage] = useState("Lekker chatten op Buzzi met Buzzi Bot! B-)");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -57,106 +59,6 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       console.warn("Could not read remembered Buzzi login credentials:", e);
     }
   }, []);
-
-  // Authenticate with Google (Mock Passport Network Integration)
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    hiveAudio.playHoneyPop();
-    try {
-      // Simulate quick-login with safe developer credentials
-      const mockName = invitedBy ? `Vriend van ${invitedBy}` : "Google Buzzi Vriend";
-      const mockEmail = `google_passport_${Date.now()}@buzzi.nl#pwd_google`;
-      
-      const newGoogleUser = {
-        uid: "u_google_" + Date.now(),
-        name: mockName,
-        email: mockEmail,
-        avatar: "🧑‍🚀",
-        status: "online",
-        personalMessage: "Aangemeld met Google ID! B-)"
-      };
-
-      // Auto register/sync google user profile
-      try {
-        await fetch("/api/db/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newGoogleUser)
-        });
-      } catch (dbErr) {
-        console.warn("Google sync to database failed, syncing to local storage backup:", dbErr);
-      }
-
-      // Save to local backup list so it is immediately registered anywhere
-      try {
-        const backupStr = localStorage.getItem("buzzi_backup_users_list");
-        const backupList = backupStr ? JSON.parse(backupStr) : [];
-        backupList.push(newGoogleUser);
-        localStorage.setItem("buzzi_backup_users_list", JSON.stringify(backupList));
-      } catch (e) {
-        console.error(e);
-      }
-
-      hiveAudio.playNotification();
-      onLoginSuccess(mockName, mockEmail);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Aanmelden met Google ID mislukt: " + (err.message || "Probeer het opnieuw"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Authenticate with Facebook (Mock Passport Network Integration)
-  const handleFacebookLogin = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    hiveAudio.playHoneyPop();
-    try {
-      // Simulate quick-login with safe developer credentials
-      const mockName = invitedBy ? `Vriend van ${invitedBy}` : "Facebook Buzzi Vriend";
-      const mockEmail = `facebook_passport_${Date.now()}@buzzi.nl#pwd_facebook`;
-      
-      const newFbUser = {
-        uid: "u_facebook_" + Date.now(),
-        name: mockName,
-        email: mockEmail,
-        avatar: "⚡",
-        status: "online",
-        personalMessage: "Aangemeld met Facebook ID! B-)"
-      };
-
-      // Auto register/sync facebook user profile
-      try {
-        await fetch("/api/db/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newFbUser)
-        });
-      } catch (dbErr) {
-        console.warn("Facebook sync to database failed, syncing to local storage backup:", dbErr);
-      }
-
-      // Save to local backup list so it is immediately registered anywhere
-      try {
-        const backupStr = localStorage.getItem("buzzi_backup_users_list");
-        const backupList = backupStr ? JSON.parse(backupStr) : [];
-        backupList.push(newFbUser);
-        localStorage.setItem("buzzi_backup_users_list", JSON.stringify(backupList));
-      } catch (e) {
-        console.error(e);
-      }
-
-      hiveAudio.playNotification();
-      onLoginSuccess(mockName, mockEmail);
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Aanmelden met Facebook ID mislukt: " + (err.message || "Probeer het opnieuw"));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Custom email login / signup backed by Node/MongoDB with persistent fallback
   const handleCustomEmailLogin = async (e: React.FormEvent) => {
@@ -252,9 +154,9 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           uid: userUid,
           name: typedName.trim(),
           email: finalizedEmail,
-          avatar: "🧑‍🚀",
+          avatar: selectedAvatar,
           status: "online",
-          personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)"
+          personalMessage: personalMessage
         };
 
         // Try DB write, fail elegantly without aborting the login
@@ -350,41 +252,41 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               setActiveTab("custom");
               setErrorMsg("");
             }}
-            className={`text-xs font-black py-2 rounded-md transition-all cursor-pointer whitespace-nowrap text-center ${
+            className={`text-[11.5px] font-black py-2.5 rounded-md transition-all cursor-pointer whitespace-nowrap text-center ${
               activeTab === "custom"
-                ? "bg-white text-[#1C427F] shadow-sm border border-slate-300"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-[#1C427F] text-white shadow-sm"
+                : "text-slate-600 hover:text-[#1C427F]"
             }`}
           >
-            📧 E-mailadres
+            📧 E-mail & Wachtwoord
           </button>
           <button
             type="button"
             onClick={() => {
-              setActiveTab("google");
+              setActiveTab("guest");
               setErrorMsg("");
             }}
-            className={`text-xs font-black py-2 rounded-md transition-all cursor-pointer whitespace-nowrap text-center ${
-              activeTab === "google"
-                ? "bg-white text-[#1C427F] shadow-sm border border-slate-300"
-                : "text-slate-600 hover:text-slate-900"
+            className={`text-[11.5px] font-black py-2.5 rounded-md transition-all cursor-pointer whitespace-nowrap text-center ${
+              activeTab === "guest"
+                ? "bg-[#1C427F] text-white shadow-sm"
+                : "text-slate-600 hover:text-[#1C427F]"
             }`}
           >
-            🌐 Snelstart
+            ⚡ Gast Snelstart
           </button>
         </div>
 
         {/* Info Banner */}
-        <div className="mx-6 mb-3 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 rounded-xl p-3 flex items-start gap-2 shadow-sm text-left shrink-0">
+        <div className="mx-6 mb-3 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 rounded-xl p-3 flex items-start gap-2 shadow-sm text-left shrink-0 animate-fade-in">
           <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <div className="text-emerald-950 text-[10px] font-black uppercase tracking-wider">
-              {activeTab === "google" ? "Snelstart Gateway:" : "Lokale Beveiliging:"}
+              {activeTab === "guest" ? "Gast Toegang Snelstart:" : "Veilige Logingegevens:"}
             </div>
             <p className="text-[10px] text-emerald-900 leading-normal font-medium font-sans">
-              {activeTab === "google"
-                ? "Meld je direct en razendsnel aan met ons standaard Buzzi Google ID of Buzzi Facebook ID."
-                : "Kies een persoonlijk wachtwoord of inlogcode bij je adres. De eerste keer stelt dit jouw wachtwoord in, de volgende keren beveiligt dit jouw chatgesprekken!"}
+              {activeTab === "guest"
+                ? "Meld je direct en anoniem aan als Buzzi Gast om de chat meteen uit te proberen, zonder wachtwoord."
+                : "Registreer de eerste keer gratis je e-mail met een wachtwoord naar keuze. Dit beveiligt jouw profiel en chatgesprekken!"}
             </p>
           </div>
         </div>
@@ -404,7 +306,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Dynamic form rendering */}
         {activeTab === "custom" && (
-          <div className="flex-1 flex flex-col justify-between">
+          <div className="flex-1 flex flex-col justify-between animate-fade-in">
             {/* Sub-tabs login vs register */}
             <div className="mx-6 mt-1 mb-2 flex bg-[#dfebf7] p-1 rounded-lg border border-[#abc4df] gap-1 shrink-0">
               <button
@@ -457,20 +359,87 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
                 {/* Display Name Input */}
                 {emailFlow === "register" && (
-                  <div className="flex flex-col gap-1 text-left animate-fade-in">
-                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
-                      <User className="w-3.5 h-3.5" />
-                      <span>Buzzi Schermnaam</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="bijvoorbeeld: Robin [B-)]"
-                      value={typedName}
-                      onChange={(e) => setTypedName(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"
-                    />
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-1 text-left animate-fade-in">
+                      <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Buzzi Schermnaam</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="bijvoorbeeld: Robin [B-)]"
+                        value={typedName}
+                        onChange={(e) => setTypedName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"
+                      />
+                    </div>
+
+                    {/* Choose Emoji Avatar */}
+                    <div className="flex flex-col gap-1 text-left animate-fade-in">
+                      <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
+                        <span>🧩</span>
+                        <span>Kies je Buzzi Avatar</span>
+                      </label>
+                      <div className="bg-[#DCE7F3] p-1.5 rounded-lg border border-[#B9CEDF] grid grid-cols-8 gap-1.5 justify-center">
+                        {["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕"].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAvatar(emoji);
+                              hiveAudio.playHoneyPop();
+                            }}
+                            className={`w-7 h-7 text-sm rounded bg-white hover:bg-sky-100 border flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                              selectedAvatar === emoji
+                                ? "border-[#1C427F] bg-[#CFE1F5] outline-none ring-2 ring-sky-500 scale-110"
+                                : "border-slate-300"
+                            }`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Choose Personal Status message preset */}
+                    <div className="flex flex-col gap-1 text-left animate-fade-in">
+                      <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
+                        <span>💬</span>
+                        <span>Kies of typ je statusbericht</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Typ je eigen status..."
+                        value={personalMessage}
+                        onChange={(e) => setPersonalMessage(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"
+                      />
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {[
+                          "Lekker chatten op Buzzi! 😎",
+                          "Aan het rocken op Veronica 🎸",
+                          "Offline vibe, online chat B-)",
+                          "Zoemend de dag door! 🐝",
+                          "Druk bezig met gamen 🎮"
+                        ].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setPersonalMessage(preset)}
+                            className={`text-[8.5px] px-1.5 py-0.5 rounded border text-slate-700 font-medium cursor-pointer transition-all ${
+                              personalMessage === preset
+                                ? "bg-[#1C427F] text-white border-[#1C427F]"
+                                : "bg-[#EAEEF4] hover:bg-[#D9E4EF] border-[#B9CEDF]"
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {/* Buzzi Wachtwoord / Inlogcode input */}
@@ -512,40 +481,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </div>
         )}
 
-        {/* Google & Facebook Snelstart Tab */}
-        {activeTab === "google" && (
-          <div className="px-6 pb-6 pt-2 flex-1 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="text-center text-[10.5px] font-bold text-slate-500 pb-1">
-                Kies een provider om direct veilig en snel in te loggen
-              </div>
-
-              {/* Google Button */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-[#2B80EB] to-[#155FB7] hover:from-[#3D8CF2] hover:to-[#1B6ECC] text-white text-xs font-black py-2.5 rounded-xl shadow-md border-2 border-[#1E56A0] flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider disabled:opacity-50"
-              >
-                <span className="text-base">🌐</span>
-                <span>{loading ? "Verbinding maken..." : "Google ID Snel Inloggen"}</span>
-              </button>
-
-              {/* Facebook Button */}
-              <button
-                type="button"
-                onClick={handleFacebookLogin}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-[#1877F2] to-[#145DBE] hover:from-[#3D8CF2] hover:to-[#1B6ECC] text-white text-xs font-black py-2.5 rounded-xl shadow-md border-2 border-[#0E499D] flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider disabled:opacity-50"
-              >
-                <span className="text-base">👥</span>
-                <span>{loading ? "Netwerk autoriseren..." : "Facebook Snel Inloggen"}</span>
-              </button>
-
-              <div className="flex items-center py-0.5 justify-center gap-2">
-                <span className="h-px bg-slate-300 w-full" />
-                <span className="text-[9px] text-slate-400 font-bold uppercase shrink-0">OF</span>
-                <span className="h-px bg-slate-300 w-full" />
+        {/* Gast Snelstart Tab */}
+        {activeTab === "guest" && (
+          <div className="px-6 pb-6 pt-2 flex-1 flex flex-col justify-between animate-fade-in">
+            <div className="space-y-4 text-center">
+              <div className="text-[11px] font-bold text-slate-500 leading-relaxed py-1">
+                Wil je liever anoniem rondkijken? Met onze Gast inlogfunctie ben je direct startklaar zonder e-mail of wachtwoord op te hoeven geven.
               </div>
 
               <button
@@ -554,11 +495,15 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   hiveAudio.playNotification();
                   onLoginSuccess("Buzzi Gast", "gast@buzzi.nl#pwd_local");
                 }}
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-2.5 rounded-xl shadow-md border-2 border-amber-700 flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider"
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-3 rounded-xl shadow-md border-2 border-amber-700 flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider"
               >
-                <span className="text-base">⚡</span>
-                <span>Gast Inloggen (Offline Modus)</span>
+                <span className="text-lg">⚡</span>
+                <span>Als Gast Binnengaan (Direct Chatten)</span>
               </button>
+
+              <div className="text-[9.5px] italic text-slate-400">
+                (Let op: Gast-accounts bewaren geen chatgeschiedenis bij het wissen van browsergegevens)
+              </div>
             </div>
           </div>
         )}

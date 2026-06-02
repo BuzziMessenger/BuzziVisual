@@ -26,7 +26,7 @@ export interface Contact {
   avatar: string;
   status: StatusType;
   personalMessage: string;
-  listeningTo?: string; // Buzzi Music feature: "Nu luistert naar: ..."
+  listeningTo?: string; // Buzzi Music feature: "Luistert nu naar: ..."
 }
 
 export interface Channel {
