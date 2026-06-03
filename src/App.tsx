@@ -386,21 +386,6 @@ export default function App() {
     }
   };
 
-try {
-        console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanTargetEmail);
-
-        // We sturen vanaf nu nog maar ÉÉN verzoek naar de server.
-        // Geen automatische tegen-verzoeken meer, dat voorkomt de ping-pong loop!
-        await fetch("/api/friend-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fromEmail: cleanMyEmail,
-            fromName: userDisplayName,
-            toEmail: cleanInviteEmail
-          })
-        });
-
         hiveAudio.playNotification();
 
         // Vervang 'cleanInviteEmail' door 'cleanTargetEmail' (of targetEmail)
