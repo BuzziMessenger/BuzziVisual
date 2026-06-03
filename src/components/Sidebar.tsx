@@ -482,10 +482,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   setTempName(userDisplayName);
                   setIsEditingName(true);
                 }}
-                className="text-sm font-bold text-slate-800 hover:bg-[#cfe1f5] px-1 py-0.5 rounded cursor-pointer truncate max-w-[150px]"
+                className="text-sm font-bold text-slate-800 hover:bg-[#cfe1f5] px-1 py-0.5 rounded cursor-pointer truncate max-w-[150px] inline-flex items-center gap-1"
                 title="Klik om je weergavenaam aan te passen (H)"
               >
-                {userDisplayName}
+                {(userEmail?.toLowerCase() === "prinsrobbin@gmail.com" || userDisplayName?.toLowerCase().includes("robbin") || userDisplayName?.toLowerCase().includes("admin")) && (
+                  <span className="text-amber-500 animate-pulse text-xs" title="Buzzi Systeem Administrator 👑">👑</span>
+                )}
+                <span>{userDisplayName}</span>
               </span>
             )}
 
@@ -858,8 +861,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                       
                       <div className="flex-1 min-w-0 pr-1">
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {contact.name}
+                        <span className="text-xs font-bold text-slate-800 truncate block flex items-center gap-1">
+                          {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
+                            <span className="text-amber-500 animate-pulse text-[10px]" title="Buzzi Systeem Administrator 👑">👑</span>
+                          )}
+                          <span>{contact.name}</span>
                         </span>
                         <p className="text-[10.5px] text-slate-400 italic truncate leading-none mt-0.5">
                           &ldquo;{contact.personalMessage}&rdquo;
@@ -917,7 +923,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon("offline")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs text-slate-600 font-medium truncate block">{contact.name}</span>
+                        <span className="text-xs text-slate-600 font-medium truncate block flex items-center gap-1">
+                          {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
+                            <span className="text-amber-500 text-[10px]" title="Buzzi Systeem Administrator 👑 font-bold">👑</span>
+                          )}
+                          <span>{contact.name}</span>
+                        </span>
                         <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>
                       </div>
                     </button>
@@ -1000,11 +1011,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* User Info footer (Classic Windows XP bottom status line) */}
       <div className="p-3 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.3</span>
+          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.4</span>
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm" />
           <span className="font-semibold text-[11px] font-sans">Buzzi Service: Verbonden</span>
         </div>
-        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.3</span>
+        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.4</span>
       </div>
 
       {/* Avatar Picker Modal */}

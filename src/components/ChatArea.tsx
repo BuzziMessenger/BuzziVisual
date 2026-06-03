@@ -456,8 +456,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   className="space-y-0.5 leading-relaxed font-sans"
                 >
                   {/* Buzzi style message header: "Robbin zegt (12:04):" */}
-                  <div className="text-xs select-none flex items-center gap-1.5 pt-1">
-                    <span className={`font-bold ${isMe ? "text-slate-500" : isQueen ? "text-sky-700" : "text-emerald-700"}`}>
+                  <div className="text-xs select-none flex items-center gap-1 pt-1">
+                    <span className={`font-bold inline-flex items-center gap-1.5 ${isMe ? "text-slate-500" : isQueen ? "text-sky-700" : "text-emerald-700"}`}>
+                      {(msg.senderName?.toLowerCase().includes("robbin") || msg.senderName?.toLowerCase().includes("admin") || msg.senderName?.toLowerCase().includes("operator")) && (
+                        <span className="text-amber-500 animate-pulse text-[11px]" title="Buzzi Systeem Administrator 👑">👑</span>
+                      )}
                       {msg.senderName} zegt:
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">({msg.timestamp})</span>

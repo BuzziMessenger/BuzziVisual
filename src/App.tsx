@@ -217,6 +217,14 @@ export default function App() {
   const [bugSuccess, setBugSuccess] = useState(false);
   const [isSubmittingBug, setIsSubmittingBug] = useState(false);
 
+  // Soft toast state for retro alerts/friendship confirmation
+  const [buzziToast, setBuzziToast] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    avatar?: string;
+  } | null>(null);
+
   // Copy Link State
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
   const handleCopyInviteLink = () => {
@@ -357,6 +365,19 @@ export default function App() {
         setUserAvatar(currentProfile.avatar || "🧑‍🚀");
         setUserStatus((currentProfile.status as StatusType) || "online");
         setUserListeningTo(currentProfile.listeningTo || "");
+
+        // Keep local storage synchronized for persistent seamless log-ins
+        if (currentProfile.name) {
+          localStorage.setItem("buzzi_remembered_name", currentProfile.name);
+          const savedUser = localStorage.getItem("buzzi_user");
+          if (savedUser) {
+            try {
+              const parsed = JSON.parse(savedUser);
+              parsed.displayName = currentProfile.name;
+              localStorage.setItem("buzzi_user", JSON.stringify(parsed));
+            } catch (e) {}
+          }
+        }
       }
     } catch (err) {
       console.warn("User profile init failed, falling back to state:", err);
@@ -456,6 +477,144 @@ export default function App() {
     }
     setAuthInitialized(true);
   }, [activeDbMode]);
+
+  // Handle URL-based / localStorage-based friend invitation auto-connect
+  useEffect(() => {
+    if (!currentUser || !currentUser.email) return;
+
+    const checkAndProcessInvite = async () => {
+      let invitedByVal = null;
+      let inviteEmailVal = null;
+
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        invitedByVal = params.get("invitedBy");
+        inviteEmailVal = params.get("inviteEmail");
+      }
+
+      // Check localStorage backup
+      if (!inviteEmailVal) {
+        try {
+          const cached = localStorage.getItem("buzzi_pending_invite");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            invitedByVal = parsed.invitedBy;
+            inviteEmailVal = parsed.inviteEmail;
+          }
+        } catch (e) {
+          console.warn("Fout bij laden pending uitnodiging uit cache:", e);
+        }
+      } else if (invitedByVal) {
+        // Safe keep in cache
+        try {
+          localStorage.setItem("buzzi_pending_invite", JSON.stringify({ invitedBy: invitedByVal, inviteEmail: inviteEmailVal }));
+        } catch {}
+      }
+
+      if (!inviteEmailVal) return;
+
+      const cleanInviteEmail = inviteEmailVal.trim().toLowerCase();
+      const cleanMyEmail = currentUser.email.split("#pwd_")[0].trim().toLowerCase();
+
+      // Avoid self invite
+      if (cleanInviteEmail === cleanMyEmail) {
+        try {
+          localStorage.removeItem("buzzi_pending_invite");
+        } catch {}
+        return;
+      }
+
+      try {
+        console.log("Processing mutual auto-invite from:", cleanInviteEmail, "to current:", cleanMyEmail);
+
+        // 1. Send / register invite request in backend from Inviter -> Invitee
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromEmail: cleanInviteEmail,
+            fromName: invitedByVal || "Buzzi Vriend",
+            toEmail: cleanMyEmail
+          })
+        });
+
+        // 2. Also save reciprocal user profile in backend if missing so they instantly exist in list
+        await fetch("/api/db/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: `u_${simpleHash(cleanInviteEmail)}`,
+            name: invitedByVal || "Buzzi Vriend",
+            email: cleanInviteEmail,
+            avatar: "🧑‍🚀",
+            status: "online",
+            personalMessage: "Gezellig samen vrienden op Buzzi! :-)"
+          })
+        });
+
+        // 3. Send mutual request Invitee -> Inviter (automatically confirming bilateral relation)
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromEmail: cleanMyEmail,
+            fromName: userDisplayName,
+            toEmail: cleanInviteEmail
+          })
+        });
+
+        // Play authentic Buzzi online sound!
+        hiveAudio.playNotification();
+
+        // Display beautiful bottom right toast!
+        setBuzziToast({
+          show: true,
+          title: "Vriend Toegevoegd! 🎉",
+          message: `${invitedByVal || "Buzzi Gebruiker"} is zojuist automatisch aan je contactenlijst toegevoegd via de uitnodigingslink!`,
+          avatar: "🧑‍🚀"
+        });
+
+        // Clean up URL search parameters cleanly matching native window state
+        try {
+          if (typeof window !== "undefined" && window.history.replaceState) {
+            const tempUrl = new URL(window.location.href);
+            tempUrl.searchParams.delete("invitedBy");
+            tempUrl.searchParams.delete("inviteEmail");
+            window.history.replaceState({}, document.title, tempUrl.pathname + tempUrl.search);
+          }
+        } catch {}
+
+        // Remove from pending cache so they don't get infinite toast notifications
+        try {
+          localStorage.removeItem("buzzi_pending_invite");
+        } catch {}
+
+        // Refresh registeredUsers immediately
+        const syncRes = await fetch("/api/db/users?t=" + Date.now());
+        if (syncRes.status === 200) {
+          const ulist = await syncRes.json();
+          const filtered = ulist
+            .filter((data: any) => data.uid !== currentUser.uid)
+            .map((data: any) => ({
+              id: data.uid,
+              name: data.name || "Buzzi Gebruiker",
+              email: data.email || "",
+              avatar: data.avatar || "🧑‍🚀",
+              status: data.status || "online",
+              personalMessage: data.personalMessage || "",
+              listeningTo: data.listeningTo || "",
+            }));
+          setRegisteredUsers(filtered);
+        }
+
+      } catch (err) {
+        console.error("Fout bij runnen van auto invite link handler:", err);
+      }
+    };
+
+    const runT = setTimeout(checkAndProcessInvite, 1500);
+    return () => clearTimeout(runT);
+  }, [currentUser, userDisplayName]);
 
   // Sync users in real-time (Polling from Express Server / MongoDB / Local JSON)
   useEffect(() => {
@@ -874,6 +1033,12 @@ export default function App() {
   // Sync methods
   const handleUpdateDisplayName = (val: string) => {
     setUserDisplayName(val);
+    if (currentUser) {
+      const updatedUser = { ...currentUser, displayName: val };
+      localStorage.setItem("buzzi_user", JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+    }
+    localStorage.setItem("buzzi_remembered_name", val);
     updateProfileInDatabase({ name: val });
   };
   const handleUpdatePersonalMessage = (val: string) => {
@@ -1540,6 +1705,122 @@ export default function App() {
           ) : (
             /* Bug Reporting panel */
             <div className="space-y-4 font-sans text-xs">
+              {/* Beheerders Controlepaneel Block */}
+              {(currentUser?.email?.toLowerCase() === "prinsrobbin@gmail.com" || 
+                userDisplayName?.toLowerCase().includes("robbin") ||
+                userDisplayName?.toLowerCase().includes("admin") ||
+                userDisplayName?.toLowerCase().includes("operator")) && (
+                <div className="bg-[#FFFFED] border border-[#DE9E1F] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-[#DE9E1F]"></div>
+                  
+                  <h3 className="font-sans font-black text-[#855B04] text-[11px] flex items-center gap-1.5 pt-1 uppercase tracking-wide">
+                    <span>👑 OPERATOR CONTROLEPANEEL</span>
+                  </h3>
+                  
+                  <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed font-semibold">
+                    Welkom Beheerder! Wijzig instellingen of broadcasting live op Buzzi Buzzi!
+                  </p>
+
+                  <div className="mt-3.5 space-y-3 pt-2.5 border-t border-amber-200">
+                    {/* Systeembericht Broadcast */}
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] font-black text-[#855B04] uppercase tracking-wider text-left">📢 Systeembericht Uitzenden</div>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          id="admin_broadcast_input"
+                          placeholder="Bijv: Welkom op Buzzi Chat!..."
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const btn = document.getElementById("send_admin_broadcast") as HTMLButtonElement;
+                              if (btn) btn.click();
+                            }
+                          }}
+                          className="flex-1 bg-white border border-[#abc4df] rounded px-2 py-1 text-[11px] text-slate-800 focus:outline-none"
+                        />
+                        <button
+                          id="send_admin_broadcast"
+                          onClick={async () => {
+                            const inputEl = document.getElementById("admin_broadcast_input") as HTMLInputElement;
+                            if (inputEl && inputEl.value.trim()) {
+                              const alertMsg = inputEl.value.trim();
+                              
+                              // Trigger a simulated system announcement!
+                              await handleSendMessage(`📢 SYSTEM ALERT: ${alertMsg}`, false, false);
+                              
+                              // Play sweet notification sound!
+                              hiveAudio.playNotification();
+                              
+                              // Show soft confirmation toast
+                              setBuzziToast({
+                                show: true,
+                                title: "Omroep Voltooid! 🚀",
+                                message: `Je systeembericht "${alertMsg}" is uitgezonden op Buzzi!`,
+                                avatar: "👑"
+                              });
+                              inputEl.value = "";
+                            }
+                          }}
+                          className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10px] px-2.5 rounded font-black cursor-pointer active:scale-95 transition-all text-center"
+                        >
+                          Zend
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Geregistreerde Leden Quick View */}
+                    <div className="bg-white/90 border border-amber-200 rounded p-2 text-[10px] text-slate-700 space-y-1.5 shadow-2xs">
+                      <div className="font-extrabold text-[#855B04] uppercase tracking-wider flex items-center justify-between">
+                        <span>👥 Geregistreerde Leden ({registeredUsers.length + 1})</span>
+                      </div>
+                      <div className="max-h-[90px] overflow-y-auto space-y-1.5 custom-scrollbar font-mono text-[9px] text-slate-600">
+                        <div className="flex items-center justify-between py-0.5 border-b border-rose-50/60 bg-yellow-50/50">
+                          <span className="truncate pr-1">👑 [Beheerder] {userDisplayName}</span>
+                          <span className="shrink-0 text-[8.5px] font-bold text-amber-700 bg-amber-100 px-1 rounded">Admin</span>
+                        </div>
+                        {registeredUsers.map((u: any) => (
+                          <div key={u.id} className="flex items-center justify-between py-0.5 border-b border-slate-100">
+                            <span className="truncate pr-1" title={u.email}>{u.name || "Gast"} ({u.email ? u.email.split("@")[0] : "Gast"})</span>
+                            <span className={`shrink-0 text-[8px] font-bold px-1 rounded ${
+                              u.status === "online" ? "text-green-700 bg-green-50" : u.status === "bezet" ? "text-red-700 bg-red-50" : "text-slate-400 bg-slate-50"
+                            }`}>
+                              {u.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Multi-action quick bar */}
+                    <button
+                      onClick={async () => {
+                        const conf = window.confirm("Weet je zeker dat je alle lokaal opgeslagen bugs wilt leegmaken?");
+                        if (conf) {
+                          try {
+                            localStorage.removeItem("buzzi_local_bugs");
+                            hiveAudio.playHoneyPop();
+                            // Delete all bugs
+                            for (const bug of bugsList) {
+                              await fetch(`/api/bugs/${bug.id}`, { method: "DELETE" });
+                            }
+                            setBugsList([]);
+                            setBuzziToast({
+                              show: true,
+                              title: "Bugs Gewist! 🧹",
+                              message: "Alle lokaal en server opgeslagen bugs zijn succesvol leeggemaakt.",
+                              avatar: "🧹"
+                            });
+                          } catch (e) {}
+                        }
+                      }}
+                      className="w-full bg-[#FFFDF0] hover:bg-rose-50 border border-amber-300 text-rose-700 font-extrabold text-[9.5px] py-1.5 rounded active:scale-95 transition-all text-center cursor-pointer"
+                    >
+                      🧹 Bulk Wis Alle Foutmeldingen
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#e43a3a]"></div>
 
@@ -1731,6 +2012,27 @@ export default function App() {
 
       {isMinesweeperOpen && (
         <Minesweeper onClose={() => setIsMinesweeperOpen(false)} />
+      )}
+
+      {/* Classic MSN / Windows XP Bubble Notice Toast */}
+      {buzziToast && buzziToast.show && (
+        <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[9999] bg-gradient-to-b from-[#FFFDF0] via-[#FFFFED] to-[#FFEAA1] border border-[#DE9E1F] rounded-xl shadow-2xl p-4 max-w-[325px] flex items-start gap-3 border-l-[6px] border-l-[#EAA406] animate-bounce select-none">
+          {buzziToast.avatar && (
+            <div className="text-3xl shrink-0 select-none">{buzziToast.avatar}</div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-[10.5px] font-black text-[#855B04] uppercase tracking-wider mb-0.5 flex items-center justify-between">
+              <span>{buzziToast.title}</span>
+              <button 
+                onClick={() => setBuzziToast(null)}
+                className="hover:text-red-600 font-extrabold text-[12px] px-1.5 py-0.5 cursor-pointer leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-[11px] font-bold text-slate-700 leading-normal text-left">{buzziToast.message}</p>
+          </div>
+        </div>
       )}
     </div>
   );

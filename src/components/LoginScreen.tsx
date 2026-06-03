@@ -45,6 +45,13 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       if (hostInviteEmail) {
         setInviteEmail(hostInviteEmail);
       }
+      if (hostInviteEmail && hostInvitedBy) {
+        try {
+          localStorage.setItem("buzzi_pending_invite", JSON.stringify({ invitedBy: hostInvitedBy, inviteEmail: hostInviteEmail }));
+        } catch (e) {
+          console.warn("Fout bij opslaan pending uitnodiging:", e);
+        }
+      }
     }
     try {
       const rememberedEmail = localStorage.getItem("buzzi_remembered_email");
@@ -92,9 +99,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       // 1. Fetch current registered users from database or backup cache list
       let usersList = [];
       try {
-        const usersRes = await fetch("/api/db/users");
+        const usersRes = await fetch("/api/db/users?t=" + Date.now());
         if (usersRes.ok) {
           usersList = await usersRes.json();
+          try {
+            localStorage.setItem("buzzi_backup_users_list", JSON.stringify(usersList));
+          } catch (e) {}
         } else {
           const backup = localStorage.getItem("buzzi_backup_users_list");
           usersList = backup ? JSON.parse(backup) : [];
