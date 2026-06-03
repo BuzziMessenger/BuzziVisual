@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Smile, RefreshCw, X, Shield, Info, HelpCircle } from "lucide-react";
+import { Smile, RefreshCw, X, Play, RotateCcw } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 
 interface MinesweeperProps {
@@ -16,23 +16,25 @@ type Cell = {
 };
 
 export function Minesweeper({ onClose }: MinesweeperProps) {
+  const [activeTab, setActiveTab] = useState<"minesweeper" | "tictactoe" | "snake">("minesweeper");
+
+  // ==========================================
+  // 💣 MINESWEEPER STATE & LOGIC
+  // ==========================================
   const [gridSize, setGridSize] = useState({ rows: 9, cols: 9, minesCount: 10 });
   const [grid, setGrid] = useState<Cell[][]>([]);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-  const [win, setWin] = useState(false);
-  const [timer, setTimer] = useState(0);
+  const [minesweeperStarted, setMinesweeperStarted] = useState(false);
+  const [minesweeperGameOver, setMinesweeperGameOver] = useState(false);
+  const [minesweeperWin, setMinesweeperWin] = useState(false);
+  const [minesweeperTimer, setMinesweeperTimer] = useState(0);
   const [minesLeft, setMinesLeft] = useState(10);
   const [faceEmoji, setFaceEmoji] = useState("😀");
-  const [isFlagMode, setIsFlagMode] = useState(false); // Mobile flag placing helper toggle
+  const [isFlagMode, setIsFlagMode] = useState(false);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const minesTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize/Reset Board
-  const initBoard = () => {
+  const initMinesweeper = () => {
     const { rows, cols, minesCount } = gridSize;
-    
-    // Create empty cells
     let newGrid: Cell[][] = [];
     for (let r = 0; r < rows; r++) {
       const row: Cell[] = [];
@@ -49,7 +51,6 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
       newGrid.push(row);
     }
 
-    // Place mines randomly
     let minesPlaced = 0;
     while (minesPlaced < minesCount) {
       const r = Math.floor(Math.random() * rows);
@@ -60,12 +61,10 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
       }
     }
 
-    // Calculate neighboring mines numbers
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (newGrid[r][c].isMine) continue;
         let count = 0;
-        // Check 8 directions
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
             const nr = r + dr;
@@ -80,78 +79,68 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     }
 
     setGrid(newGrid);
-    setGameStarted(false);
-    setGameOver(false);
-    setWin(false);
-    setTimer(0);
+    setMinesweeperStarted(false);
+    setMinesweeperGameOver(false);
+    setMinesweeperWin(false);
+    setMinesweeperTimer(0);
     setMinesLeft(minesCount);
     setFaceEmoji("😀");
+    stopMinesTimer();
   };
 
-  // Run initial setup on mount
   useEffect(() => {
-    initBoard();
-    return () => stopTimer();
+    initMinesweeper();
+    return () => stopMinesTimer();
   }, [gridSize]);
 
-  // Timer effect
   useEffect(() => {
-    if (gameStarted && !gameOver && !win) {
-      intervalRef.current = setInterval(() => {
-        setTimer((t) => {
-          if (t >= 999) return 999;
-          return t + 1;
-        });
+    if (minesweeperStarted && !minesweeperGameOver && !minesweeperWin) {
+      minesTimerRef.current = setInterval(() => {
+        setMinesweeperTimer((t) => (t >= 999 ? 999 : t + 1));
       }, 1000);
     } else {
-      stopTimer();
+      stopMinesTimer();
     }
-    return () => stopTimer();
-  }, [gameStarted, gameOver, win]);
+    return () => stopMinesTimer();
+  }, [minesweeperStarted, minesweeperGameOver, minesweeperWin]);
 
-  const stopTimer = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const stopMinesTimer = () => {
+    if (minesTimerRef.current) {
+      clearInterval(minesTimerRef.current);
+      minesTimerRef.current = null;
     }
   };
 
-  // Reveal Cell Logic
   const revealCell = (r: number, c: number) => {
-    if (gameOver || win) return;
+    if (minesweeperGameOver || minesweeperWin) return;
     const currentCell = grid[r][c];
     if (currentCell.isRevealed || currentCell.isFlagged) return;
 
-    // First click triggers timer and guarantees safety if desired (optional, let's keep it classic and simple)
-    if (!gameStarted) {
-      setGameStarted(true);
+    if (!minesweeperStarted) {
+      setMinesweeperStarted(true);
     }
 
     setFaceEmoji("😮");
     setTimeout(() => {
-      if (!gameOver && !win) setFaceEmoji("😀");
+      if (!minesweeperGameOver && !minesweeperWin) setFaceEmoji("😀");
     }, 150);
 
     const nextGrid = [...grid.map((row) => [...row])];
 
-    // Hit a mine!
     if (currentCell.isMine) {
-      // Reveal all mines and trigger end
       revealAllMines(nextGrid, r, c);
-      setGameOver(true);
+      setMinesweeperGameOver(true);
       setFaceEmoji("😵");
-      hiveAudio.playNudge(0.4); // play retro rattle/exploded sound!
+      hiveAudio.playNudge(0.4);
       return;
     }
 
-    // Normal safe move
-    hiveAudio.playNotification(); // soft click sound!
+    hiveAudio.playNotification();
     floodReveal(nextGrid, r, c);
     setGrid(nextGrid);
-    checkWinCondition(nextGrid);
+    checkMinesWin(nextGrid);
   };
 
-  // Recurse / flood fill for empty cells
   const floodReveal = (g: Cell[][], r: number, c: number) => {
     const rows = g.length;
     const cols = g[0].length;
@@ -164,7 +153,6 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
       
       cell.isRevealed = true;
 
-      // If cell has 0 neighboring mines, flood reveal its neighbors
       if (cell.neighborMines === 0) {
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
@@ -182,7 +170,6 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     }
   };
 
-  // Reveal all when game lost
   const revealAllMines = (g: Cell[][], clickedR: number, clickedC: number) => {
     for (let r = 0; r < g.length; r++) {
       for (let c = 0; c < g[0].length; c++) {
@@ -194,8 +181,7 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     setGrid(g);
   };
 
-  // Check if player won
-  const checkWinCondition = (g: Cell[][]) => {
+  const checkMinesWin = (g: Cell[][]) => {
     let unrevealedSafeCount = 0;
     for (let r = 0; r < g.length; r++) {
       for (let c = 0; c < g[0].length; c++) {
@@ -207,37 +193,23 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     }
 
     if (unrevealedSafeCount === 0) {
-      setWin(true);
+      setMinesweeperWin(true);
       setFaceEmoji("😎");
-      hiveAudio.playCrazyWink(); // play win sound!
-      
-      // Auto-flag all mines
+      hiveAudio.playCrazyWink();
       const finalGrid = g.map((row) =>
-        row.map((cell) => {
-          if (cell.isMine) {
-            return { ...cell, isFlagged: true };
-          }
-          return cell;
-        })
+        row.map((cell) => (cell.isMine ? { ...cell, isFlagged: true } : cell))
       );
       setGrid(finalGrid);
       setMinesLeft(0);
     }
   };
 
-  // Right Click / Flag Toggle Logic
-  const handleRightClick = (e: React.MouseEvent, r: number, c: number) => {
-    e.preventDefault();
-    toggleFlag(r, c);
-  };
-
   const toggleFlag = (r: number, c: number) => {
-    if (gameOver || win) return;
+    if (minesweeperGameOver || minesweeperWin) return;
     const cell = grid[r][c];
     if (cell.isRevealed) return;
 
     hiveAudio.playNotification();
-
     const nextGrid = [...grid.map((row) => [...row])];
     const isNowFlagged = !cell.isFlagged;
     nextGrid[r][c].isFlagged = isNowFlagged;
@@ -254,176 +226,639 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     }
   };
 
-  // Get color depending on mine number
   const getNumberColorClass = (n: number) => {
     switch (n) {
-      case 1: return "text-blue-600 font-extrabold";
-      case 2: return "text-emerald-600 font-extrabold";
-      case 3: return "text-red-600 font-extrabold";
-      case 4: return "text-purple-800 font-extrabold";
-      case 5: return "text-amber-800 font-extrabold";
-      case 6: return "text-cyan-700 font-extrabold";
-      case 7: return "text-stone-900 font-extrabold";
-      case 8: return "text-zinc-500 font-extrabold";
+      case 1: return "text-blue-600 font-bold";
+      case 2: return "text-green-600 font-bold";
+      case 3: return "text-red-600 font-bold";
+      case 4: return "text-purple-800 font-bold";
+      case 5: return "text-red-800 font-bold";
+      case 6: return "text-cyan-700 font-bold";
+      case 7: return "text-black font-bold";
+      case 8: return "text-gray-600 font-bold";
       default: return "";
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
-      
-      {/* 2004-style XP Window Shell for Games */}
-      <div className="bg-gradient-to-b from-[#f2f6fb] via-[#e2eef9] to-[#d3e5f4] w-full max-w-[340px] rounded-t-xl rounded-b-lg border-2 border-[#1c5c8a] shadow-2xl flex flex-col overflow-hidden animate-fade-in font-sans">
+  // ==========================================
+  // ❌ TIC-TAC-TOE STATE & LOGIC
+  // ==========================================
+  const [tttBoard, setTttBoard] = useState<string[]>(Array(9).fill(""));
+  const [tttWinner, setTttWinner] = useState<string | null>(null); // "X", "O", "TIE"
+  const [tttTurn, setTttTurn] = useState<"player" | "bot">("player");
+  const [tttStatus, setTttStatus] = useState("Jouw beurt! Zet een X.");
+
+  const tttWinningCombos = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  const resetTicTacToe = () => {
+    setTttBoard(Array(9).fill(""));
+    setTttWinner(null);
+    setTttTurn("player");
+    setTttStatus("Jouw beurt! Zet een X.");
+  };
+
+  const checkWinner = (board: string[]): string | null => {
+    for (const combo of tttWinningCombos) {
+      const [a, b, c] = combo;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        return board[a];
+      }
+    }
+    if (board.every(cell => cell !== "")) return "TIE";
+    return null;
+  };
+
+  const handleTttClick = (index: number) => {
+    if (tttBoard[index] !== "" || tttWinner || tttTurn !== "player") return;
+
+    hiveAudio.playNotification();
+    const newBoard = [...tttBoard];
+    newBoard[index] = "X";
+    setTttBoard(newBoard);
+
+    const winner = checkWinner(newBoard);
+    if (winner) {
+      setTttWinner(winner);
+      if (winner === "X") {
+        setTttStatus("🎉 Je hebt gewonnen! Te gek!");
+        hiveAudio.playCrazyWink();
+      } else {
+        setTttStatus("🤝 Gelijkspel! Nog een potje?");
+      }
+      return;
+    }
+
+    setTttTurn("bot");
+    setTttStatus("🤖 Buzzi Bot denkt na...");
+
+    // Bot response delay
+    setTimeout(() => {
+      makeBotMove(newBoard);
+    }, 600);
+  };
+
+  const makeBotMove = (currentBoard: string[]) => {
+    const updatedBoard = [...currentBoard];
+    
+    // 1. Can bot win?
+    for (const combo of tttWinningCombos) {
+      const [a, b, c] = combo;
+      const vals = [updatedBoard[a], updatedBoard[b], updatedBoard[c]];
+      const oCount = vals.filter(v => v === "O").length;
+      const emptyCount = vals.filter(v => v === "").length;
+      if (oCount === 2 && emptyCount === 1) {
+        const emptyIdx = combo[vals.indexOf("")];
+        updatedBoard[emptyIdx] = "O";
+        triggerBotFinish(updatedBoard);
+        return;
+      }
+    }
+
+    // 2. Can bot block player win?
+    for (const combo of tttWinningCombos) {
+      const [a, b, c] = combo;
+      const vals = [updatedBoard[a], updatedBoard[b], updatedBoard[c]];
+      const xCount = vals.filter(v => v === "X").length;
+      const emptyCount = vals.filter(v => v === "").length;
+      if (xCount === 2 && emptyCount === 1) {
+        const emptyIdx = combo[vals.indexOf("")];
+        updatedBoard[emptyIdx] = "O";
+        triggerBotFinish(updatedBoard);
+        return;
+      }
+    }
+
+    // 3. Take center if available
+    if (updatedBoard[4] === "") {
+      updatedBoard[4] = "O";
+      triggerBotFinish(updatedBoard);
+      return;
+    }
+
+    // 4. Random move
+    const emptyIndices = updatedBoard.map((val, idx) => val === "" ? idx : null).filter(val => val !== null) as number[];
+    if (emptyIndices.length > 0) {
+      const randIdx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+      updatedBoard[randIdx] = "O";
+    }
+
+    triggerBotFinish(updatedBoard);
+  };
+
+  const triggerBotFinish = (finalBoard: string[]) => {
+    setTttBoard(finalBoard);
+    hiveAudio.playNotification();
+
+    const winner = checkWinner(finalBoard);
+    if (winner) {
+      setTttWinner(winner);
+      if (winner === "O") {
+        setTttStatus("🤖 Oef... Buzzi Bot wint dit keer!");
+        hiveAudio.playNudge(0.5);
+      } else {
+        setTttStatus("🤝 Gelijkspel! Wel spannend.");
+      }
+      setTttTurn("player");
+      return;
+    }
+
+    setTttTurn("player");
+    setTttStatus("Jouw beurt! Zet een X.");
+  };
+
+  // ==========================================
+  // 🐍 SNAKE STATE & LOGIC
+  // ==========================================
+  const [snake, setSnake] = useState<{r: number, c: number}[]>([
+    { r: 7, c: 7 },
+    { r: 7, c: 8 },
+    { r: 7, c: 9 }
+  ]);
+  const [food, setFood] = useState<{r: number, c: number}>({ r: 4, c: 4 });
+  const [direction, setDirection] = useState<"UP" | "DOWN" | "LEFT" | "RIGHT">("LEFT");
+  const [snakeScore, setSnakeScore] = useState(0);
+  const [snakeAlive, setSnakeAlive] = useState(true);
+  const [snakeActive, setSnakeActive] = useState(false);
+
+  const snakeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentDirectionRef = useRef(direction);
+
+  useEffect(() => {
+    currentDirectionRef.current = direction;
+  }, [direction]);
+
+  const initSnake = () => {
+    setSnake([
+      { r: 7, c: 7 },
+      { r: 7, c: 8 },
+      { r: 7, c: 9 }
+    ]);
+    setFood({ r: 3, c: 4 });
+    setDirection("LEFT");
+    setSnakeScore(0);
+    setSnakeAlive(true);
+    setSnakeActive(false);
+  };
+
+  const startSnake = () => {
+    setSnakeActive(true);
+    hiveAudio.playNotification();
+  };
+
+  // Game Tic tick handler
+  useEffect(() => {
+    if (!snakeActive || !snakeAlive) return;
+
+    snakeTimerRef.current = setInterval(() => {
+      setSnake((prevSnake) => {
+        const head = { ...prevSnake[0] };
+        const dir = currentDirectionRef.current;
+
+        if (dir === "UP") head.r -= 1;
+        else if (dir === "DOWN") head.r += 1;
+        else if (dir === "LEFT") head.c -= 3; // larger steps for easy layout grid columns
+        else if (dir === "RIGHT") head.c += 1; // standard
         
-        {/* XP Style Header blue strap */}
-        <div className="bg-gradient-to-r from-[#1d5c8a] via-[#3a8bca] to-[#1d5c8a] px-3 py-2 flex items-center justify-between text-white border-b border-[#0f3c5e] shrink-0">
-          <div className="flex items-center gap-1.5 select-none">
-            <span className="text-sm">🎮</span>
-            <span className="text-xs font-black tracking-wide uppercase">Buzzi Mijnenveger 2004</span>
+        // Custom wrap or boundary collision checks
+        const colsBound = 15;
+        const rowsBound = 12;
+
+        // Custom step offsets normalized to simplify
+        let nextR = head.r;
+        let nextC = head.c;
+
+        if (dir === "UP") { nextR = head.r; nextC = head.c; }
+        else if (dir === "DOWN") { nextR = head.r; nextC = head.c; }
+        else if (dir === "LEFT") { nextR = head.r; nextC = head.c - 1; } // adjust stepping
+        else if (dir === "RIGHT") { nextR = head.r; nextC = head.c + 1; }
+
+        let adjustedHead = { r: head.r, c: head.c };
+        if (dir === "UP") adjustedHead = { r: prevSnake[0].r - 1, c: prevSnake[0].c };
+        else if (dir === "DOWN") adjustedHead = { r: prevSnake[0].r + 1, c: prevSnake[0].c };
+        else if (dir === "LEFT") adjustedHead = { r: prevSnake[0].r, c: prevSnake[0].c - 1 };
+        else if (dir === "RIGHT") adjustedHead = { r: prevSnake[0].r, c: prevSnake[0].c + 1 };
+
+        // Test wall collision
+        if (
+          adjustedHead.r < 0 || 
+          adjustedHead.r >= rowsBound || 
+          adjustedHead.c < 0 || 
+          adjustedHead.c >= colsBound
+        ) {
+          setSnakeAlive(false);
+          setSnakeActive(false);
+          hiveAudio.playNudge(0.6);
+          return prevSnake;
+        }
+
+        // Test self collision
+        for (const segment of prevSnake) {
+          if (segment.r === adjustedHead.r && segment.c === adjustedHead.c) {
+            setSnakeAlive(false);
+            setSnakeActive(false);
+            hiveAudio.playNudge(0.6);
+            return prevSnake;
+          }
+        }
+
+        const newSnake = [adjustedHead, ...prevSnake];
+
+        // Eat food check
+        if (adjustedHead.r === food.r && adjustedHead.c === food.c) {
+          setSnakeScore((s) => s + 10);
+          hiveAudio.playNotification();
+          
+          // Respawn food
+          let newFood = { r: 0, c: 0 };
+          let onSnake = true;
+          while (onSnake) {
+            newFood = {
+              r: Math.floor(Math.random() * rowsBound),
+              c: Math.floor(Math.random() * colsBound)
+            };
+            onSnake = newSnake.some(s => s.r === newFood.r && s.c === newFood.c);
+          }
+          setFood(newFood);
+        } else {
+          newSnake.pop(); // remove tail
+        }
+
+        return newSnake;
+      });
+    }, 180);
+
+    return () => {
+      if (snakeTimerRef.current) clearInterval(snakeTimerRef.current);
+    };
+  }, [snakeActive, snakeAlive, food]);
+
+  const changeSnakeDir = (newDir: "UP" | "DOWN" | "LEFT" | "RIGHT") => {
+    const opp = {
+      UP: "DOWN",
+      DOWN: "UP",
+      LEFT: "RIGHT",
+      RIGHT: "LEFT"
+    };
+    if (opp[newDir] !== direction) {
+      setDirection(newDir);
+    }
+  };
+
+  // Keyboard controls listener
+  useEffect(() => {
+    const handleKeys = (e: KeyboardEvent) => {
+      if (activeTab !== "snake") return;
+      if (["ArrowUp", "KeyW"].includes(e.code)) {
+        e.preventDefault();
+        changeSnakeDir("UP");
+      } else if (["ArrowDown", "KeyS"].includes(e.code)) {
+        e.preventDefault();
+        changeSnakeDir("DOWN");
+      } else if (["ArrowLeft", "KeyA"].includes(e.code)) {
+        e.preventDefault();
+        changeSnakeDir("LEFT");
+      } else if (["ArrowRight", "KeyD"].includes(e.code)) {
+        e.preventDefault();
+        changeSnakeDir("RIGHT");
+      }
+    };
+    window.addEventListener("keydown", handleKeys);
+    return () => window.removeEventListener("keydown", handleKeys);
+  }, [direction, activeTab]);
+
+  return (
+    <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
+      <div className="w-full max-w-sm bg-[#eedcc0] border-4 border-[#1c5c8a] shadow-2xl rounded-md flex flex-col overflow-hidden animate-scale-up">
+        
+        {/* Retro Header Bar */}
+        <div className="bg-gradient-to-r from-[#2178b8] via-[#1c5c8a] to-[#124264] text-white px-3 py-2 flex items-center justify-between border-b-2 border-[#124264] shrink-0 select-none">
+          <div className="flex items-center gap-1.5 font-sans font-black text-xs sm:text-sm tracking-wider uppercase drop-shadow">
+            🎮 Buzzi Arcade Spellen Center
           </div>
-          <button 
+          <button
             type="button"
             onClick={onClose}
-            className="w-5 h-5 rounded-md bg-[#e43a3a] hover:bg-[#ff5555] active:scale-95 border border-[#8b1a1a] flex items-center justify-center text-white font-extrabold text-[10px] cursor-pointer"
+            className="p-1 rounded bg-red-600 hover:bg-red-700 active:scale-95 text-white transition-all shadow-inner cursor-pointer"
+            title="Sluiten"
           >
-            &#10005;
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Windows Menu options helper */}
-        <div className="px-3 py-1 bg-[#efebd8]/30 border-b border-[#bad0e3] flex justify-between items-center text-[11px] font-bold text-[#1C427F]">
-          <div className="flex gap-3">
-            <button onClick={initBoard} className="hover:underline">Bestand / Reset</button>
-            <button 
-              onClick={() => {
-                alert("ℹ️ DOEL VAN HET SPEL:\nKlik op de vakjes om ze te onthullen. Het getal laat zien hoeveel mijnen er omheen liggen.\n\nGebruik de rechtermuisknop of zet de Vlag Modus aan om vlaggen (🚩) te plaatsen en de mijnen te markeren. Ontwijk alle 10 mijnen om te winnen!");
-              }} 
-              className="hover:underline"
-            >
-              Uitleg
-            </button>
-          </div>
-          <span className="text-[10px] text-slate-500 font-mono">Grid: 9x9</span>
+        {/* Windows-style XP Tab selector bar */}
+        <div className="flex bg-[#cbdcf0] border-b border-gray-300 p-1 shrink-0 overflow-x-auto text-[10.5px]">
+          <button
+            onClick={() => { hiveAudio.playNotification(); setActiveTab("minesweeper"); }}
+            className={`px-3 py-1 mr-1 rounded-t-md font-sans border-t border-x transition-all ${
+              activeTab === "minesweeper"
+                ? "bg-[#eedcc0] border-[#1c5c8a] font-bold text-[#1c5c8a] md:border-b-transparent"
+                : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
+            }`}
+          >
+            💣 Mijnenveger
+          </button>
+          <button
+            onClick={() => { hiveAudio.playNotification(); setActiveTab("tictactoe"); }}
+            className={`px-3 py-1 mr-1 rounded-t-md font-sans border-t border-x transition-all ${
+              activeTab === "tictactoe"
+                ? "bg-[#eedcc0] border-[#1c5c8a] font-bold text-[#1c5c8a]"
+                : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
+            }`}
+          >
+            ❌ Tic-Tac-Toe
+          </button>
+          <button
+            onClick={() => { hiveAudio.playNotification(); setActiveTab("snake"); }}
+            className={`px-3 py-1 rounded-t-md font-sans border-t border-x transition-all ${
+              activeTab === "snake"
+                ? "bg-[#eedcc0] border-[#1c5c8a] font-bold text-[#1c5c8a]"
+                : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
+            }`}
+          >
+            🐍 Nokia Snake
+          </button>
         </div>
 
-        {/* The Game Console Body */}
-        <div className="p-4 flex flex-col items-center justify-center">
-
-          {/* Minesweeper Classic Gray Board Box */}
-          <div className="bg-[#bdbdbd] p-3 rounded-lg border-4 border-t-white border-l-white border-r-[#7b7b7b] border-b-[#7b7b7b] shadow-inner w-full flex flex-col gap-3">
-            
-            {/* Upper Info Row: Mine Counter, Smile Button, Timer */}
-            <div className="bg-[#bdbdbd] px-2 py-1.5 border-3 border-t-[#7b7b7b] border-l-[#7b7b7b] border-r-white border-b-white flex items-center justify-between">
+        {/* Main scrollable view */}
+        <div className="p-4 overflow-y-auto flex-1 flex flex-col items-center">
+          
+          {/* TAB 1: MINESWEEPER */}
+          {activeTab === "minesweeper" && (
+            <div className="w-full flex flex-col items-center">
               
-              {/* Mine Left Counter (Classic LCD styling mockup) */}
-              <div className="bg-black text-[13px] font-mono text-[#ff0707] px-2.5 py-0.5 rounded border border-[#2b2525] font-black w-14 text-center select-all tracking-wider">
-                {String(Math.max(0, minesLeft)).padStart(3, "0")}
+              {/* Minesweeper Header stats row */}
+              <div className="bg-[#cbdcf0] border border-[#a2b5cd] w-fit px-4 py-2 flex items-center justify-between gap-6 rounded-lg shadow-inner mb-4">
+                {/* Remainder display digits */}
+                <div className="bg-black text-red-500 font-mono text-lg px-2 py-0.5 rounded border border-gray-600 w-12 text-center select-all">
+                  {String(Math.max(0, minesLeft)).padStart(3, "0")}
+                </div>
+                
+                {/* Reset smiley trigger */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    hiveAudio.playNotification();
+                    initMinesweeper();
+                  }}
+                  className="bg-[#cbdcf0] border-2 border-t-white border-l-white border-r-[#7b7b7b] border-b-[#7b7b7b] hover:bg-slate-200 active:border-t-[#7b7b7b] active:border-l-[#7b7b7b] active:border-r-white active:border-b-white p-1 rounded transition-all cursor-pointer text-xl flex items-center justify-center shadow-sm shrink-0"
+                >
+                  {faceEmoji}
+                </button>
+
+                {/* Duration timer */}
+                <div className="bg-black text-red-500 font-mono text-lg px-2 py-0.5 rounded border border-gray-600 w-12 text-center">
+                  {String(minesweeperTimer).padStart(3, "0")}
+                </div>
               </div>
 
-              {/* Smiley Face Interactive Button */}
-              <button 
-                onClick={initBoard}
-                className="w-9 h-9 text-2xl flex items-center justify-center bg-[#bdbdbd] active:border-t-[#7b7b7b] active:border-l-[#7b7b7b] active:border-r-white active:border-b-white border-3 border-t-white border-l-white border-r-[#7b7b7b] border-b-[#7b7b7b] rounded cursor-pointer select-none transition-all"
+              {/* Grid cell matrix */}
+              <div className="border-4 border-[#7b7b7b] shadow-inner p-1.5 bg-[#a3a3a3]">
+                <div 
+                  className="grid gap-[1px]"
+                  style={{ gridTemplateColumns: `repeat(${gridSize.cols}, minmax(0, 1fr))` }}
+                >
+                  {grid.map((row) =>
+                    row.map((cell) => {
+                      let cellStyle = "w-7 h-7 flex items-center justify-center text-xs font-bold transition-all select-none focus:outline-none ";
+                      let cellContent = "";
+
+                      if (cell.isRevealed) {
+                        cellStyle += "bg-[#bdbdbd] border border-[#7b7b7b] ";
+                        if (cell.isMine) {
+                          cellContent = "💣";
+                          cellStyle += "bg-red-500/70 ";
+                        } else if (cell.neighborMines > 0) {
+                          cellContent = String(cell.neighborMines);
+                        }
+                      } else {
+                        cellStyle += "bg-[#bdbdbd] border-3 border-t-white border-l-white border-r-[#7b7b7b] border-b-[#7b7b7b] hover:bg-[#d0d0d0] ";
+                        if (cell.isFlagged) {
+                          cellContent = "🚩";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={`${cell.r}-${cell.c}`}
+                          type="button"
+                          onClick={() => handleCellClick(cell.r, cell.c)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            toggleFlag(cell.r, cell.c);
+                          }}
+                          className={cellStyle}
+                        >
+                          <span className={cell.isRevealed && !cell.isMine ? getNumberColorClass(cell.neighborMines) : "leading-none"}>
+                            {cellContent}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Status block warnings */}
+              {minesweeperGameOver && (
+                <div className="w-full mt-3 p-2 bg-red-100 border border-red-300 text-red-950 text-center font-bold text-[11px] rounded-lg animate-bounce leading-relaxed">
+                  💥 BOEM! Je hebt een mijn geraakt! <br/>
+                  <span className="text-[9.5px] font-normal text-red-800">Klik op de smiley 😀 om opnieuw te proberen.</span>
+                </div>
+              )}
+
+              {minesweeperWin && (
+                <div className="w-full mt-3 p-2 bg-emerald-100 border border-emerald-300 text-emerald-950 text-center font-bold text-[11px] rounded-lg animate-bounce leading-relaxed">
+                  🎉 SUPER! Je hebt de Mijnenveger overleefd! <br/>
+                  <span className="text-[9.5px] font-normal text-emerald-800">Gefeliciteerd op het Buzzi Netwerk! 😎</span>
+                </div>
+              )}
+
+              {/* Touch Helper Option */}
+              <div className="w-full mt-4 bg-white/40 border border-[#bad0e3] rounded-xl p-2 flex items-center justify-between gap-1 shrink-0">
+                <span className="text-[10px] text-[#1c5c8a] font-bold">
+                  {isFlagMode ? "Vlag plaatsen actief 🚩" : "Normaal graven ⛏️"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    hiveAudio.playNotification();
+                    setIsFlagMode(!isFlagMode);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[10.5px] font-black transition-all border ${
+                    isFlagMode 
+                      ? "bg-red-500 text-white border-red-700 shadow-inner" 
+                      : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300 shadow-sm"
+                  }`}
+                >
+                  🚩 Vlag Modus
+                </button>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 2: TIC-TAC-TOE */}
+          {activeTab === "tictactoe" && (
+            <div className="w-full flex flex-col items-center">
+              <div className="bg-[#cbdcf0] border border-[#a2b5cd] px-4 py-2 w-full text-center rounded-lg shadow-inner mb-4 text-[#1c5c8a] font-bold text-xs">
+                {tttStatus}
+              </div>
+
+              {/* Grid 3x3 */}
+              <div className="grid grid-cols-3 gap-2 p-2 bg-[#7b7b7b] rounded-lg border-2 border-stone-800 shadow-md">
+                {tttBoard.map((cell, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleTttClick(idx)}
+                    className="w-20 h-20 bg-[#ececec] border-4 border-t-white border-l-white border-r-stone-400 border-b-stone-400 hover:bg-stone-100 flex items-center justify-center font-sans font-black text-3xl text-stone-800 select-none focus:outline-none transition-all active:border-inner"
+                  >
+                    <span className={cell === "X" ? "text-indigo-600" : "text-red-500"}>
+                      {cell}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Clear button */}
+              <button
+                onClick={() => {
+                  hiveAudio.playNotification();
+                  resetTicTacToe();
+                }}
+                className="mt-4 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer"
               >
-                {faceEmoji}
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Opnieuw Beginnen</span>
               </button>
-
-              {/* Digital Timer Counter */}
-              <div className="bg-black text-[13px] font-mono text-[#ff0707] px-2.5 py-0.5 rounded border border-[#2b2525] font-black w-14 text-center tracking-wider">
-                {String(timer).padStart(3, "0")}
-              </div>
-
             </div>
+          )}
 
-            {/* Grid Container Board */}
-            <div className="bg-[#7b7b7b] p-1 border-3 border-t-[#7b7b7b] border-l-[#7b7b7b] border-r-white border-b-white flex items-center justify-center overflow-auto">
-              <div 
-                className="grid gap-0.5"
-                style={{ gridTemplateColumns: `repeat(${gridSize.cols}, minmax(0, 1fr))` }}
-              >
-                {grid.map((row, r) =>
-                  row.map((cell, c) => {
-                    // Decide display visual
-                    let cellContent = "";
-                    let cellStyle = "w-7 h-7 flex items-center justify-center text-xs font-bold transition-colors select-none text-center cursor-pointer ";
-                    
-                    if (cell.isRevealed) {
-                      cellStyle += "bg-[#bdbdbd] border border-[#7b7b7b] ";
-                      if (cell.isMine) {
-                        cellContent = "💣";
-                        cellStyle += "bg-red-500/70 ";
-                      } else if (cell.neighborMines > 0) {
-                        cellContent = String(cell.neighborMines);
-                      }
-                    } else {
-                      // Unrevealed state
-                      cellStyle += "bg-[#bdbdbd] border-3 border-t-white border-l-white border-r-[#7b7b7b] border-b-[#7b7b7b] hover:bg-[#d0d0d0] ";
-                      if (cell.isFlagged) {
-                        cellContent = "🚩";
-                      }
-                    }
+          {/* TAB 3: NOKIA SNAKE */}
+          {activeTab === "snake" && (
+            <div className="w-full flex flex-col items-center">
+              
+              <div className="bg-stone-950 border-4 border-[#7b7b7b] p-1 shadow-inner flex flex-col items-center">
+                {/* Top header stats bar */}
+                <div className="w-full px-2 py-0.5 bg-green-500 text-xs text-stone-950 font-black font-mono flex items-center justify-between mb-1 select-none">
+                  <span>PUNTEN: {snakeScore}</span>
+                  <span>{snakeAlive ? (snakeActive ? "🏃 REN!" : "⏸️ GESTOPT") : "💀 CRASH!"}</span>
+                </div>
 
-                    return (
+                {/* Snake Grid display */}
+                <div className="grid grid-cols-15 gap-[1px] bg-[#8cc63f]/30 border border-[#8cc63f] relative overflow-hidden" style={{ width: "242px", height: "194px" }}>
+                  {/* Grid squares rendering overlay */}
+                  {Array.from({ length: 12 }).map((_, rIdx) => 
+                    Array.from({ length: 15 }).map((_, cIdx) => {
+                      const isSnakeSegment = snake.some(s => s.r === rIdx && s.c === cIdx);
+                      const isHead = snake[0] && snake[0].r === rIdx && snake[0].c === cIdx;
+                      const isFoodSquare = food.r === rIdx && food.c === cIdx;
+
+                      let cellColor = "bg-stone-900/10";
+                      if (isHead) cellColor = "bg-stone-950";
+                      else if (isSnakeSegment) cellColor = "bg-stone-800";
+                      else if (isFoodSquare) cellColor = "bg-red-600 animate-pulse";
+
+                      return (
+                        <div 
+                          key={`${rIdx}-${cIdx}`} 
+                          className={`w-[15px] h-[15px] border-[0.5px] border-emerald-950/5 flex items-center justify-center text-[8px] ${cellColor}`}
+                        >
+                          {isFoodSquare && "🍎"}
+                          {isHead && "👀"}
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* GameOver Screen overlay */}
+                  {!snakeAlive && (
+                    <div className="absolute inset-0 bg-stone-950/90 flex flex-col items-center justify-center font-mono text-[#8cc63f] gap-1 z-10">
+                      <div className="text-sm font-black uppercase text-red-400">💀 GAME OVER! 💀</div>
+                      <div className="text-[10px]">EIND SCORE: {snakeScore}</div>
                       <button
-                        key={`${r}-${c}`}
-                        type="button"
-                        onClick={() => handleCellClick(r, c)}
-                        onContextMenu={(e) => handleRightClick(e, r, c)}
-                        className={cellStyle}
+                        onClick={() => { hiveAudio.playNotification(); initSnake(); }}
+                        className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-[9px] rounded uppercase select-none transition-all active:scale-95"
                       >
-                        <span className={cell.isRevealed && !cell.isMine ? getNumberColorClass(cell.neighborMines) : "leading-none"}>
-                          {cellContent}
-                        </span>
+                        Nieuwe Poging
                       </button>
-                    );
-                  })
-                )}
+                    </div>
+                  )}
+
+                  {/* Ready Screen Overlay */}
+                  {snakeAlive && !snakeActive && (
+                    <div className="absolute inset-0 bg-stone-950/70 flex flex-col items-center justify-center font-mono text-emerald-300 gap-1 z-10">
+                      <div className="text-[11px] text-center px-4">Gebruik pijltoetsen of knoppen links-rechts-boven-onder!</div>
+                      <button
+                        onClick={startSnake}
+                        className="mt-2 text-stone-950 font-black bg-[#8cc63f] px-4 py-1.5 text-xs rounded-xl flex items-center gap-1 hover:scale-105 active:scale-95 transition-all select-none uppercase cursor-pointer shadow border-2 border-green-800"
+                      >
+                        <Play className="w-3 h-3 fill-stone-950" />
+                        <span>Starten</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-          </div>
+              {/* D-PAD arrow touch controllers block for amazing device responsiveness! */}
+              <div className="mt-3 flex flex-col items-center gap-1 select-none">
+                <button
+                  type="button"
+                  onClick={() => changeSnakeDir("UP")}
+                  disabled={!snakeActive || !snakeAlive}
+                  className="w-10 h-10 bg-[#cbdcf0] hover:bg-slate-200 disabled:opacity-40 border border-[#a2b5cd] font-black rounded-lg text-[#1c5c8a] flex items-center justify-center focus:outline-none transition-all active:scale-95 cursor-pointer"
+                >
+                  ▲
+                </button>
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => changeSnakeDir("LEFT")}
+                    disabled={!snakeActive || !snakeAlive}
+                    className="w-10 h-10 bg-[#cbdcf0] hover:bg-slate-200 disabled:opacity-40 border border-[#a2b5cd] font-black rounded-lg text-[#1c5c8a] flex items-center justify-center focus:outline-none transition-all active:scale-95 cursor-pointer"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { hiveAudio.playNotification(); initSnake(); }}
+                    className="w-10 h-10 bg-red-100 hover:bg-red-200 border border-red-300 font-bold rounded-lg text-red-600 text-[10px] flex items-center justify-center focus:outline-none transition-all active:scale-95 cursor-pointer"
+                    title="Herstarten"
+                  >
+                    🔄
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeSnakeDir("RIGHT")}
+                    disabled={!snakeActive || !snakeAlive}
+                    className="w-10 h-10 bg-[#cbdcf0] hover:bg-slate-200 disabled:opacity-40 border border-[#a2b5cd] font-black rounded-lg text-[#1c5c8a] flex items-center justify-center focus:outline-none transition-all active:scale-95 cursor-pointer"
+                  >
+                    ▶
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => changeSnakeDir("DOWN")}
+                  disabled={!snakeActive || !snakeAlive}
+                  className="w-10 h-10 bg-[#cbdcf0] hover:bg-slate-200 disabled:opacity-40 border border-[#a2b5cd] font-black rounded-lg text-[#1c5c8a] flex items-center justify-center focus:outline-none transition-all active:scale-95 cursor-pointer"
+                >
+                  ▼
+                </button>
+              </div>
 
-          {/* Win / Loss overlay text banners */}
-          {gameOver && (
-            <div className="w-full mt-3 p-2 bg-red-100 border border-red-300 text-red-950 text-center font-bold text-xs rounded-lg animate-bounce leading-relaxed">
-              💥 BOEM! Je hebt een mijn geraakt! <br/>
-              <span className="text-[10px] font-normal text-red-850">Klik op de smiley 😀 om opnieuw te proberen.</span>
             </div>
           )}
-
-          {win && (
-            <div className="w-full mt-3 p-2 bg-emerald-100 border border-emerald-300 text-emerald-950 text-center font-bold text-xs rounded-lg animate-bounce leading-relaxed">
-              🎉 SUPER! Je hebt de Mijnenveger overleefd! <br/>
-              <span className="text-[10px] font-normal text-emerald-850">Gefeliciteerd op het Buzzi Netwerk! 😎</span>
-            </div>
-          )}
-
-          {/* Touch controller flagship toggle (Extremely high usability for phones and laptops!) */}
-          <div className="w-full mt-4 bg-white/40 border border-[#bad0e3] rounded-xl p-2 flex items-center justify-between gap-1">
-            <span className="text-[10px] text-[#1c5c8a] font-bold">
-              {isFlagMode ? "Vlag plaatsen actief 🚩" : "Normaal graven ⛏️"}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                hiveAudio.playNotification();
-                setIsFlagMode(!isFlagMode);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
-                isFlagMode 
-                  ? "bg-red-500 text-white border-red-700 shadow-inner" 
-                  : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300 shadow-sm"
-              }`}
-            >
-              🚩 Vlag Modus
-            </button>
-          </div>
 
         </div>
 
-        {/* Footer actions bar */}
-        <div className="px-4 py-3 bg-[#e1ecf7] border-t border-[#bad0e3] flex justify-between items-center text-[11.5px] select-none text-slate-500 shrink-0">
-          <span className="font-mono text-[9px] uppercase tracking-wide">Mijnen: 10</span>
+        {/* Status bar base info section */}
+        <div className="px-4 py-2 bg-[#cbdcf0] border-t border-[#bad0e3] flex justify-between items-center text-[10.5px] select-none text-slate-500 shrink-0 font-sans">
+          <span>Retro Spellen</span>
           <button
             type="button"
             onClick={onClose}

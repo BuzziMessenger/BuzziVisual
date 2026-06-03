@@ -1013,11 +1013,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* User Info footer (Classic Windows XP bottom status line) */}
       <div className="p-3 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.4</span>
+          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.5</span>
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm" />
           <span className="font-semibold text-[11px] font-sans">Buzzi Service: Verbonden</span>
         </div>
-        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.4</span>
+        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.5</span>
       </div>
 
       {/* Avatar Picker Modal */}

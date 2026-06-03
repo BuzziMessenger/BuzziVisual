@@ -432,6 +432,78 @@ class BuzziAudioSynthesizer {
       console.warn("Disco synth failed:", e);
     }
   }
+
+  public playLaserWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(1400, now);
+      osc.frequency.linearRampToValueAtTime(80, now + 0.6);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch (e) {
+      console.warn("Laser sound failed:", e);
+    }
+  }
+
+  public playAlienWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(400, now);
+      for (let i = 0; i < 8; i++) {
+        const t = now + (i * 0.15);
+        osc.frequency.setValueAtTime(400 + (i % 2 === 0 ? 150 : -150), t);
+      }
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 1.25);
+    } catch (e) {
+      console.warn("Alien sound failed:", e);
+    }
+  }
+
+  public playBananaWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 659.25, 523.25];
+      melody.forEach((freq, idx) => {
+        const t = now + (idx * 0.14);
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.08, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.13);
+      });
+    } catch (e) {
+      console.warn("Banana sound failed:", e);
+    }
+  }
 }
 
 export const hiveAudio = new BuzziAudioSynthesizer();

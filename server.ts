@@ -330,20 +330,24 @@ async function startServer() {
   app.get("/api/bugs", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
+      let bugs: any[] = [];
+      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      bugs = [...fileBugs];
+
       if (dbInstance) {
         try {
-          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error("MongoDB bugs fetch timeout")), 1500)
-          );
-          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
-          res.json(bugs);
-          return;
+          const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          mongoBugs.forEach((mb: any) => {
+            if (!bugs.some(b => b.id === mb.id)) {
+              bugs.push(mb);
+            }
+          });
         } catch (mongoErr) {
-          console.warn("MongoDB bugs fetch failed or timed out, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bugs fetch failed, relying on JSON file:", mongoErr);
         }
       }
-      const bugs = readJsonFile<any[]>(BUGS_FILE, []);
+
+      bugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       res.json(bugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -372,28 +376,34 @@ async function startServer() {
         status: "Open"
       };
 
+      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      fileBugs.unshift(newBug);
+      writeJsonFile(BUGS_FILE, fileBugs);
+
       if (dbInstance) {
         try {
-          const insertPromise = dbInstance.collection("bugs").insertOne(newBug);
-          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error("MongoDB bug insertion timeout")), 1500)
-          );
-          
-          await Promise.race([insertPromise, timeoutPromise]);
-          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
-          res.json(bugs);
-          return;
+          await dbInstance.collection("bugs").insertOne(newBug);
         } catch (mongoErr) {
-          console.warn("MongoDB bug insert/fetch failed or timed out, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bug insert failed, stored in JSON only:", mongoErr);
         }
       }
 
-      const bugs = readJsonFile<any[]>(BUGS_FILE, []);
-      bugs.unshift(newBug); // Add most recent first
-      writeJsonFile(BUGS_FILE, bugs);
-      res.json(bugs);
+      let combinedBugs = [...fileBugs];
+      if (dbInstance) {
+        try {
+          const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          mongoBugs.forEach((mb: any) => {
+            if (!combinedBugs.some(b => b.id === mb.id)) {
+              combinedBugs.push(mb);
+            }
+          });
+        } catch (mongoErr) {
+          console.warn("MongoDB bug fetch during POST failed:", mongoErr);
+        }
+      }
+
+      combinedBugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      res.json(combinedBugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -405,28 +415,34 @@ async function startServer() {
       const dbInstance = await getMongoDb();
       const bugId = req.params.id;
       
+      let fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      fileBugs = fileBugs.filter((b) => b.id !== bugId);
+      writeJsonFile(BUGS_FILE, fileBugs);
+
       if (dbInstance) {
         try {
-          const deletePromise = dbInstance.collection("bugs").deleteOne({ id: bugId });
-          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error("MongoDB bug delete timeout")), 1500)
-          );
-          
-          await Promise.race([deletePromise, timeoutPromise]);
-          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
-          res.json(bugs);
-          return;
+          await dbInstance.collection("bugs").deleteOne({ id: bugId });
         } catch (mongoErr) {
-          console.warn("MongoDB bug delete/fetch failed or timed out, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bug delete failed:", mongoErr);
         }
       }
 
-      let bugs = readJsonFile<any[]>(BUGS_FILE, []);
-      bugs = bugs.filter((b) => b.id !== bugId);
-      writeJsonFile(BUGS_FILE, bugs);
-      res.json(bugs);
+      let combinedBugs = [...fileBugs];
+      if (dbInstance) {
+        try {
+          const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          mongoBugs.forEach((mb: any) => {
+            if (!combinedBugs.some(b => b.id === mb.id)) {
+              combinedBugs.push(mb);
+            }
+          });
+        } catch (mongoErr) {
+          console.warn("MongoDB fetch during DELETE failed:", mongoErr);
+        }
+      }
+
+      combinedBugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      res.json(combinedBugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

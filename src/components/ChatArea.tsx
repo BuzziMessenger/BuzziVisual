@@ -69,6 +69,13 @@ const BUZZI_EMOTICONS = [
   { code: "(dog)", char: "🐶", name: "Hond" },
   { code: "(cat)", char: "🐱", name: "Kat" },
   { code: "(ghost)", char: "👻", name: "Spook" },
+  { code: "(dance)", char: "🕺", name: "Dansen" },
+  { code: "(stare)", char: "😳", name: "Staren" },
+  { code: "(zipped)", char: "🤐", name: "Stil" },
+  { code: "(heart_eyes)", char: "😍", name: "Verliefd" },
+  { code: "(yawn)", char: "🥱", name: "Gapen" },
+  { code: "(alien)", char: "👽", name: "Alien" },
+  { code: "(devil)", char: "😈", name: "Duiveltje" }
 ];
 
 const WINKS_LIST = [
@@ -79,7 +86,10 @@ const WINKS_LIST = [
   { id: "heart", title: "Hartjes Explosie", icon: "💖", desc: "Een groot kloppend hart dat kapot schiet in tientallen harten." },
   { id: "ghost", title: "MSN Spookje", icon: "👻", desc: "Een spooky groen Buzzi-spookje dat over je scherm zweeft!" },
   { id: "kiss", title: "Klop Kus-afdruk", icon: "💋", desc: "Een grote lippenstift-kusafdruk die op je scherm stempelt!" },
-  { id: "disco", title: "Retro Disco Bal", icon: "🪩", desc: "Laat een flitsende neon discobal over je scherm draaien!" }
+  { id: "disco", title: "Retro Disco Bal", icon: "🪩", desc: "Laat een flitsende neon discobal over je scherm draaien!" },
+  { id: "laser", title: "Neon Laser Ogen", icon: "👁️", desc: "Zet je laserblik op scherp en splits het scherm in tweeën!" },
+  { id: "alien", title: "Spaceship UFO", icon: "🛸", desc: "Laat een buitenaards ruimteschip de boel ontvoeren met felle lichten!" },
+  { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende MSN-banaan swingt over je scherm!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -142,6 +152,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         hiveAudio.playKissWink();
       } else if (lastMsg.winkId === "disco") {
         hiveAudio.playDiscoWink();
+      } else if (lastMsg.winkId === "laser") {
+        hiveAudio.playLaserWink();
+      } else if (lastMsg.winkId === "alien") {
+        hiveAudio.playAlienWink();
+      } else if (lastMsg.winkId === "banana") {
+        hiveAudio.playBananaWink();
       }
 
       const timer = setTimeout(() => {
@@ -847,6 +863,94 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </motion.div>
                   <div className="bg-gradient-to-r from-fuchsia-500 to-cyan-500 text-white font-extrabold border-2 border-white shadow-lg px-6 py-2 rounded-xl mt-6 text-xs uppercase tracking-widest animate-pulse">
                     🕺 FEESTJE! DANSEN! 💃✨
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Laser Ogen Wink */}
+            {activeWink === "laser" && (
+              <div className="absolute inset-0 bg-red-950/20 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <div className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none" />
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0, 1.4, 1.4, 1.2, 0] }}
+                  transition={{ duration: 4.5 }}
+                  className="flex flex-col items-center relative"
+                >
+                  <div className="text-[120px] filter drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] relative animate-bounce">
+                    👀
+                    <div className="absolute top-[35%] left-[20%] w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_15px_6px_rgba(239,68,68,1)] animate-ping" />
+                    <div className="absolute top-[35%] right-[20%] w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_15px_6px_rgba(239,68,68,1)] animate-ping" />
+                  </div>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: ["0%", "100%", "100%", "0%"] }}
+                    transition={{ delay: 0.5, duration: 3 }}
+                    className="absolute h-1 bg-red-500 shadow-[0_0_10px_3px_rgba(239,68,68,1)] top-16 left-1/2 -translate-x-1/2"
+                  />
+                  <div className="bg-red-600 text-white font-black border-2 border-red-200 shadow-xl px-4 py-2 rounded-full mt-4 text-xs tracking-wider animate-pulse uppercase">
+                    ⚡ LASERBLIK GEACTIVEERD! 👁️🔥
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Spaceship UFO Wink */}
+            {activeWink === "alien" && (
+              <div className="absolute inset-0 bg-slate-900/40 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: [0, 0.6, 0.6, 0], height: ["0%", "80%", "80%", "0%"] }}
+                  transition={{ delay: 0.8, duration: 3.2 }}
+                  className="absolute top-10 w-44 bg-gradient-to-b from-green-400/60 to-transparent blur-xs"
+                />
+                <motion.div
+                  initial={{ y: -200 }}
+                  animate={{ y: [-200, -50, -50, -250] }}
+                  transition={{ duration: 4.5, times: [0, 0.2, 0.8, 1] }}
+                  className="flex flex-col items-center relative animate-bounce"
+                >
+                  <div className="text-[120px] filter drop-shadow-[0_10px_20px_rgba(74,222,128,0.5)]">
+                    🛸
+                  </div>
+                  <motion.div
+                    initial={{ y: 200, opacity: 0, scale: 0.5 }}
+                    animate={{ y: [200, 30, -20], opacity: [0, 1, 0], scale: [0.5, 1.2, 0.2] }}
+                    transition={{ delay: 1.2, duration: 2.2 }}
+                    className="text-4xl absolute"
+                  >
+                    🐮
+                  </motion.div>
+                </motion.div>
+                <div className="absolute bottom-16 bg-green-500 text-stone-950 font-black border-2 border-white shadow-xl px-4 py-2 rounded-full text-xs animate-bounce uppercase">
+                  👽 WE ARE NOT ALONE! 🛸✨
+                </div>
+              </div>
+            )}
+
+            {/* Dansende Banaan Wink */}
+            {activeWink === "banana" && (
+              <div className="absolute inset-0 bg-yellow-500/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ x: -300, rotate: 0 }}
+                  animate={{ 
+                    x: [-300, 0, 0, 300], 
+                    rotate: [0, 360, 720, 1080],
+                    y: [0, -30, 30, 0] 
+                  }}
+                  transition={{ duration: 4.5, times: [0, 0.25, 0.75, 1] }}
+                  className="flex flex-col items-center relative"
+                >
+                  <motion.div
+                    animate={{ y: [-15, 15, -15] }}
+                    transition={{ repeat: Infinity, duration: 0.5 }}
+                    className="text-[140px] filter drop-shadow-xl select-none"
+                  >
+                    🍌
+                  </motion.div>
+                  <div className="bg-yellow-400 text-stone-900 font-bold border-2 border-stone-950 shadow-md px-4 py-2 rounded-xl mt-4 text-xs tracking-wider animate-bounce">
+                    🍌 IT'S PEANUT BUTTER JELLY TIME! 💃
                   </div>
                 </motion.div>
               </div>

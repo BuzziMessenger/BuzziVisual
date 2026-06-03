@@ -800,7 +800,7 @@ export default function App() {
     };
 
     fetchBugs();
-    const intervalId = setInterval(fetchBugs, 10000);
+    const intervalId = setInterval(fetchBugs, 4000);
     return () => clearInterval(intervalId);
   }, [currentUser]);
 
