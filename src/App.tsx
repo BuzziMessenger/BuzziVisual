@@ -387,7 +387,7 @@ export default function App() {
   };
 
 try {
-        console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanInviteEmail);
+        console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanTargetEmail);
 
         // We sturen vanaf nu nog maar ÉÉN verzoek naar de server.
         // Geen automatische tegen-verzoeken meer, dat voorkomt de ping-pong loop!
