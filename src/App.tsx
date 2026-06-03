@@ -338,7 +338,8 @@ export default function App() {
   };
 
   const initUserProfile = async (user: any, preferredName?: string) => {
-    const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "Buzzi Gebruiker";
+    // VEILIGE SPLIT HIER:
+    const defaultName = preferredName || user?.displayName || (user?.email || "").split("@")[0] || "Buzzi Gebruiker";
 
     try {
       const localName = localStorage.getItem("buzzi_remembered_name");
@@ -350,14 +351,14 @@ export default function App() {
       let currentProfile = null;
       if (res.status === 200) {
         const list = await res.json();
-        currentProfile = list.find((u: any) => u.uid === user.uid);
+        currentProfile = list.find((u: any) => u.uid === user?.uid);
       }
 
       if (!currentProfile) {
         const initialProfile = {
-          uid: user.uid,
+          uid: user?.uid,
           name: localName || defaultName,
-          email: user.email || "",
+          email: user?.email || "",
           avatar: localAvatar || "🧑‍🚀",
           status: "online",
           personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)",
@@ -650,10 +651,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // VEILIGE BUDDIES FILTER MET OPTIONAL CHAINING OM CRASHES BIJ INLADEN TE VOORKOMEN
+  // VEILIGE BUDDIES FILTER MET EXTRA VERANKERING TEGEN CRASHES
   const isDemoUser = currentUser?.email === "gast@buzzi.nl" || currentUser?.email?.startsWith("gast_") || currentUser?.email?.includes("pwd_local");
   
-  const currentBuddies = (isDemoUser
+  const currentBuddies = (!currentUser
+    ? []
+    : isDemoUser
     ? [
         ...INITIAL_CONTACTS,
         ...registeredUsers.filter(u => 
@@ -1081,8 +1084,10 @@ export default function App() {
   };
 
   const handleLoginSuccess = async (name: string, email: string) => {
-    const hash = simpleHash(email.split("#pwd_")[0]);
-    const mockUser = { uid: `u_${hash}`, displayName: name, email: email.split("#pwd_")[0] };
+    // VEILIGE SPLIT BIJ LOGIN HASH:
+    const cleanEmail = (email || "").split("#pwd_")[0];
+    const hash = simpleHash(cleanEmail);
+    const mockUser = { uid: `u_${hash}`, displayName: name, email: cleanEmail };
     localStorage.setItem("buzzi_user", JSON.stringify(mockUser));
     setCurrentUser(mockUser);
     setUserDisplayName(name);
@@ -1190,6 +1195,7 @@ export default function App() {
   const activeMessages = messages[activeId] || [];
   const currentActiveContact = currentBuddies.find(c => c.id === activeId);
   const currentActiveChannel = visibleChannels.find(ch => ch.id === activeId);
+  // Extra veilige split voor mobiele tabs weergave:
   const activeChatName = activeType === "channel" 
     ? `#${currentActiveChannel?.name || activeId}` 
     : (currentActiveContact?.name || "Onbekend contact");
@@ -1479,7 +1485,7 @@ export default function App() {
                             {bug.category}
                           </span>
                           <span className="text-slate-400 italic">
-                            Door: {bug.senderName?.split(" (")[0] || "Onbekend"}
+                            Door: {bug.senderName ? bug.senderName.split(" (")[0] : "Onbekend"}
                           </span>
                         </div>
                       </div>
@@ -1528,7 +1534,9 @@ export default function App() {
           className={`h-full flex flex-col items-center justify-center border-r border-[#D4D0C8] text-slate-700 ${mobileActiveTab === "chat" ? "bg-white border-b-4 border-b-[#0058E6] font-bold" : ""}`}
         >
           <Send size={16} />
-          <span className="text-[9.5px] uppercase tracking-wider mt-0.5">Chat ({activeChatName.split(" (")[0]})</span>
+          <span className="text-[9.5px] uppercase tracking-wider mt-0.5">
+            Chat ({activeChatName ? activeChatName.split(" (")[0] : "Chat"})
+          </span>
         </button>
         <button
           onClick={() => setMobileActiveTab("tools")}
