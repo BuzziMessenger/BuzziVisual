@@ -6,6 +6,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/chat",
+      "destination": "/api/chat.ts"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://buzzimessenger.onrender.com/api/:path*"
     },
