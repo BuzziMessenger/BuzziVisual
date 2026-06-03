@@ -318,56 +318,42 @@ export default function App() {
       return { success: false, reason: "SELF_ADD" };
     }
 
-    const mockUserUid = `u_${simpleHash(cleanTargetEmail)}`;
+try {
+        console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanInviteEmail);
 
-    // Check if user already exists under a registered account or is a default contact
-    const existingUser = registeredUsers.find((r: any) => {
-      const cleanRegEmail = (r.email || "").split("#pwd_")[0].trim().toLowerCase();
-      return cleanRegEmail === cleanTargetEmail || r.id === mockUserUid;
-    }) || INITIAL_CONTACTS.find((ic: any) => (ic.email || "").toLowerCase() === cleanTargetEmail);
-
-    // Restore from deleted contacts list if they were previously hidden
-    if (existingUser && deletedContactIds.includes(existingUser.id)) {
-      const updated = deletedContactIds.filter(id => id !== existingUser.id);
-      setDeletedContactIds(updated);
-      localStorage.setItem("buzzi_deleted_contacts_" + (currentUser?.uid || ""), JSON.stringify(updated));
-    }
-
-    // Register shadow profile if they don't exist in the DB at all yet (for mock accounts)
-    if (!existingUser) {
-      const newContactProfile = {
-        uid: mockUserUid,
-        name: targetName || targetEmail.split("@")[0],
-        email: cleanTargetEmail,
-        avatar: avatar || "🧑‍🚀",
-        status: "online" as StatusType,
-        personalMessage: "Lekker chatten op Buzzi! [B-)]"
-      };
-
-      try {
-        await fetch("/api/db/users", {
+        // We sturen vanaf nu nog maar ÉÉN verzoek naar de server.
+        // Geen automatische tegen-verzoeken meer, dat voorkomt de ping-pong loop!
+        await fetch("/api/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newContactProfile)
+          body: JSON.stringify({
+            fromEmail: cleanMyEmail,
+            fromName: userDisplayName,
+            toEmail: cleanInviteEmail
+          })
         });
-      } catch (err) {
-        console.warn("Fout bij aanmaken schaduwprofiel:", err);
-      }
-    }
 
-    // ALWAYS issue a real-time friend request so that the other user receives it under pending requests
-    try {
-      await fetch("/api/friend-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromEmail: currentUser?.email || "",
-          fromName: userDisplayName,
-          toEmail: cleanTargetEmail
-        })
-      });
+        hiveAudio.playNotification();
 
-      hiveAudio.playNotification();
+        setBuzziToast({
+          show: true,
+          title: "Verzoek Verstuurd! ✉️",
+          message: `Er is een vriendenverzoek verstuurd naar ${cleanInviteEmail}. Zodra zij dit accepteren, staan jullie in elkaars lijst!`,
+          avatar: "🧑‍🚀"
+        });
+
+        // Clean up URL search parameters en cache DIRECT
+        try {
+          if (typeof window !== "undefined") {
+            const tempUrl = new URL(window.location.href);
+            tempUrl.searchParams.delete("invitedBy");
+            tempUrl.searchParams.delete("inviteEmail");
+            window.history.replaceState({}, document.title, tempUrl.pathname);
+          }
+          localStorage.removeItem("buzzi_pending_invite");
+        } catch {}
+
+        return; // Stop de functie hier direct!
 
       // Trigger immediate reload of registered users list and accepted friendships
       const syncRes = await fetch("/api/db/users?t=" + Date.now());
