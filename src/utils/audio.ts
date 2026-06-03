@@ -344,6 +344,94 @@ class BuzziAudioSynthesizer {
       console.warn("Heart arpeggio sound failed:", e);
     }
   }
+
+  // Ghostly spooky sweep synthesizer sound
+  public playGhostWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+
+      // Spooky rising modulator sweep
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(120, now);
+      osc.frequency.linearRampToValueAtTime(750, now + 1.2);
+      osc.frequency.linearRampToValueAtTime(300, now + 1.8);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 1.8);
+    } catch (e) {
+      console.warn("Ghost sweep failed:", e);
+    }
+  }
+
+  // Squeaky pop / kiss smack sound
+  public playKissWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+
+      // Two rapid high-pitched squeaks
+      [0, 0.2].forEach((offset) => {
+        const t = now + offset;
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(1500, t + 0.12);
+
+        gain.gain.setValueAtTime(0.09, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.13);
+      });
+    } catch (e) {
+      console.warn("Kiss sound failed:", e);
+    }
+  }
+
+  // Upbeat synth arpeggio disco beat
+  public playDiscoWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+
+      // Multi-note arpeggiator chord sequence matching retro synthesizer patterns
+      const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63, 261.63];
+      notes.forEach((freq, idx) => {
+        const t = now + (idx * 0.12);
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.16);
+      });
+    } catch (e) {
+      console.warn("Disco synth failed:", e);
+    }
+  }
 }
 
 export const hiveAudio = new BuzziAudioSynthesizer();

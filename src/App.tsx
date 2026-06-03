@@ -197,6 +197,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [registeredUsers, setRegisteredUsers] = useState<Contact[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
@@ -219,7 +220,7 @@ export default function App() {
   // Copy Link State
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
   const handleCopyInviteLink = () => {
-    const shareDomain = "https://v0-buzzi-messenger-0o.vercel.app";
+    const shareDomain = "https://www.buzzimessenger.nl";
     const inviteLink = `${shareDomain}/?invitedBy=${encodeURIComponent(userDisplayName)}&inviteEmail=${encodeURIComponent(currentUser?.email || "")}`;
     navigator.clipboard.writeText(inviteLink);
     hiveAudio.playNotification();
@@ -273,10 +274,21 @@ export default function App() {
         throw new Error("Kon contactpersoon niet opslaan in database");
       }
 
+      // Automatically issue an interactive friend request to the client!
+      await fetch("/api/friend-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromEmail: currentUser?.email || "",
+          fromName: userDisplayName,
+          toEmail: cleanEmail
+        })
+      });
+
       hiveAudio.playNotification();
 
       // Trigger immediate reload of list
-      const syncRes = await fetch("/api/db/users");
+      const syncRes = await fetch("/api/db/users?t=" + Date.now());
       if (syncRes.status === 200) {
         const list = await syncRes.json();
         const filtered = list
@@ -303,7 +315,7 @@ export default function App() {
     const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "Buzzi Gebruiker";
 
     try {
-      const res = await fetch("/api/db/users");
+      const res = await fetch("/api/db/users?t=" + Date.now());
       let currentProfile = null;
       if (res.status === 200) {
         const list = await res.json();
@@ -445,7 +457,7 @@ export default function App() {
     
     const syncUsers = async () => {
       try {
-        const res = await fetch("/api/db/users");
+        const res = await fetch("/api/db/users?t=" + Date.now());
         if (res.status === 200) {
           const list = await res.json();
           const filtered = list
@@ -472,7 +484,7 @@ export default function App() {
   }, [currentUser]);
 
   // Combine buddy lists: if gast@buzzi.nl, show full static initial buddies. If custom email, start fresh with Buzzi Bot and real registered database contacts!
-  const isDemoUser = currentUser?.email === "gast@buzzi.nl";
+  const isDemoUser = currentUser?.email === "gast@buzzi.nl" || currentUser?.email?.startsWith("gast_") || currentUser?.email?.includes("pwd_local");
   const currentBuddies = (isDemoUser
     ? [
         ...INITIAL_CONTACTS,
@@ -501,7 +513,7 @@ export default function App() {
 
     const fetchChannels = async () => {
       try {
-        const res = await fetch("/api/channels");
+        const res = await fetch("/api/channels?t=" + Date.now());
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -524,7 +536,7 @@ export default function App() {
 
     const fetchBugs = async () => {
       try {
-        const res = await fetch("/api/bugs");
+        const res = await fetch("/api/bugs?t=" + Date.now());
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list)) {
@@ -540,6 +552,107 @@ export default function App() {
     const intervalId = setInterval(fetchBugs, 10000);
     return () => clearInterval(intervalId);
   }, [currentUser]);
+
+  // Poll friend requests in real-time
+  useEffect(() => {
+    if (!currentUser || !currentUser.email) return;
+
+    const fetchFriendRequests = async () => {
+      try {
+        const res = await fetch(`/api/friend-requests?toEmail=${encodeURIComponent(currentUser.email)}&t=${Date.now()}`);
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list)) {
+            // Play notification if a new pending request arrives
+            if (list.length > friendRequests.length) {
+              hiveAudio.playNotification();
+            }
+            setFriendRequests(list);
+          }
+        }
+      } catch (err) {
+        console.warn("Fout bij ophalen van vriendenverzoeken:", err);
+      }
+    };
+
+    fetchFriendRequests();
+    const interval = setInterval(fetchFriendRequests, 5000);
+    return () => clearInterval(interval);
+  }, [currentUser, friendRequests.length]);
+
+  const handleAcceptFriendRequest = async (id: string, fromName: string, fromEmail: string) => {
+    try {
+      const res = await fetch("/api/friend-requests/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        setFriendRequests(prev => prev.filter(r => r.id !== id));
+        hiveAudio.playNotification();
+        
+        // Ensure both profiles are registered/refreshed
+        await fetch("/api/db/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: `u_${simpleHash(fromEmail)}`,
+            name: fromName,
+            email: fromEmail,
+            avatar: "🧑‍🚀",
+            status: "online",
+            personalMessage: "Gezellig samen vrienden op Buzzi! :-)"
+          })
+        });
+        
+        // Also send a reciprocal request back so they see us instantly too!
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromEmail: currentUser?.email || "",
+            fromName: userDisplayName,
+            toEmail: fromEmail
+          })
+        });
+        
+        // Sync users list immediately
+        const syncRes = await fetch("/api/db/users?t=" + Date.now());
+        if (syncRes.status === 200) {
+          const list = await syncRes.json();
+          const filtered = list
+            .filter((data: any) => data.uid !== currentUser?.uid)
+            .map((data: any) => ({
+              id: data.uid,
+              name: data.name || "Buzzi Gebruiker",
+              email: data.email || "",
+              avatar: data.avatar || "🧑‍🚀",
+              status: (data.status as StatusType) || "online",
+              personalMessage: data.personalMessage || "",
+            }));
+          setRegisteredUsers(filtered);
+        }
+      }
+    } catch (e) {
+      console.warn("Kon vriendenverzoek niet accepteren:", e);
+    }
+  };
+
+  const handleDeclineFriendRequest = async (id: string) => {
+    try {
+      const res = await fetch("/api/friend-requests/decline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        setFriendRequests(prev => prev.filter(r => r.id !== id));
+        hiveAudio.playHoneyPop();
+      }
+    } catch (e) {
+      console.warn("Kon vriendenverzoek niet weigeren:", e);
+    }
+  };
 
   const handleSendBugReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -566,7 +679,7 @@ export default function App() {
         hiveAudio.playNotification();
 
         // Refresh bugs list
-        const freshRes = await fetch("/api/bugs");
+        const freshRes = await fetch("/api/bugs?t=" + Date.now());
         if (freshRes.ok) {
           const list = await freshRes.json();
           setBugsList(list);
@@ -604,7 +717,7 @@ export default function App() {
 
     const syncMessages = async () => {
       try {
-        const res = await fetch("/api/db/messages");
+        const res = await fetch("/api/db/messages?t=" + Date.now());
         if (res.status === 200) {
           const list = await res.json();
           
@@ -1089,6 +1202,9 @@ export default function App() {
           onDeleteContact={handleDeleteContact}
           onCreateChannel={handleCreateChannel}
           onAddContact={handleAddContact}
+          friendRequests={friendRequests}
+          onAcceptFriendRequest={handleAcceptFriendRequest}
+          onDeclineFriendRequest={handleDeclineFriendRequest}
           
           // Custom interactive profile properties for Buzzi
           userDisplayName={userDisplayName}
@@ -1265,7 +1381,7 @@ export default function App() {
                       <input
                         type="text"
                         readOnly
-                        value={`https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`}
+                        value={`https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`}
                         className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
                       />
                       <button
@@ -1281,7 +1397,7 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <a
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                        `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                        `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1293,7 +1409,7 @@ export default function App() {
                     </a>
                     <a
                       href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-                        `https://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                        `https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1306,7 +1422,7 @@ export default function App() {
 
                   <a
                     href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
-                      `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://v0-buzzi-messenger-0o.vercel.app/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
+                      `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
                     )}`}
                     onClick={() => hiveAudio.playNotification()}
                     className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"

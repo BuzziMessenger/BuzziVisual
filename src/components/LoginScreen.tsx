@@ -548,7 +548,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 type="button"
                 onClick={() => {
                   hiveAudio.playNotification();
-                  onLoginSuccess("Buzzi Gast", "gast@buzzi.nl#pwd_local");
+                  let guestId = localStorage.getItem("buzzi_guest_id");
+                  if (!guestId) {
+                    guestId = String(Math.floor(Math.random() * 900000 + 100000));
+                    localStorage.setItem("buzzi_guest_id", guestId);
+                  }
+                  onLoginSuccess(`Buzzi Gast #${guestId}`, `gast_${guestId}@buzzi.nl#pwd_local`);
                 }}
                 className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-3 rounded-xl shadow-md border-2 border-amber-700 flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider"
               >

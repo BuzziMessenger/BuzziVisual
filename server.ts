@@ -13,6 +13,7 @@ const USERS_FILE = path.join(process.cwd(), "data_users.json");
 const MESSAGES_FILE = path.join(process.cwd(), "data_messages.json");
 const CHANNELS_FILE = path.join(process.cwd(), "data_channels.json");
 const BUGS_FILE = path.join(process.cwd(), "data_bugs.json");
+const FRIEND_REQUESTS_FILE = path.join(process.cwd(), "data_friend_requests.json");
 
 function readJsonFile<T>(filePath: string, defaultVal: T): T {
   try {
@@ -408,6 +409,132 @@ async function startServer() {
       bugs = bugs.filter((b) => b.id !== bugId);
       writeJsonFile(BUGS_FILE, bugs);
       res.json(bugs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 6. FRIEND REQUESTS API: GET pending friend requests for a specific email
+  app.get("/api/friend-requests", async (req, res) => {
+    try {
+      const { toEmail } = req.query;
+      if (!toEmail) {
+        res.status(400).json({ error: "toEmail parameter is verplicht" });
+        return;
+      }
+      const cleanToEmail = (toEmail as string).trim().toLowerCase();
+      const dbInstance = await getMongoDb();
+      let list = [];
+      if (dbInstance) {
+        list = await dbInstance.collection("friend_requests").find({ toEmail: cleanToEmail, status: "pending" }).toArray();
+      } else {
+        list = readJsonFile<any[]>(FRIEND_REQUESTS_FILE, []);
+        list = list.filter((r: any) => r.toEmail === cleanToEmail && r.status === "pending");
+      }
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 7. FRIEND REQUESTS API: POST issue a new friend request / add friend
+  app.post("/api/friend-requests", async (req, res) => {
+    try {
+      const { fromEmail, fromName, toEmail } = req.body;
+      if (!fromEmail || !toEmail) {
+        res.status(400).json({ error: "fromEmail en toEmail zijn verplicht" });
+        return;
+      }
+
+      const cleanFromEmail = fromEmail.trim().toLowerCase();
+      const cleanToEmail = toEmail.trim().toLowerCase();
+
+      if (cleanFromEmail === cleanToEmail) {
+        res.status(400).json({ error: "Je kunt jezelf niet toevoegen" });
+        return;
+      }
+
+      const reqId = "fr-" + Math.random().toString(36).substring(2, 11);
+      const newRequest = {
+        id: reqId,
+        fromEmail: cleanFromEmail,
+        fromName: fromName || cleanFromEmail.split("@")[0],
+        toEmail: cleanToEmail,
+        status: "pending",
+        timestamp: Date.now()
+      };
+
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        const existing = await dbInstance.collection("friend_requests").findOne({
+          fromEmail: cleanFromEmail,
+          toEmail: cleanToEmail,
+          status: "pending"
+        });
+        if (!existing) {
+          await dbInstance.collection("friend_requests").insertOne(newRequest);
+        }
+      } else {
+        const requests = readJsonFile<any[]>(FRIEND_REQUESTS_FILE, []);
+        const exists = requests.some(r => r.fromEmail === cleanFromEmail && r.toEmail === cleanToEmail && r.status === "pending");
+        if (!exists) {
+          requests.push(newRequest);
+          writeJsonFile(FRIEND_REQUESTS_FILE, requests);
+        }
+      }
+      res.json({ success: true, requestId: reqId });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 8. FRIEND REQUESTS API: POST accept friend request
+  app.post("/api/friend-requests/accept", async (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) {
+        res.status(400).json({ error: "id is verplicht" });
+        return;
+      }
+
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        await dbInstance.collection("friend_requests").updateOne({ id }, { $set: { status: "accepted" } });
+      } else {
+        const requests = readJsonFile<any[]>(FRIEND_REQUESTS_FILE, []);
+        const idx = requests.findIndex(r => r.id === id);
+        if (idx >= 0) {
+          requests[idx].status = "accepted";
+          writeJsonFile(FRIEND_REQUESTS_FILE, requests);
+        }
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 9. FRIEND REQUESTS API: POST decline friend request
+  app.post("/api/friend-requests/decline", async (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) {
+        res.status(400).json({ error: "id is verplicht" });
+        return;
+      }
+
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        await dbInstance.collection("friend_requests").updateOne({ id }, { $set: { status: "declined" } });
+      } else {
+        const requests = readJsonFile<any[]>(FRIEND_REQUESTS_FILE, []);
+        const idx = requests.findIndex(r => r.id === id);
+        if (idx >= 0) {
+          requests[idx].status = "declined";
+          writeJsonFile(FRIEND_REQUESTS_FILE, requests);
+        }
+      }
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

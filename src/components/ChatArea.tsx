@@ -58,6 +58,17 @@ const BUZZI_EMOTICONS = [
   { code: "(pi)", char: "🍕", name: "Pizza" },
   { code: "(beer)", char: "🍺", name: "Bier" },
   { code: "(v)", char: "✌️", name: "Peace" },
+  { code: "(c)", char: "☕", name: "Koffie" },
+  { code: "(yn)", char: "🤞", name: "Duimen" },
+  { code: "(ball)", char: "⚽", name: "Voetbal" },
+  { code: "(car)", char: "🚗", name: "Auto" },
+  { code: "(rain)", char: "🌧️", name: "Regen" },
+  { code: "(sun)", char: "☀️", name: "Zon" },
+  { code: "(hug)", char: "🤗", name: "Knuffel" },
+  { code: "(kiss)", char: "😘", name: "Kusje" },
+  { code: "(dog)", char: "🐶", name: "Hond" },
+  { code: "(cat)", char: "🐱", name: "Kat" },
+  { code: "(ghost)", char: "👻", name: "Spook" },
 ];
 
 const WINKS_LIST = [
@@ -65,7 +76,10 @@ const WINKS_LIST = [
   { id: "crazy", title: "Gekke Lachebek", icon: "🤪", desc: "Een gigantische gele smiley die onbedaarlijk lacht en rammelt." },
   { id: "water", title: "Waterballon", icon: "🎈", desc: "Gooi een waterballon tegen het scherm en laat het druipen!" },
   { id: "guitar", title: "Luchtgitaar", icon: "🎸", desc: "Scheur op een vette elektrische gitaar met bliksem en sterren!" },
-  { id: "heart", title: "Hartjes Explosie", icon: "💖", desc: "Een groot kloppend hart dat kapot schiet in tientallen harten." }
+  { id: "heart", title: "Hartjes Explosie", icon: "💖", desc: "Een groot kloppend hart dat kapot schiet in tientallen harten." },
+  { id: "ghost", title: "MSN Spookje", icon: "👻", desc: "Een spooky groen Buzzi-spookje dat over je scherm zweeft!" },
+  { id: "kiss", title: "Klop Kus-afdruk", icon: "💋", desc: "Een grote lippenstift-kusafdruk die op je scherm stempelt!" },
+  { id: "disco", title: "Retro Disco Bal", icon: "🪩", desc: "Laat een flitsende neon discobal over je scherm draaien!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -122,6 +136,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         hiveAudio.playGuitarWink();
       } else if (lastMsg.winkId === "heart") {
         hiveAudio.playHeartWink();
+      } else if (lastMsg.winkId === "ghost") {
+        hiveAudio.playGhostWink();
+      } else if (lastMsg.winkId === "kiss") {
+        hiveAudio.playKissWink();
+      } else if (lastMsg.winkId === "disco") {
+        hiveAudio.playDiscoWink();
       }
 
       const timer = setTimeout(() => {
@@ -752,6 +772,78 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </motion.div>
                   <div className="bg-red-500 text-white font-extrabold border-2 border-red-200 shadow-md px-4 py-2 rounded-full mt-4 text-xs tracking-wide animate-bounce">
                     *KABOOM!* ❤️ Hartjes Liefde!
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Spooky Ghost Wink */}
+            {activeWink === "ghost" && (
+              <div className="absolute inset-0 bg-emerald-950/20 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ x: -300, y: 100, scale: 0.2 }}
+                  animate={{ 
+                    x: [-300, 100, -50, 0],
+                    y: [100, -80, 50, 0],
+                    scale: [0.2, 1.8, 1.5, 1.3] 
+                  }}
+                  transition={{ duration: 4.5, ease: "easeInOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="text-[130px] sm:text-[180px] filter drop-shadow-[0_15px_15px_rgba(52,211,153,0.4)] animate-bounce">
+                    👻
+                  </div>
+                  <div className="bg-[#8cc63f] text-slate-900 font-extrabold border-2 border-slate-900 shadow-lg px-5 py-2 rounded-xl mt-4 text-xs animate-pulse">
+                    🎃 BOE!!! SCHROK JE? 😱👻
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Smaak Kus Wink */}
+            {activeWink === "kiss" && (
+              <div className="absolute inset-0 bg-rose-200/20 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ scale: 0, rotate: -45 }}
+                  animate={{ 
+                    scale: [0, 2.2, 1.8],
+                    rotate: [0, 15, -10]
+                  }}
+                  transition={{ duration: 1.5, ease: "backOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="text-[140px] sm:text-[200px] filter drop-shadow-[0_10px_10px_rgba(225,29,72,0.5)]">
+                    💋
+                  </div>
+                  <div className="bg-rose-600 text-white font-black border-2 border-white shadow-xl px-4 py-2 rounded-full mt-4 text-xs animate-bounce uppercase tracking-wide">
+                    *SMACK!* 💋 Een dikke kus!
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Retro Disco Bal Wink */}
+            {activeWink === "disco" && (
+              <div className="absolute inset-0 bg-fuchsia-950/30 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <div className="absolute inset-0 bg-gradient-to-tr from-fuchsia-500/10 via-cyan-500/10 to-transparent animate-pulse pointer-events-none" />
+                <motion.div
+                  initial={{ y: -300, scale: 0.5 }}
+                  animate={{ 
+                    y: [-300, 0, -20, 0],
+                    scale: [0.5, 1.5, 1.3, 1.3]
+                  }}
+                  transition={{ duration: 2.2, ease: "easeOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+                    className="text-[140px] sm:text-[180px] filter drop-shadow-[0_10px_20px_rgba(168,85,247,0.6)]"
+                  >
+                    🪩
+                  </motion.div>
+                  <div className="bg-gradient-to-r from-fuchsia-500 to-cyan-500 text-white font-extrabold border-2 border-white shadow-lg px-6 py-2 rounded-xl mt-6 text-xs uppercase tracking-widest animate-pulse">
+                    🕺 FEESTJE! DANSEN! 💃✨
                   </div>
                 </motion.div>
               </div>

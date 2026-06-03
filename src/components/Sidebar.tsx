@@ -155,6 +155,10 @@ interface SidebarProps {
   onUpdateAvatar: (avatar: string) => void;
   userListeningTo: string;
   onUpdateListeningTo: (msg: string) => void;
+
+  friendRequests?: any[];
+  onAcceptFriendRequest?: (id: string, fromName: string, fromEmail: string) => void;
+  onDeclineFriendRequest?: (id: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -178,7 +182,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userAvatar,
   onUpdateAvatar,
   userListeningTo,
-  onUpdateListeningTo
+  onUpdateListeningTo,
+  friendRequests = [],
+  onAcceptFriendRequest,
+  onDeclineFriendRequest
 }) => {
   // Collapsible groups states
   const [onlineExpanded, setOnlineExpanded] = useState(true);
@@ -220,11 +227,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [visualizerHeights, setVisualizerHeights] = useState<number[]>([4, 4, 4, 4, 4, 4]);
 
-  // Lazy initialize audio object once
+  // Handle cleanup of audio resources
   useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -251,10 +255,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Direct play/pause functions to bypass mobile/iOS touch-gesture restrictions
   const playTrackDirect = (trackIdx: number) => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
     const audio = audioRef.current;
+    if (!audio) {
+      console.warn("Audio element not yet mounted in the DOM!");
+      return;
+    }
     
     const track = RETRO_PLAYLIST[trackIdx];
     let audioUrl = track.url;
@@ -381,6 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="w-80 bg-[#e4ecf7] text-slate-800 flex flex-col h-full border-r border-[#6f8da5] select-none font-sans shadow-md">
+      <audio ref={audioRef} className="hidden" />
       {/* Buzzi Messenger Title Bar / Header Decoration */}
       <div className="bg-gradient-to-r from-[#1d6fa5] via-[#469cd2] to-[#1d6fa5] p-2.5 text-white flex items-center justify-between border-b border-[#0f4f7d] shadow-sm">
         <div className="flex items-center gap-1.5">
@@ -714,6 +720,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Buddy List (Collapsible Groups with Classic Arrows) */}
       <div className="flex-1 overflow-y-auto p-2 space-y-3 bg-white border-[#9ebcd1] custom-scrollbar">
 
+        {/* Pending Friend Requests Banner */}
+        {friendRequests && friendRequests.length > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-2.5 animate-pulse shrink-0 space-y-2 mb-2 shadow-sm">
+            <div className="flex items-center gap-1.5 text-amber-800">
+              <span className="text-base">🔔</span>
+              <span className="text-[10.5px] font-black uppercase tracking-wide">Vrienden verzoek!</span>
+            </div>
+            {friendRequests.map((req) => (
+              <div key={req.id} className="bg-white/95 border border-amber-200 p-2 rounded flex flex-col gap-1.5 shadow-xs">
+                <div className="text-[11px] font-bold text-slate-700 leading-tight">
+                  <span className="text-amber-700 font-extrabold">{req.fromName}</span> ({req.fromEmail}) wil je toevoegen!
+                </div>
+                <div className="flex justify-start gap-1.5">
+                  <button
+                    onClick={() => onAcceptFriendRequest?.(req.id, req.fromName, req.fromEmail)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9.5px] uppercase tracking-wider px-2 py-1 rounded shadow-sm border border-emerald-700 cursor-pointer active:scale-95 transition-all"
+                  >
+                    Accepteren
+                  </button>
+                  <button
+                    onClick={() => onDeclineFriendRequest?.(req.id)}
+                    className="bg-slate-500 hover:bg-slate-600 text-white font-black text-[9.5px] uppercase tracking-wider px-2 py-1 rounded shadow-sm border border-slate-600 cursor-pointer active:scale-95 transition-all"
+                  >
+                    Slaan
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Group 1: Chat Robots */}
         <div>
           <button 
@@ -940,11 +977,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User Info footer (Classic Windows XP bottom status line) */}
       <div className="p-3 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.1</span>
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm" />
           <span className="font-semibold text-[11px] font-sans">Buzzi Service: Verbonden</span>
         </div>
-        <span className="text-[10px] font-mono font-medium text-slate-500">v7.5.0311</span>
+        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.1</span>
       </div>
 
       {/* Avatar Picker Modal */}
