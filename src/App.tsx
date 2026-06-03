@@ -445,24 +445,27 @@ export default function App() {
     }
   };
 
-  // Sync profile edits to Server-side storage (MongoDB or Local memory)
+// Sync profile edits to Server-side storage (MongoDB or Local memory)
   const updateProfileInDatabase = async (fields: Partial<any>) => {
     if (!currentUser) return;
 
     try {
+      // We bouwen het object zo op dat de binnenkomende 'fields' de oude states overschrijven
+      const updatedProfile = {
+        uid: currentUser.uid,
+        name: fields.name !== undefined ? fields.name : userDisplayName,
+        email: currentUser.email || "",
+        avatar: fields.avatar !== undefined ? fields.avatar : userAvatar,
+        status: fields.status !== undefined ? fields.status : userStatus,
+        personalMessage: fields.personalMessage !== undefined ? fields.personalMessage : userPersonalMessage,
+        listeningTo: fields.listeningTo !== undefined ? fields.listeningTo : userListeningTo,
+        ...fields // Dit zorgt ervoor dat eventuele extra meegestuurde velden ook overschrijven
+      };
+
       await fetch("/api/db/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          name: userDisplayName,
-          email: currentUser.email || "",
-          avatar: userAvatar,
-          status: userStatus,
-          personalMessage: userPersonalMessage,
-          listeningTo: userListeningTo,
-          ...fields
-        })
+        body: JSON.stringify(updatedProfile)
       });
     } catch (err) {
       console.warn("Failed to update profile in database:", err);
