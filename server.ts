@@ -432,22 +432,47 @@ async function startServer() {
     }
   });
 
-  // 6. FRIEND REQUESTS API: GET pending friend requests for a specific email
+  // 6. FRIEND REQUESTS API: GET pending or accepted friend requests/relations
   app.get("/api/friend-requests", async (req, res) => {
     try {
-      const { toEmail } = req.query;
-      if (!toEmail) {
-        res.status(400).json({ error: "toEmail parameter is verplicht" });
-        return;
-      }
-      const cleanToEmail = (toEmail as string).trim().toLowerCase();
+      const { toEmail, fromEmail, email, status } = req.query;
       const dbInstance = await getMongoDb();
       let list = [];
+      const targetStatus = status || "pending";
+
+      let query: any = {};
+      if (targetStatus !== "all") {
+        query.status = targetStatus;
+      }
+
+      if (email) {
+        const cleanEmail = (email as string).trim().toLowerCase();
+        query.$or = [{ fromEmail: cleanEmail }, { toEmail: cleanEmail }];
+      } else {
+        if (toEmail) {
+          query.toEmail = (toEmail as string).trim().toLowerCase();
+        }
+        if (fromEmail) {
+          query.fromEmail = (fromEmail as string).trim().toLowerCase();
+        }
+      }
+
       if (dbInstance) {
-        list = await dbInstance.collection("friend_requests").find({ toEmail: cleanToEmail, status: "pending" }).toArray();
+        list = await dbInstance.collection("friend_requests").find(query).toArray();
       } else {
         list = readJsonFile<any[]>(FRIEND_REQUESTS_FILE, []);
-        list = list.filter((r: any) => r.toEmail === cleanToEmail && r.status === "pending");
+        list = list.filter((r: any) => {
+          const statusMatch = targetStatus === "all" || r.status === targetStatus;
+          let emailMatch = true;
+          if (email) {
+            const cleanEmail = (email as string).trim().toLowerCase();
+            emailMatch = r.fromEmail === cleanEmail || r.toEmail === cleanEmail;
+          } else {
+            if (toEmail && r.toEmail !== (toEmail as string).trim().toLowerCase()) emailMatch = false;
+            if (fromEmail && r.fromEmail !== (fromEmail as string).trim().toLowerCase()) emailMatch = false;
+          }
+          return statusMatch && emailMatch;
+        });
       }
       res.json(list);
     } catch (err: any) {

@@ -142,7 +142,7 @@ interface SidebarProps {
   onSignOut?: () => void;
   onDeleteContact?: (contactId: string) => void;
   onCreateChannel?: (name: string, description: string) => Promise<boolean>;
-  onAddContact?: (name: string, email: string, avatar: string) => Promise<boolean>;
+  onAddContact?: (name: string, emailOrUsername: string, avatar: string, mode: "username" | "email") => Promise<any>;
   
   // Custom User Profile State for Buzzi Clone
   userDisplayName: string;
@@ -208,6 +208,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [addContactError, setAddContactError] = useState("");
   const [addContactSuccess, setAddContactSuccess] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
+  const [addContactMode, setAddContactMode] = useState<"username" | "email">("username");
+  const [addedFriendName, setAddedFriendName] = useState("");
 
   // Edit fields visibility
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1237,27 +1239,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <form 
             onSubmit={async (e) => {
               e.preventDefault();
-              if (!addContactName.trim() || !addContactEmail.trim()) {
-                setAddContactError("Naam en e-mailadres zijn verplicht.");
-                return;
+              
+              if (addContactMode === "username") {
+                if (!addContactName.trim()) {
+                  setAddContactError("Schermnaam is verplicht.");
+                  return;
+                }
+              } else {
+                if (!addContactName.trim() || !addContactEmail.trim()) {
+                  setAddContactError("Naam en e-mailadres zijn verplicht.");
+                  return;
+                }
               }
+
               setIsAddingContact(true);
               setAddContactError("");
               
               if (onAddContact) {
-                const ok = await onAddContact(
+                const result = await onAddContact(
                   addContactName.trim(),
-                  addContactEmail.trim(),
-                  addContactAvatar
+                  addContactMode === "username" ? addContactName.trim() : addContactEmail.trim(),
+                  addContactAvatar,
+                  addContactMode
                 );
-                if (ok) {
+
+                if (result && result.success) {
+                  setAddedFriendName(result.name || addContactName.trim());
                   setAddContactSuccess(true);
                   setTimeout(() => {
                     setAddContactSuccess(false);
                     setIsAddContactOpen(false);
-                  }, 2000);
+                    setAddedFriendName("");
+                  }, 4000);
                 } else {
-                  setAddContactError("Kon contactpersoon niet toevoegen. Mogelijk bestaat deze al.");
+                  if (result && result.reason === "USER_NOT_FOUND") {
+                    setAddContactError(`We konden helaas geen actieve Buzzi-gebruiker vinden met de schermnaam "${addContactName.trim()}". Let op hoofdletters en spelling!`);
+                  } else if (result && result.reason === "SELF_ADD") {
+                    setAddContactError("Je kunt jezelf niet toevoegen als vriend! Dat is een beetje ongezellig. 😉");
+                  } else {
+                    setAddContactError("Kon vriendschapsverzoek niet verzenden. Mogelijk bestaat er al een verzoek.");
+                  }
                 }
               } else {
                 setAddContactError("Voeg contact handeling is niet beschikbaar.");
@@ -1283,72 +1304,133 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
+            {/* Retro Tabs for Selection Mode */}
+            {!addContactSuccess && (
+              <div className="flex bg-[#cbdcf0] p-1 border-b border-[#abc4df] shrink-0 gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddContactMode("username");
+                    setAddContactError("");
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className={`flex-1 text-center py-1.5 rounded text-[10px] font-black transition-all cursor-pointer ${
+                    addContactMode === "username"
+                      ? "bg-[#1d5c8a] text-white shadow-sm"
+                      : "text-[#1d5c8a] hover:bg-[#cfe1f5]"
+                  }`}
+                >
+                  👑 Schermnaam Zoeken
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddContactMode("email");
+                    setAddContactError("");
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className={`flex-1 text-center py-1.5 rounded text-[10px] font-black transition-all cursor-pointer ${
+                    addContactMode === "email"
+                      ? "bg-[#1d5c8a] text-white shadow-sm"
+                      : "text-[#1d5c8a] hover:bg-[#cfe1f5]"
+                  }`}
+                >
+                  ✉️ E-mailadres / Handmatig
+                </button>
+              </div>
+            )}
+
             {/* Content Area */}
             <div className="p-5 space-y-4 flex-1">
               {addContactSuccess ? (
-                <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 text-center text-emerald-950 font-bold text-xs space-y-1 my-4 animate-bounce">
-                  <div>🎉 Joehoe! Vriend succesvol toegevoegd!</div>
-                  <div className="text-[10px] font-normal text-emerald-850">Hij of zij staat nu in de lijst!</div>
+                <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 text-center text-emerald-950 font-bold text-xs space-y-1.5 my-4 animate-bounce">
+                  <div>🎉 Joehoe! Vriendschapsverzoek verstuurd!</div>
+                  <div className="text-[10px] font-normal text-emerald-800 leading-relaxed">
+                    Je hebt een verzoek gestuurd naar <span className="font-black text-emerald-950">{addedFriendName}</span>. 
+                    Zodra hij of zij accepteert, staan jullie gezellig bij elkaar in de lijst! 👑
+                  </div>
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
-                      Naam van je vriend
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="bijv: Kelly / Wouter"
-                      value={addContactName}
-                      onChange={(e) => setAddContactName(e.target.value)}
-                      maxLength={25}
-                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text text-left"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
-                      Zijn/haar e-mailadres
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="bijv: kelly@live.nl"
-                      value={addContactEmail}
-                      onChange={(e) => setAddContactEmail(e.target.value)}
-                      maxLength={80}
-                      className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text text-left font-semibold"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
-                      Selecteer een retro Buzzi avatar status
-                    </label>
-                    <div className="grid grid-cols-5 gap-2 bg-white/80 p-2 border border-[#bad0e3] rounded-lg">
-                      {["🧑‍🚀", "👸", "👾", "🦊", "🐯", "🐼", "🕶️", "🎩", "🍕", "🎸"].map((av) => (
-                        <button
-                          key={av}
-                          type="button"
-                          onClick={() => {
-                            setAddContactAvatar(av);
-                            hiveAudio.playHoneyPop();
-                          }}
-                          className={`text-xl p-1.5 rounded transition-transform active:scale-95 text-center cursor-pointer ${
-                            addContactAvatar === av
-                              ? "bg-sky-200 ring-2 ring-sky-500 scale-110"
-                              : "hover:bg-slate-100"
-                          }`}
-                        >
-                          {av}
-                        </button>
-                      ))}
+                  {addContactMode === "username" ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                        MSN Schermnaam van je vriend
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="bijv: Robbin1993"
+                        value={addContactName}
+                        onChange={(e) => setAddContactName(e.target.value)}
+                        maxLength={25}
+                        className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text text-left"
+                      />
+                      <span className="text-[9.5px] text-slate-500 italic leading-normal mt-1">
+                        Typ simpelweg de unieke weergavenaam in. Er wordt onmiddellijk een verzoek gestuurd naar hun Buzzi-account! Let op hoofdletters.
+                      </span>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                          Naam van je vriend
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="bijv: Kelly / Wouter"
+                          value={addContactName}
+                          onChange={(e) => setAddContactName(e.target.value)}
+                          maxLength={25}
+                          className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] font-bold select-text text-left"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                          Zijn/haar e-mailadres
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="bijv: kelly@live.nl"
+                          value={addContactEmail}
+                          onChange={(e) => setAddContactEmail(e.target.value)}
+                          maxLength={80}
+                          className="w-full px-2.5 py-1.5 text-xs rounded border border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text text-left font-semibold"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
+                          Selecteer een retro Buzzi avatar status
+                        </label>
+                        <div className="grid grid-cols-5 gap-2 bg-white/80 p-2 border border-[#bad0e3] rounded-lg">
+                          {["🧑‍🚀", "👸", "👾", "🦊", "🐯", "🐼", "🕶️", "🎩", "🍕", "🎸"].map((av) => (
+                            <button
+                              key={av}
+                              type="button"
+                              onClick={() => {
+                                setAddContactAvatar(av);
+                                hiveAudio.playHoneyPop();
+                              }}
+                              className={`text-xl p-1.5 rounded transition-transform active:scale-95 text-center cursor-pointer ${
+                                addContactAvatar === av
+                                  ? "bg-sky-200 ring-2 ring-sky-500 scale-110"
+                                  : "hover:bg-slate-100"
+                              }`}
+                            >
+                              {av}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {addContactError && (
-                    <div className="text-[10px] font-black text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                    <div className="text-[10px] text-red-600 bg-red-50 p-2 rounded border border-red-200 leading-normal">
                       ⚠️ {addContactError}
                     </div>
                   )}

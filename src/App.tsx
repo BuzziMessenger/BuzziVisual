@@ -198,6 +198,7 @@ export default function App() {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [registeredUsers, setRegisteredUsers] = useState<Contact[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [acceptedFriendships, setAcceptedFriendships] = useState<any[]>([]);
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
@@ -239,24 +240,73 @@ export default function App() {
   };
 
   // Add Contact Handler (triggered from Sidebar modal)
-  const handleAddContact = async (name: string, email: string, avatar: string) => {
-    if (!name.trim() || !email.trim()) return false;
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanMyEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
-
-    // Prevent adding oneself
-    if (cleanEmail === cleanMyEmail) {
-      return false;
+  const handleAddContact = async (
+    name: string,
+    emailOrUsername: string,
+    avatar: string,
+    mode: "username" | "email" = "email"
+  ): Promise<any> => {
+    if (!emailOrUsername.trim()) {
+      return { success: false, reason: "EMPTY" };
     }
 
-    const mockUserUid = `u_${simpleHash(cleanEmail)}`;
+    let targetEmail = "";
+    let targetName = "";
 
-    // Check if user already exists under a registered account (e.g., has #pwd_) or INITIAL_CONTACTS
+    const myCleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
+
+    if (mode === "username") {
+      // Fetch latest users of the Buzzi platform to search our potential friend
+      try {
+        const res = await fetch("/api/db/users?t=" + Date.now());
+        if (res.status === 200) {
+          const allUsers = await res.json();
+          const targetCleanName = emailOrUsername.trim().toLowerCase();
+          
+          // Try to find matching user based on their registered name
+          const found = allUsers.find((u: any) => {
+            const uName = (u.name || "").trim().toLowerCase();
+            return uName === targetCleanName && u.email !== currentUser?.email;
+          });
+
+          if (found) {
+            targetEmail = found.email;
+            targetName = found.name;
+          } else {
+            return { success: false, reason: "USER_NOT_FOUND" };
+          }
+        } else {
+          return { success: false, reason: "DB_ERROR" };
+        }
+      } catch (err) {
+        console.warn("Could not query DB users:", err);
+        return { success: false, reason: "DB_ERROR" };
+      }
+    } else {
+      // Traditional Email mode
+      targetEmail = emailOrUsername.trim().toLowerCase();
+      targetName = name.trim();
+
+      // Prevent adding oneself
+      if (targetEmail === myCleanEmail) {
+        return { success: false, reason: "SELF_ADD" };
+      }
+    }
+
+    const cleanTargetEmail = targetEmail.trim().toLowerCase();
+    
+    // Prevent adding oneself
+    if (cleanTargetEmail === myCleanEmail) {
+      return { success: false, reason: "SELF_ADD" };
+    }
+
+    const mockUserUid = `u_${simpleHash(cleanTargetEmail)}`;
+
+    // Check if user already exists under a registered account or is a default contact
     const existingUser = registeredUsers.find((r: any) => {
       const cleanRegEmail = (r.email || "").split("#pwd_")[0].trim().toLowerCase();
-      return cleanRegEmail === cleanEmail || r.id === mockUserUid;
-    }) || INITIAL_CONTACTS.find((ic: any) => (ic.email || "").toLowerCase() === cleanEmail);
+      return cleanRegEmail === cleanTargetEmail || r.id === mockUserUid;
+    }) || INITIAL_CONTACTS.find((ic: any) => (ic.email || "").toLowerCase() === cleanTargetEmail);
 
     // Restore from deleted contacts list if they were previously hidden
     if (existingUser && deletedContactIds.includes(existingUser.id)) {
@@ -265,12 +315,12 @@ export default function App() {
       localStorage.setItem("buzzi_deleted_contacts_" + (currentUser?.uid || ""), JSON.stringify(updated));
     }
 
-    // Register shadow profile if they don't exist in the DB at all yet
+    // Register shadow profile if they don't exist in the DB at all yet (for mock accounts)
     if (!existingUser) {
       const newContactProfile = {
         uid: mockUserUid,
-        name: name.trim(),
-        email: cleanEmail,
+        name: targetName || targetEmail.split("@")[0],
+        email: cleanTargetEmail,
         avatar: avatar || "🧑‍🚀",
         status: "online" as StatusType,
         personalMessage: "Lekker chatten op Buzzi! [B-)]"
@@ -295,13 +345,13 @@ export default function App() {
         body: JSON.stringify({
           fromEmail: currentUser?.email || "",
           fromName: userDisplayName,
-          toEmail: cleanEmail
+          toEmail: cleanTargetEmail
         })
       });
 
       hiveAudio.playNotification();
 
-      // Trigger immediate reload of list
+      // Trigger immediate reload of registered users list and accepted friendships
       const syncRes = await fetch("/api/db/users?t=" + Date.now());
       if (syncRes.status === 200) {
         const list = await syncRes.json();
@@ -317,10 +367,20 @@ export default function App() {
           }));
         setRegisteredUsers(filtered);
       }
-      return true;
+
+      // Fetch friendships immediately to get live synchronization
+      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+      if (acceptedRes.ok) {
+        const alist = await acceptedRes.json();
+        if (Array.isArray(alist)) {
+          setAcceptedFriendships(alist);
+        }
+      }
+
+      return { success: true, name: targetName };
     } catch (err: any) {
       console.error(err);
-      return false;
+      return { success: false, reason: "REQUEST_FAILED" };
     }
   };
 
@@ -648,7 +708,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Combine buddy lists: if gast@buzzi.nl, show full static initial buddies. If custom email, start fresh with Buzzi Bot and real registered database contacts!
+  // Combine buddy lists: if gast@buzzi.nl, show full static initial buddies. If custom email, start fresh with Buzzi Bot and only accepted friends!
   const isDemoUser = currentUser?.email === "gast@buzzi.nl" || currentUser?.email?.startsWith("gast_") || currentUser?.email?.includes("pwd_local");
   const currentBuddies = (isDemoUser
     ? [
@@ -662,12 +722,19 @@ export default function App() {
       ]
     : [
         INITIAL_CONTACTS[0], // Keep Buzzi Bot!
-        ...registeredUsers.filter(u => 
-          u.id !== "queen" && 
-          u.email !== "buzzi_bot@live.nl" && 
-          u.email !== currentUser?.email &&
-          !INITIAL_CONTACTS.some(ic => ic.id !== "queen" && ic.email === u.email)
-        )
+        ...registeredUsers.filter(u => {
+          if (u.id === "queen" || u.email === "buzzi_bot@live.nl" || u.email === currentUser?.email) return false;
+          
+          // Check if there is an accepted friendship with this registered user
+          const isFriend = acceptedFriendships.some(fr => {
+            const cleanU = (u.email || "").trim().toLowerCase();
+            const cleanMe = (currentUser?.email || "").trim().toLowerCase();
+            const from = (fr.fromEmail || "").trim().toLowerCase();
+            const to = (fr.toEmail || "").trim().toLowerCase();
+            return (from === cleanMe && to === cleanU) || (from === cleanU && to === cleanMe);
+          });
+          return isFriend;
+        })
       ]).filter(c => !deletedContactIds.includes(c.id));
 
   const visibleChannels = channels;
@@ -737,13 +804,14 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, [currentUser]);
 
-  // Poll friend requests in real-time
+  // Poll friend requests and accepted friendships in real-time
   useEffect(() => {
     if (!currentUser || !currentUser.email) return;
 
-    const fetchFriendRequests = async () => {
+    const fetchFriendRequestsAndFriendships = async () => {
       try {
-        const res = await fetch(`/api/friend-requests?toEmail=${encodeURIComponent(currentUser.email)}&t=${Date.now()}`);
+        // 1. Pending requests to me (default GET is pending)
+        const res = await fetch(`/api/friend-requests?toEmail=${encodeURIComponent(currentUser.email)}&status=pending&t=${Date.now()}`);
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list)) {
@@ -754,13 +822,22 @@ export default function App() {
             setFriendRequests(list);
           }
         }
+
+        // 2. Accepted friendships (where I am recipient or sender)
+        const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+        if (acceptedRes.ok) {
+          const alist = await acceptedRes.json();
+          if (Array.isArray(alist)) {
+            setAcceptedFriendships(alist);
+          }
+        }
       } catch (err) {
-        console.warn("Fout bij ophalen van vriendenverzoeken:", err);
+        console.warn("Fout bij ophalen van vriendenverzoeken/relaties:", err);
       }
     };
 
-    fetchFriendRequests();
-    const interval = setInterval(fetchFriendRequests, 5000);
+    fetchFriendRequestsAndFriendships();
+    const interval = setInterval(fetchFriendRequestsAndFriendships, 4000);
     return () => clearInterval(interval);
   }, [currentUser, friendRequests.length]);
 
