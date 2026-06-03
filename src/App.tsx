@@ -312,11 +312,79 @@ export default function App() {
     }
 
     const cleanTargetEmail = targetEmail.trim().toLowerCase();
+    const cleanMyEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
     
     // Prevent adding oneself
     if (cleanTargetEmail === myCleanEmail) {
       return { success: false, reason: "SELF_ADD" };
     }
+
+    try {
+      console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanTargetEmail);
+
+      // We sturen vanaf nu nog maar ÉÉN verzoek naar de server met de JUISTE variabele!
+      await fetch("/api/friend-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromEmail: cleanMyEmail,
+          fromName: userDisplayName,
+          toEmail: cleanTargetEmail // <-- HIER GEFIXT: Dit was cleanInviteEmail
+        })
+      });
+
+      hiveAudio.playNotification();
+
+      setBuzziToast({
+        show: true,
+        title: "Verzoek Verstuurd! ✉️",
+        message: `Er is een vriendenverzoek verstuurd naar ${cleanTargetEmail}. Zodra zij dit accepteren, staan jullie in elkaars lijst!`,
+        avatar: "🧑‍🚀"
+      });
+
+      // Clean up URL search parameters en cache DIRECT
+      try {
+        if (typeof window !== "undefined") {
+          const tempUrl = new URL(window.location.href);
+          tempUrl.searchParams.delete("invitedBy");
+          tempUrl.searchParams.delete("inviteEmail");
+          window.history.replaceState({}, document.title, tempUrl.pathname);
+        }
+        localStorage.removeItem("buzzi_pending_invite");
+      } catch {}
+
+      // Trigger immediate reload of registered users list and accepted friendships
+      const syncRes = await fetch("/api/db/users?t=" + Date.now());
+      if (syncRes.status === 200) {
+        const list = await syncRes.json();
+        const filtered = list
+          .filter((data: any) => data.uid !== currentUser?.uid)
+          .map((data: any) => ({
+            id: data.uid,
+            name: data.name || "Buzzi Gebruiker",
+            email: data.email || "",
+            avatar: data.avatar || "🧑‍🚀",
+            status: (data.status as StatusType) || "online",
+            personalMessage: data.personalMessage || "",
+          }));
+        setRegisteredUsers(filtered);
+      }
+
+      // Fetch friendships immediately to get live synchronization
+      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+      if (acceptedRes.ok) {
+        const alist = await acceptedRes.json();
+        if (Array.isArray(alist)) {
+          setAcceptedFriendships(alist);
+        }
+      }
+
+      return { success: true, name: targetName };
+    } catch (err: any) {
+      console.error(err);
+      return { success: false, reason: "REQUEST_FAILED" };
+    }
+  };
 
 try {
         console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanInviteEmail);
