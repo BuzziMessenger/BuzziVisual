@@ -250,6 +250,7 @@ export default function App() {
     }, 2500);
   };
 
+// Add Contact Handler (triggered from Sidebar modal)
   const handleAddContact = async (
     name: string,
     emailOrUsername: string,
@@ -262,15 +263,18 @@ export default function App() {
 
     let targetEmail = "";
     let targetName = "";
+
     const myCleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
 
     if (mode === "username") {
+      // Fetch latest users of the Buzzi platform to search our potential friend
       try {
         const res = await fetch("/api/db/users?t=" + Date.now());
         if (res.status === 200) {
           const allUsers = await res.json();
           const targetCleanName = emailOrUsername.trim().toLowerCase();
           
+          // Try to find matching user based on their registered name
           const found = allUsers.find((u: any) => {
             const uName = (u.name || "").trim().toLowerCase();
             return uName === targetCleanName && u.email !== currentUser?.email;
@@ -290,21 +294,28 @@ export default function App() {
         return { success: false, reason: "DB_ERROR" };
       }
     } else {
+      // Traditional Email mode
       targetEmail = emailOrUsername.trim().toLowerCase();
       targetName = name.trim();
 
+      // Prevent adding oneself
       if (targetEmail === myCleanEmail) {
         return { success: false, reason: "SELF_ADD" };
       }
     }
 
     const cleanTargetEmail = targetEmail.trim().toLowerCase();
+    
+    // Prevent adding oneself
     if (cleanTargetEmail === myCleanEmail) {
       return { success: false, reason: "SELF_ADD" };
     }
 
     try {
-      // De eenmalige fetch logic voor invite afhandeling
+      console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanTargetEmail);
+
+      // We sturen vanaf nu nog maar ÉÉN verzoek naar de server.
+      // Geen automatische tegen-verzoeken meer, dat voorkomt de ping-pong loop!
       await fetch("/api/friend-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -324,6 +335,7 @@ export default function App() {
         avatar: "🧑‍🚀"
       });
 
+      // Trigger immediate reload of registered users list and accepted friendships
       const syncRes = await fetch("/api/db/users?t=" + Date.now());
       if (syncRes.status === 200) {
         const list = await syncRes.json();
@@ -340,6 +352,7 @@ export default function App() {
         setRegisteredUsers(filtered);
       }
 
+      // Fetch friendships immediately to get live synchronization
       const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
       if (acceptedRes.ok) {
         const alist = await acceptedRes.json();
