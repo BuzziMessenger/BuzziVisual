@@ -262,22 +262,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     
     const track = RETRO_PLAYLIST[trackIdx];
-    let audioUrl = track.url;
-    if (audioUrl.startsWith("http")) {
-      audioUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
-    }
     
-    const absoluteUrl = new URL(audioUrl, window.location.origin).toString();
+    // Clear previous error handlers
+    audio.onerror = null;
     
-    if (audio.src !== absoluteUrl) {
-      audio.src = absoluteUrl;
-      audio.load();
-    }
-    
+    // Use target direct stream address for optimal speed, native decoder and no bandwidth throttling
+    audio.src = track.url;
+    audio.load();
     audio.volume = volume / 100;
-    audio.play().catch((err) => {
-      console.warn("Direct play failed/blocked on mobile:", err);
-    });
+    
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("Direct play failed/blocked, falling back to secure proxy...", err);
+        const fallbackUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
+        const absoluteFallback = new URL(fallbackUrl, window.location.origin).toString();
+        
+        if (audio.src !== absoluteFallback) {
+          audio.src = absoluteFallback;
+          audio.load();
+          audio.play().catch((proxyErr) => {
+            console.error("Direct and proxy play both blocked or failed:", proxyErr);
+          });
+        }
+      });
+    }
+    
+    // Set dynamic onError delegate to slide over to proxy in case stream loading chokes or drops
+    audio.onerror = () => {
+      const fallbackUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
+      const absoluteFallback = new URL(fallbackUrl, window.location.origin).toString();
+      if (audio.src !== absoluteFallback) {
+        console.warn("Stream error triggered. Initiating proxy recovery stream...");
+        audio.src = absoluteFallback;
+        audio.load();
+        audio.volume = volume / 100;
+        audio.play().catch((e) => console.log("Proxy retry failed:", e));
+      }
+    };
     
     setCurrentTrackIdx(trackIdx);
     setIsPlaying(true);
@@ -978,11 +1000,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* User Info footer (Classic Windows XP bottom status line) */}
       <div className="p-3 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.1</span>
+          <span className="text-[10.5px] font-mono font-black text-[#1D5C8A]">v7.6.3</span>
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm" />
           <span className="font-semibold text-[11px] font-sans">Buzzi Service: Verbonden</span>
         </div>
-        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.1</span>
+        <span className="text-[10px] font-mono font-medium text-slate-500">v7.6.3</span>
       </div>
 
       {/* Avatar Picker Modal */}

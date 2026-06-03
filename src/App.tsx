@@ -235,6 +235,13 @@ export default function App() {
     if (!name.trim() || !email.trim()) return false;
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanMyEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
+
+    // Prevent adding oneself
+    if (cleanEmail === cleanMyEmail) {
+      return false;
+    }
+
     const mockUserUid = `u_${simpleHash(cleanEmail)}`;
 
     // Check if user already exists under a registered account (e.g., has #pwd_) or INITIAL_CONTACTS
@@ -243,38 +250,37 @@ export default function App() {
       return cleanRegEmail === cleanEmail || r.id === mockUserUid;
     }) || INITIAL_CONTACTS.find((ic: any) => (ic.email || "").toLowerCase() === cleanEmail);
 
-    if (existingUser) {
-      // Restore from deleted contacts list if they were previously hidden
-      if (deletedContactIds.includes(existingUser.id)) {
-        const updated = deletedContactIds.filter(id => id !== existingUser.id);
-        setDeletedContactIds(updated);
-        localStorage.setItem("buzzi_deleted_contacts_" + (currentUser?.uid || ""), JSON.stringify(updated));
-      }
-      hiveAudio.playNotification();
-      return true;
+    // Restore from deleted contacts list if they were previously hidden
+    if (existingUser && deletedContactIds.includes(existingUser.id)) {
+      const updated = deletedContactIds.filter(id => id !== existingUser.id);
+      setDeletedContactIds(updated);
+      localStorage.setItem("buzzi_deleted_contacts_" + (currentUser?.uid || ""), JSON.stringify(updated));
     }
 
-    const newContactProfile = {
-      uid: mockUserUid,
-      name: name.trim(),
-      email: cleanEmail,
-      avatar: avatar || "🧑‍🚀",
-      status: "online" as StatusType,
-      personalMessage: "Lekker chatten op Buzzi! [B-)]"
-    };
+    // Register shadow profile if they don't exist in the DB at all yet
+    if (!existingUser) {
+      const newContactProfile = {
+        uid: mockUserUid,
+        name: name.trim(),
+        email: cleanEmail,
+        avatar: avatar || "🧑‍🚀",
+        status: "online" as StatusType,
+        personalMessage: "Lekker chatten op Buzzi! [B-)]"
+      };
 
-    try {
-      const res = await fetch("/api/db/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newContactProfile)
-      });
-
-      if (!res.ok) {
-        throw new Error("Kon contactpersoon niet opslaan in database");
+      try {
+        await fetch("/api/db/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newContactProfile)
+        });
+      } catch (err) {
+        console.warn("Fout bij aanmaken schaduwprofiel:", err);
       }
+    }
 
-      // Automatically issue an interactive friend request to the client!
+    // ALWAYS issue a real-time friend request so that the other user receives it under pending requests
+    try {
       await fetch("/api/friend-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -537,14 +543,33 @@ export default function App() {
     const fetchBugs = async () => {
       try {
         const res = await fetch("/api/bugs?t=" + Date.now());
+        let listFromSrv = [];
         if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list)) {
-            setBugsList(list);
-          }
+          listFromSrv = await res.json();
         }
+        
+        // Merge with client-side localStorage backup to guarantee instantly robust local reporting visibility
+        let localSaved: any[] = [];
+        try {
+          localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
+        } catch {}
+        
+        const combined = [...listFromSrv];
+        localSaved.forEach((lb: any) => {
+          if (!combined.some((sb: any) => sb.id === lb.id)) {
+            combined.push(lb);
+          }
+        });
+        
+        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setBugsList(combined);
       } catch (err) {
-        console.warn("Fout bij ophalen van bug reports:", err);
+        console.warn("Fout bij ophalen van bug reports, fallback naar lokaal:", err);
+        let localSaved = [];
+        try {
+          localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
+        } catch {}
+        setBugsList(localSaved);
       }
     };
 
@@ -659,6 +684,34 @@ export default function App() {
     if (!bugTitle.trim() || !bugDescription.trim()) return;
 
     setIsSubmittingBug(true);
+
+    // Create unique optimistic item
+    const tempId = "bug-" + Math.random().toString(36).substring(2, 11);
+    const newBugItem = {
+      id: tempId,
+      title: bugTitle.trim(),
+      description: bugDescription.trim(),
+      category: bugCategory,
+      senderName: userDisplayName || "Onbekend",
+      senderEmail: currentUser?.email || "geen@email.nl",
+      timestamp: new Date().toISOString(),
+      status: "Open"
+    };
+
+    // Store in localStorage as instant redundant backup
+    let localSaved: any[] = [];
+    try {
+      localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
+    } catch {}
+    localSaved.unshift(newBugItem);
+    localStorage.setItem("buzzi_local_bugs", JSON.stringify(localSaved));
+
+    // Instantly update state optimistically
+    setBugsList(prev => {
+      const updated = [newBugItem, ...prev];
+      return updated.filter((item, index, self) => self.findIndex(t => t.id === item.id) === index);
+    });
+
     try {
       const res = await fetch("/api/bugs", {
         method: "POST",
@@ -678,19 +731,29 @@ export default function App() {
         setBugSuccess(true);
         hiveAudio.playNotification();
 
-        // Refresh bugs list
+        // Refresh bugs list from API
         const freshRes = await fetch("/api/bugs?t=" + Date.now());
         if (freshRes.ok) {
           const list = await freshRes.json();
-          setBugsList(list);
+          // Merge with local storage
+          const combined = [...list];
+          localSaved.forEach((lb: any) => {
+            if (!combined.some((sb: any) => sb.id === lb.id)) {
+              combined.push(lb);
+            }
+          });
+          combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          setBugsList(combined);
         }
 
         setTimeout(() => {
           setBugSuccess(false);
         }, 3000);
+      } else {
+        console.warn("Bug-API reageerde met status fout:", res.status);
       }
     } catch (err) {
-      console.error("Fout bij opslaan bug report:", err);
+      console.error("Fout bij opslaan bug report op de server:", err);
     } finally {
       setIsSubmittingBug(false);
     }
@@ -698,16 +761,34 @@ export default function App() {
 
   const handleDeleteBug = async (bugId: string) => {
     try {
+      // Instantly filter out from local cache
+      let localSaved: any[] = [];
+      try {
+        localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
+      } catch {}
+      localSaved = localSaved.filter((b: any) => b.id !== bugId);
+      localStorage.setItem("buzzi_local_bugs", JSON.stringify(localSaved));
+
+      // Filter in state optimistically
+      setBugsList(prev => prev.filter(b => b.id !== bugId));
+
       const res = await fetch(`/api/bugs/${bugId}`, {
         method: "DELETE"
       });
       if (res.ok) {
         const list = await res.json();
-        setBugsList(list);
+        const combined = [...list];
+        localSaved.forEach((lb: any) => {
+          if (!combined.some((sb: any) => sb.id === lb.id)) {
+            combined.push(lb);
+          }
+        });
+        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setBugsList(combined);
         hiveAudio.playNotification();
       }
     } catch (err) {
-      console.error("Fout bij verwijderen van bug:", err);
+      console.error("Fout bij verwijderen van bug op de server, lokaal is wel verwijderd:", err);
     }
   };
 
@@ -1521,7 +1602,7 @@ export default function App() {
                       disabled={isSubmittingBug}
                       className="w-full bg-gradient-to-r from-red-600 via-rose-700 to-red-800 hover:from-red-500 hover:to-red-700 text-white text-xs font-black py-2 rounded-lg border border-red-950 active:scale-95 transition-all text-center flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                     >
-                      <span>Meld Bug aan Robbin 🐞</span>
+                      <span>Meld Bug 🐞</span>
                     </button>
                   </form>
                 )}

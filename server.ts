@@ -79,11 +79,11 @@ async function getMongoDb(): Promise<Db | null> {
 // Proactive MongoDB connection attempt
 getMongoDb().catch(e => console.warn("Initial MongoDB connection attempt failed:", e));
 
-async function startServer() {
-  const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const app = express();
+app.use(express.json());
 
-  app.use(express.json());
+async function startServer() {
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Database Connection Status API
   app.get("/api/db/status", async (req, res) => {
@@ -332,11 +332,15 @@ async function startServer() {
       const dbInstance = await getMongoDb();
       if (dbInstance) {
         try {
-          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("MongoDB bugs fetch timeout")), 1500)
+          );
+          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
           res.json(bugs);
           return;
         } catch (mongoErr) {
-          console.warn("MongoDB bugs fetch failed, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bugs fetch failed or timed out, falling back to JSON:", mongoErr);
         }
       }
       const bugs = readJsonFile<any[]>(BUGS_FILE, []);
@@ -370,12 +374,19 @@ async function startServer() {
 
       if (dbInstance) {
         try {
-          await dbInstance.collection("bugs").insertOne(newBug);
-          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          const insertPromise = dbInstance.collection("bugs").insertOne(newBug);
+          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("MongoDB bug insertion timeout")), 1500)
+          );
+          
+          await Promise.race([insertPromise, timeoutPromise]);
+          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
           res.json(bugs);
           return;
         } catch (mongoErr) {
-          console.warn("MongoDB bug insert failed, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bug insert/fetch failed or timed out, falling back to JSON:", mongoErr);
         }
       }
 
@@ -396,12 +407,19 @@ async function startServer() {
       
       if (dbInstance) {
         try {
-          await dbInstance.collection("bugs").deleteOne({ id: bugId });
-          const bugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          const deletePromise = dbInstance.collection("bugs").deleteOne({ id: bugId });
+          const fetchPromise = dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("MongoDB bug delete timeout")), 1500)
+          );
+          
+          await Promise.race([deletePromise, timeoutPromise]);
+          const bugs = await Promise.race([fetchPromise, timeoutPromise]);
           res.json(bugs);
           return;
         } catch (mongoErr) {
-          console.warn("MongoDB bug delete failed, falling back to JSON:", mongoErr);
+          console.warn("MongoDB bug delete/fetch failed or timed out, falling back to JSON:", mongoErr);
         }
       }
 
@@ -738,4 +756,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
