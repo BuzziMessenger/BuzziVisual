@@ -335,12 +335,16 @@ try {
 
         hiveAudio.playNotification();
 
-        setBuzziToast({
-          show: true,
-          title: "Verzoek Verstuurd! ✉️",
-          message: `Er is een vriendenverzoek verstuurd naar ${cleanInviteEmail}. Zodra zij dit accepteren, staan jullie in elkaars lijst!`,
-          avatar: "🧑‍🚀"
-        });
+        // Vervang 'cleanInviteEmail' door 'cleanTargetEmail' (of targetEmail)
+// En verplaats de return óf haal hem weg als de sync-code eronder moet draaien!
+setBuzziToast({
+  show: true,
+  title: "Verzoek Verstuurd! ✉️",
+  message: `Er is een vriendenverzoek verstuurd naar ${cleanTargetEmail}.`,
+  avatar: "🧑‍🚀"
+});
+
+// Verwijder de losse 'return;' hier als de database-sync die eronder staat moet worden uitgevoerd!
 
         // Clean up URL search parameters en cache DIRECT
         try {
