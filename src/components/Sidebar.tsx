@@ -220,51 +220,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [visualizerHeights, setVisualizerHeights] = useState<number[]>([4, 4, 4, 4, 4, 4]);
 
-  // Handle active audio element source and status securely
+  // Lazy initialize audio object once
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
-    
-    const audio = audioRef.current;
-    audio.volume = volume / 100;
-
-    const streamHandler = () => {
-      // Avoid interrupting state
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     };
+  }, []);
 
-    audio.addEventListener("error", streamHandler);
-    
+  // Sync listening status with track index when playing
+  useEffect(() => {
     if (isPlaying) {
       const track = RETRO_PLAYLIST[currentTrackIdx];
-      
-      let audioUrl = track.url;
-      if (audioUrl.startsWith("http")) {
-        audioUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
-      }
-      
-      // Resolve to absolute path to guarantee exact comparison with browser's audio.src
-      const absoluteUrl = new URL(audioUrl, window.location.origin).toString();
-      
-      // If the source is different, load the new track
-      if (audio.src !== absoluteUrl) {
-        audio.src = absoluteUrl;
-        audio.load();
-      }
-      
-      // Update Buzzi live messenger listening status
       onUpdateListeningTo(track.title);
-
-      audio.play().catch((err) => {
-        console.warn("Autoplay or stream initialization blocked:", err);
-      });
     } else {
-      audio.pause();
+      onUpdateListeningTo("");
     }
-
-    return () => {
-      audio.removeEventListener("error", streamHandler);
-    };
   }, [isPlaying, currentTrackIdx]);
 
   // Adjust volume dynamically
@@ -273,6 +248,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
       audioRef.current.volume = volume / 100;
     }
   }, [volume]);
+
+  // Direct play/pause functions to bypass mobile/iOS touch-gesture restrictions
+  const playTrackDirect = (trackIdx: number) => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    const audio = audioRef.current;
+    
+    const track = RETRO_PLAYLIST[trackIdx];
+    let audioUrl = track.url;
+    if (audioUrl.startsWith("http")) {
+      audioUrl = `/api/proxy-audio?url=${encodeURIComponent(track.url)}`;
+    }
+    
+    const absoluteUrl = new URL(audioUrl, window.location.origin).toString();
+    
+    if (audio.src !== absoluteUrl) {
+      audio.src = absoluteUrl;
+      audio.load();
+    }
+    
+    audio.volume = volume / 100;
+    audio.play().catch((err) => {
+      console.warn("Direct play failed/blocked on mobile:", err);
+    });
+    
+    setCurrentTrackIdx(trackIdx);
+    setIsPlaying(true);
+  };
+
+  const pauseTrackDirect = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+  };
 
   // Visualizer bars dynamic bouncing loop
   useEffect(() => {
@@ -651,12 +662,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex gap-1">
             <button
               onClick={() => {
-                if (currentTrackIdx > 0) {
-                  setCurrentTrackIdx(currentTrackIdx - 1);
-                } else {
-                  setCurrentTrackIdx(RETRO_PLAYLIST.length - 1);
-                }
-                setIsPlaying(true);
+                const prevIdx = currentTrackIdx > 0 ? currentTrackIdx - 1 : RETRO_PLAYLIST.length - 1;
+                playTrackDirect(prevIdx);
               }}
               className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
               title="Vorige nummer"
@@ -667,8 +674,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isPlaying ? (
               <button
                 onClick={() => {
-                  setIsPlaying(false);
-                  onUpdateListeningTo("");
+                  pauseTrackDirect();
                 }}
                 className="px-2 py-0.5 bg-gradient-to-b from-amber-600 to-amber-900 border border-amber-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
                 title="Pauzeren"
@@ -677,7 +683,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             ) : (
               <button
-                onClick={() => setIsPlaying(true)}
+                onClick={() => {
+                  playTrackDirect(currentTrackIdx);
+                }}
                 className="px-2 py-0.5 bg-gradient-to-b from-emerald-600 to-emerald-900 border border-emerald-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
                 title="Afspelen"
               >
@@ -687,8 +695,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => {
-                setCurrentTrackIdx((currentTrackIdx + 1) % RETRO_PLAYLIST.length);
-                setIsPlaying(true);
+                const nextIdx = (currentTrackIdx + 1) % RETRO_PLAYLIST.length;
+                playTrackDirect(nextIdx);
               }}
               className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
               title="Volgende nummer"

@@ -236,6 +236,23 @@ export default function App() {
     const cleanEmail = email.trim().toLowerCase();
     const mockUserUid = `u_${simpleHash(cleanEmail)}`;
 
+    // Check if user already exists under a registered account (e.g., has #pwd_) or INITIAL_CONTACTS
+    const existingUser = registeredUsers.find((r: any) => {
+      const cleanRegEmail = (r.email || "").split("#pwd_")[0].trim().toLowerCase();
+      return cleanRegEmail === cleanEmail || r.id === mockUserUid;
+    }) || INITIAL_CONTACTS.find((ic: any) => (ic.email || "").toLowerCase() === cleanEmail);
+
+    if (existingUser) {
+      // Restore from deleted contacts list if they were previously hidden
+      if (deletedContactIds.includes(existingUser.id)) {
+        const updated = deletedContactIds.filter(id => id !== existingUser.id);
+        setDeletedContactIds(updated);
+        localStorage.setItem("buzzi_deleted_contacts_" + (currentUser?.uid || ""), JSON.stringify(updated));
+      }
+      hiveAudio.playNotification();
+      return true;
+    }
+
     const newContactProfile = {
       uid: mockUserUid,
       name: name.trim(),
@@ -603,10 +620,24 @@ export default function App() {
 
           list.forEach((data: any) => {
             const recId = data.receiverId;
-            if (!freshMessages[recId]) {
-              freshMessages[recId] = [];
+            let conversationKey = recId;
+
+            // Differentiate between group channels/bots and peer-to-peer DMs
+            if (recId !== "mensen-van-toen" && recId !== "breezer-groep" && !recId.startsWith("ch-") && recId !== "queen") {
+              if (data.senderId === currentUser.uid) {
+                conversationKey = data.receiverId; // We sent it, associate with the peer's ID
+              } else if (data.receiverId === currentUser.uid) {
+                conversationKey = data.senderId; // They sent it, associate with the sender's ID (peer)
+              } else {
+                // Confidential private conversation between others; do not load
+                return;
+              }
             }
-            freshMessages[recId].push({
+
+            if (!freshMessages[conversationKey]) {
+              freshMessages[conversationKey] = [];
+            }
+            freshMessages[conversationKey].push({
               id: data.id,
               senderId: data.senderId,
               senderName: data.senderName,
