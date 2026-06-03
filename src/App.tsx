@@ -200,7 +200,25 @@ export default function App() {
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [acceptedFriendships, setAcceptedFriendships] = useState<any[]>([]);
   const [dbStatus, setDbStatus] = useState<any>(null);
-  const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
+  const [activeDbMode, setActiveDbMode] = useState<"local" | "mongodb">("mongodb");
+  // Krachtige MongoDB cloud check - Dwingt de app op MongoDB te blijven staan
+  useEffect(() => {
+    async function forceMongoConnect() {
+      try {
+        const res = await fetch("/api/db/status");
+        if (res.status === 200) {
+          const d = await res.json();
+          if (d.connected) {
+            setActiveDbMode("mongodb");
+            console.log("Succesvol verbonden met MongoDB Cloud! (Y)");
+          }
+        }
+      } catch (e) {
+        console.warn("Render server reageert nog niet, we blijven proberen...", e);
+      }
+    }
+    forceMongoConnect();
+  }, []);
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
 
   // Buzzi Clone interactive tools state
@@ -385,10 +403,16 @@ export default function App() {
   };
 
   // Initial user fetch/setup from DB (check-first to avoid race overwrites!)
-  const initUserProfile = async (user: any, preferredName?: string) => {
+const initUserProfile = async (user: any, preferredName?: string) => {
     const defaultName = preferredName || user.displayName || user.email?.split("@")[0] || "Buzzi Gebruiker";
 
     try {
+      // Haal eventuele lokale back-up op van dit apparaat
+      const localName = localStorage.getItem("buzzi_remembered_name");
+      const localAvatar = localStorage.getItem("buzzi_remembered_avatar");
+      if (localName) setUserDisplayName(localName);
+      if (localAvatar) setUserAvatar(localAvatar);
+
       const res = await fetch("/api/db/users?t=" + Date.now());
       let currentProfile = null;
       if (res.status === 200) {
@@ -397,12 +421,11 @@ export default function App() {
       }
 
       if (!currentProfile) {
-        // Only if user profile does not exist do we create and write the initial default profile!
         const initialProfile = {
           uid: user.uid,
-          name: defaultName,
+          name: localName || defaultName,
           email: user.email || "",
-          avatar: "🧑‍🚀",
+          avatar: localAvatar || "🧑‍🚀",
           status: "online",
           personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)",
           listeningTo: ""
@@ -413,31 +436,21 @@ export default function App() {
           body: JSON.stringify(initialProfile)
         });
         
-        setUserDisplayName(defaultName);
-        setUserPersonalMessage("Lekker chatten op Buzzi met Buzzi Bot! B-)");
-        setUserAvatar("🧑‍🚀");
-        setUserStatus("online");
-        setUserListeningTo("");
+        setUserDisplayName(initialProfile.name);
+        setUserAvatar(initialProfile.avatar);
       } else {
-        // Load existing saved profile details securely!
-        setUserDisplayName(currentProfile.name || defaultName);
+        // Laad profiel in en update de lokale back-up
+        const finalName = currentProfile.name || localName || defaultName;
+        const finalAvatar = currentProfile.avatar || localAvatar || "🧑‍🚀";
+
+        setUserDisplayName(finalName);
+        setUserAvatar(finalAvatar);
         setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)");
-        setUserAvatar(currentProfile.avatar || "🧑‍🚀");
         setUserStatus((currentProfile.status as StatusType) || "online");
         setUserListeningTo(currentProfile.listeningTo || "");
 
-        // Keep local storage synchronized for persistent seamless log-ins
-        if (currentProfile.name) {
-          localStorage.setItem("buzzi_remembered_name", currentProfile.name);
-          const savedUser = localStorage.getItem("buzzi_user");
-          if (savedUser) {
-            try {
-              const parsed = JSON.parse(savedUser);
-              parsed.displayName = currentProfile.name;
-              localStorage.setItem("buzzi_user", JSON.stringify(parsed));
-            } catch (e) {}
-          }
-        }
+        localStorage.setItem("buzzi_remembered_name", finalName);
+        localStorage.setItem("buzzi_remembered_avatar", finalAvatar);
       }
     } catch (err) {
       console.warn("User profile init failed, falling back to state:", err);
@@ -450,7 +463,6 @@ export default function App() {
     if (!currentUser) return;
 
     try {
-      // We bouwen het object zo op dat de binnenkomende 'fields' de oude states overschrijven
       const updatedProfile = {
         uid: currentUser.uid,
         name: fields.name !== undefined ? fields.name : userDisplayName,
@@ -459,8 +471,12 @@ export default function App() {
         status: fields.status !== undefined ? fields.status : userStatus,
         personalMessage: fields.personalMessage !== undefined ? fields.personalMessage : userPersonalMessage,
         listeningTo: fields.listeningTo !== undefined ? fields.listeningTo : userListeningTo,
-        ...fields // Dit zorgt ervoor dat eventuele extra meegestuurde velden ook overschrijven
+        ...fields
       };
+
+      // Sla direct op in de browser cache van het apparaat zelf
+      if (fields.name) localStorage.setItem("buzzi_remembered_name", fields.name);
+      if (fields.avatar) localStorage.setItem("buzzi_remembered_avatar", fields.avatar);
 
       await fetch("/api/db/users", {
         method: "POST",
