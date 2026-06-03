@@ -637,15 +637,21 @@ export default function App() {
           avatar: "🧑‍🚀"
         });
 
-        // Clean up URL search parameters cleanly matching native window state
+// Clean up URL search parameters cleanly matching native window state
         try {
-          if (typeof window !== "undefined" && window.history.replaceState) {
+          if (typeof window !== "undefined") {
             const tempUrl = new URL(window.location.href);
             tempUrl.searchParams.delete("invitedBy");
             tempUrl.searchParams.delete("inviteEmail");
-            window.history.replaceState({}, document.title, tempUrl.pathname + tempUrl.search);
+            // Dit haalt de parameters direct en definitief weg uit de browserbalk:
+            window.history.replaceState({}, document.title, tempUrl.pathname);
           }
-        } catch {}
+          
+          // Wis ook de tijdelijke opslag in de browser zodat hij niet herhaalt
+          localStorage.removeItem("buzzi_pending_invite");
+        } catch (e) {
+          console.warn("Fout bij het opschonen van de URL:", e);
+        }
 
         // Remove from pending cache so they don't get infinite toast notifications
         try {
