@@ -574,9 +574,18 @@ export default function App() {
         } catch {}
       }
 
-      if (!inviteEmailVal) return;
+if (!inviteEmailVal) return;
 
       const cleanInviteEmail = inviteEmailVal.trim().toLowerCase();
+
+      // EXTRA BEVEILIGING: Als deze persoon al in je vriendenlijst staat, stop de loop direct!
+      const alVriend = currentBuddies.some(buddy => buddy.email?.toLowerCase() === cleanInviteEmail);
+      if (alVriend) {
+        try {
+          localStorage.removeItem("buzzi_pending_invite");
+        } catch {}
+        return; // Stop de functie hier, stuur geen nieuwe requests!
+      }
       const cleanMyEmail = currentUser.email.split("#pwd_")[0].trim().toLowerCase();
 
       // Avoid self invite
