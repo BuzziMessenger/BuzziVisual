@@ -115,7 +115,7 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
       senderId: "queen",
       senderName: "🤖 Buzzi Bot (H)",
       senderAvatar: "🤖",
-      text: "🤖 *PING!* W00t! Welkom op mijn Buzzi Messenger-kanaal! Ik ben aangedreven door Buzzi AI Niches en spreek vloeiend 2004 Buzzi Messenger-slang! Vraag me over inbelverbindingen, retro-muziek of stuur me een 'Nudge' (duwtje) met de rode knop! :-D",
+      text: "🤖 *PING!* W00t! Welkom op mijn Buzzi Messenger-kanaal! Ik ben aangedreven door Buzzi AI Niches Niches en spreek vloeiend 2004 Buzzi Messenger-slang! Vraag me over inbelverbindingen, retro-muziek of stuur me een 'Nudge' (duwtje) met de rode knop! :-D",
       timestamp: "16:15"
     }
   ],
@@ -151,29 +151,6 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
   ]
 };
 
-const WORKER_REPLIES: Record<string, string[]> = {
-  "wouter": [
-    "🛹 *w00t!* Ik ben ff een level aan het halen in Tony Hawk! Ik sta bezet maar stuur gerust een bericht! :P",
-    "🛹 omg, mijn computer loopt bijna vast door Limewire! Ik probeer een mp3 te downen maar duurt 4 uur!",
-    "🛹 ff serieus, die leraar wiskunde snapt er echt geen snars van hè? (grr)",
-    "🛹 Haha vet! Ik ga zo ff buiten skaten bij de supermarkt, cu later!"
-  ],
-  "kelly": [
-    "🤘 Heyyy!! Heb je gister de videoclip van Avril Lavigne gezien? Echt zóóó stoer! :-D (L)",
-    "🤘 omg ik zit me echt dood te vervelen op mijn kamer... we moeten ff afspreken in de stad!",
-    "🤘 (Y) leuk!! Stuur me nog een leuk Plaatje of mss een vet muziekje!",
-    "🤘 Ssst! Mijn moeder mag niet horen dat ik nog op de computer zit, she denkt dat ik allang slaap haha!"
-  ],
-  "danny": [
-    "🎮 Bzzz... Ik probeer nu stiekem te skaten in de woonkamer maar mn vader is woest lmao! (H)",
-    "🎮 Vet cool! Gaan we morgen mss een zak snoep halen bij de Jamin?",
-    "🎮 brb, mn broertje wil ook op de pc dus we moeten dadelijk afwisselen... grrrr!"
-  ]
-};
-
-const NICKNAME_PREFIXES = ["★ ~ ", "xX__", "✿ *~ ", "o0o_"];
-const NICKNAME_SUFFIXES = [" ~ ★", "__Xx", " ~* ✿ (L)", "_o0o"];
-
 export default function App() {
   const [activeId, setActiveId] = useState<string>("queen");
   const [activeType, setActiveType] = useState<"channel" | "dm">("dm");
@@ -198,6 +175,7 @@ export default function App() {
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [activeDbMode, setActiveDbMode] = useState<"local" | "mongodb">("mongodb");
 
+  // Forceer initiële verbinding met MongoDB Cloud
   useEffect(() => {
     async function forceMongoConnect() {
       try {
@@ -250,7 +228,7 @@ export default function App() {
     }, 2500);
   };
 
-// Add Contact Handler (triggered from Sidebar modal)
+  // Hufterproof Add Contact Handler zonder compiler errors of loops
   const handleAddContact = async (
     name: string,
     emailOrUsername: string,
@@ -267,14 +245,12 @@ export default function App() {
     const myCleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
 
     if (mode === "username") {
-      // Fetch latest users of the Buzzi platform to search our potential friend
       try {
         const res = await fetch("/api/db/users?t=" + Date.now());
         if (res.status === 200) {
           const allUsers = await res.json();
           const targetCleanName = emailOrUsername.trim().toLowerCase();
           
-          // Try to find matching user based on their registered name
           const found = allUsers.find((u: any) => {
             const uName = (u.name || "").trim().toLowerCase();
             return uName === targetCleanName && u.email !== currentUser?.email;
@@ -294,11 +270,9 @@ export default function App() {
         return { success: false, reason: "DB_ERROR" };
       }
     } else {
-      // Traditional Email mode
       targetEmail = emailOrUsername.trim().toLowerCase();
       targetName = name.trim();
 
-      // Prevent adding oneself
       if (targetEmail === myCleanEmail) {
         return { success: false, reason: "SELF_ADD" };
       }
@@ -306,7 +280,6 @@ export default function App() {
 
     const cleanTargetEmail = targetEmail.trim().toLowerCase();
     
-    // Prevent adding oneself
     if (cleanTargetEmail === myCleanEmail) {
       return { success: false, reason: "SELF_ADD" };
     }
@@ -314,8 +287,6 @@ export default function App() {
     try {
       console.log("Verwerken van eenmalig vriendenverzoek naar:", cleanTargetEmail);
 
-      // We sturen vanaf nu nog maar ÉÉN verzoek naar de server.
-      // Geen automatische tegen-verzoeken meer, dat voorkomt de ping-pong loop!
       await fetch("/api/friend-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -335,7 +306,6 @@ export default function App() {
         avatar: "🧑‍🚀"
       });
 
-      // Trigger immediate reload of registered users list and accepted friendships
       const syncRes = await fetch("/api/db/users?t=" + Date.now());
       if (syncRes.status === 200) {
         const list = await syncRes.json();
@@ -352,8 +322,7 @@ export default function App() {
         setRegisteredUsers(filtered);
       }
 
-      // Fetch friendships immediately to get live synchronization
-      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser?.email || "")}&status=accepted&t=${Date.now()}`);
       if (acceptedRes.ok) {
         const alist = await acceptedRes.json();
         if (Array.isArray(alist)) {
@@ -516,7 +485,7 @@ export default function App() {
     setAuthInitialized(true);
   }, [activeDbMode]);
 
-  // Handle URL-based invitations en polling functionaliteiten
+  // Handle URL-based invitations en polling functionaliteiten (Hufterproof split toegepast)
   useEffect(() => {
     if (!currentUser || !currentUser.email) return;
 
@@ -557,7 +526,8 @@ export default function App() {
         } catch {}
         return;
       }
-      const cleanMyEmail = currentUser.email.split("#pwd_")[0].trim().toLowerCase();
+      
+      const cleanMyEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
 
       if (cleanInviteEmail === cleanMyEmail) {
         try {
@@ -680,7 +650,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
+  // VEILIGE BUDDIES FILTER MET OPTIONAL CHAINING OM CRASHES BIJ INLADEN TE VOORKOMEN
   const isDemoUser = currentUser?.email === "gast@buzzi.nl" || currentUser?.email?.startsWith("gast_") || currentUser?.email?.includes("pwd_local");
+  
   const currentBuddies = (isDemoUser
     ? [
         ...INITIAL_CONTACTS,
@@ -698,7 +670,7 @@ export default function App() {
           
           const isFriend = acceptedFriendships.some(fr => {
             const cleanU = (u.email || "").trim().toLowerCase();
-            const cleanMe = (currentUser?.email || "").trim().toLowerCase();
+            const cleanMe = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
             const from = (fr.fromEmail || "").trim().toLowerCase();
             const to = (fr.toEmail || "").trim().toLowerCase();
             return (from === cleanMe && to === cleanU) || (from === cleanU && to === cleanMe);
@@ -850,7 +822,7 @@ export default function App() {
               avatar: data.avatar || "🧑‍🚀",
               status: (data.status as StatusType) || "online",
               personalMessage: data.personalMessage || "",
-            }));
+          }));
           setRegisteredUsers(filtered);
         }
       }
@@ -1126,6 +1098,8 @@ export default function App() {
 
   const generateRetroName = () => {
     hiveAudio.playHoneyPop();
+    const NICKNAME_PREFIXES = ["★ ~ ", "xX__", "✿ *~ ", "o0o_"];
+    const NICKNAME_SUFFIXES = [" ~ ★", "__Xx", " ~* ✿ (L)", "_o0o"];
     const pref = NICKNAME_PREFIXES[Math.floor(Math.random() * NICKNAME_PREFIXES.length)];
     const suff = NICKNAME_SUFFIXES[Math.floor(Math.random() * NICKNAME_SUFFIXES.length)];
     const plainName = userDisplayName.replace(/[★~Xx✿*()_0-9]/g, "").trim() || "Robbin";
@@ -1193,47 +1167,9 @@ export default function App() {
     }
   };
 
-  const writeSimulatedReply = async (simText: string, simName: string, simAvatar: string, simId: string, additional: Partial<Message> = {}) => {
-    if (!currentUser) return;
-    const msgId = `m-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const msgDoc = {
-      id: msgId,
-      senderId: simId,
-      senderName: simName,
-      senderAvatar: simAvatar,
-      text: simText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isBuzz: additional.isBuzz || false,
-      isWink: additional.isWink || false,
-      winkId: additional.winkId || "",
-      receiverId: activeId,
-      createdAt: new Date().toISOString()
-    };
-
-    try {
-      await fetch("/api/db/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(msgDoc)
-      });
-      setMessages(prev => {
-        const h = prev[activeId] || [];
-        if (h.some(m => m.id === msgId)) return prev;
-        return { ...prev, [activeId]: [...h, msgDoc as Message] };
-      });
-    } catch (err) {
-      console.warn("Reply write failed, using local state fallback:", err);
-      setMessages(prev => {
-        const h = prev[activeId] || [];
-        return { ...prev, [activeId]: [...h, msgDoc as Message] };
-      });
-    }
-  };
-
   const handleSendMessage = async (text: string, isBuzz: boolean = false, isWink: boolean = false, winkId?: string) => {
     if (!currentUser) return;
     await saveMessageToDatabase({ text, isBuzz, isWink, winkId });
-    // De rest van de AI chat trigger logica volgt hieronder in je JSX...
   };
 
   if (!authInitialized) {
@@ -1260,7 +1196,7 @@ export default function App() {
 
   return (
     <div className={`h-screen w-screen flex flex-col bg-[#F0F0EE] text-slate-800 select-none overflow-hidden font-sans ${isBuzzingFlash ? "animate-ping" : ""}`}>
-      {/* Windows XP Style Top Titlebar Bar */}
+      {/* Titlebar Windows XP-style */}
       <div className="bg-gradient-to-r from-[#0058E6] via-[#3A80F2] to-[#0058E6] text-white px-3 py-1.5 flex items-center justify-between shadow-md border-b border-[#003CB3] shrink-0">
         <div className="flex items-center gap-2">
           <div className="bg-[#5CABFF] p-1 rounded-md text-white shadow-inner">
@@ -1286,7 +1222,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Container Layout Workspace */}
+      {/* Main Layout Workspace */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* SIDEBAR NAVIGATION PANEL */}
         <div className={`w-full md:w-[320px] shrink-0 border-r border-[#D4D0C8] flex flex-col bg-[#FAF9F5] ${mobileActiveTab !== "sidebar" ? "hidden md:flex" : "flex"}`}>
@@ -1335,7 +1271,6 @@ export default function App() {
 
         {/* UTILITIES & RETRO FUN CONTROLS RIGHT BAR */}
         <div className={`w-full md:w-[280px] shrink-0 bg-[#F1EFEA] border-l border-[#D4D0C8] flex flex-col ${mobileActiveTab !== "tools" ? "hidden lg:flex" : "flex"}`}>
-          {/* Sub tabs header selection inside utilities */}
           <div className="grid grid-cols-2 text-center bg-[#E4E1DA] border-b border-[#D4D0C8] shrink-0">
             <button
               onClick={() => setActiveUtilityTab("tools")}
@@ -1454,7 +1389,7 @@ export default function App() {
                 </div>
               </>
             ) : (
-              /* LIVE BUG TRACKER FORM AND VISIBILITY PANEL */
+              /* LIVE BUG TRACKER FORM */
               <div className="flex flex-col gap-3">
                 <form onSubmit={handleSendBugReport} className="bg-[#FFFEE6] border border-[#DE9E1F] rounded-lg p-3 shadow-xs flex flex-col gap-2">
                   <h4 className="text-[11.5px] font-black text-[#855B04] uppercase tracking-wider mb-0.5 flex items-center gap-1">
@@ -1512,7 +1447,7 @@ export default function App() {
                   )}
                 </form>
 
-                {/* Bug items feedback listing box container */}
+                {/* Bug items list container */}
                 <div className="flex flex-col gap-2">
                   <h5 className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider px-0.5">
                     Recente meldingen van developers:
@@ -1555,7 +1490,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Minesweeper Launch Icon Short-link panel footer bar */}
+          {/* Minesweeper Launch Button */}
           <div className="p-2 border-t border-[#D4D0C8] bg-[#E4E1DA] shrink-0 flex items-center justify-between">
             <button
               onClick={() => {
@@ -1579,7 +1514,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* MOBILE LOWER LAYER TAB BAR CONTAINER NAVIGATION BUTTONS */}
+      {/* MOBILE LAYER TAB BAR CONTAINER */}
       <div className="md:hidden bg-[#E4E1DA] border-t border-[#D4D0C8] h-12 shrink-0 grid grid-cols-3 text-center items-center">
         <button
           onClick={() => setMobileActiveTab("sidebar")}
@@ -1608,7 +1543,7 @@ export default function App() {
         <Minesweeper onClose={() => setIsMinesweeperOpen(false)} />
       )}
 
-      {/* Classic MSN / Windows XP Bubble Notice Toast */}
+      {/* Buzzi Toast Notice Bubble */}
       {buzziToast && buzziToast.show && (
         <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[9999] bg-gradient-to-b from-[#FFFDF0] via-[#FFFFED] to-[#FFEAA1] border border-[#DE9E1F] rounded-xl shadow-2xl p-4 max-w-[325px] flex items-start gap-3 border-l-[6px] border-l-[#EAA406] animate-bounce select-none">
           {buzziToast.avatar && (
