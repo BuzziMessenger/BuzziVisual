@@ -1360,7 +1360,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <input
                         type="text"
                         required
-                        placeholder="bijv: Robbin1993"
+                        placeholder="bijv: Buzzi2026"
                         value={addContactName}
                         onChange={(e) => setAddContactName(e.target.value)}
                         maxLength={25}

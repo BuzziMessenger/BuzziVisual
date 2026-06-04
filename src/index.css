@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+@theme {
+  /* MSN Tahoma/Segoe UI retro styling overrides */
+  --font-sans: "Tahoma", "Segoe UI", -apple-system, BlinkMacSystemFont, "lucida grande", sans-serif;
+}
+
+/* Base styles for compact retro look */
+body {
+  font-family: "Tahoma", "Segoe UI", -apple-system, BlinkMacSystemFont, "lucida grande", sans-serif;
+  font-size: 11.5px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Compact input and textarea settings for Windows XP/MSN vibes */
+input, textarea, select, button {
+  font-family: inherit;
+  font-size: 11.5px;
+}

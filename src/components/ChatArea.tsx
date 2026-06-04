@@ -110,7 +110,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [showWinksPicker, setShowWinksPicker] = useState(false);
   const [activeWink, setActiveWink] = useState<string | null>(null);
-  const lastProcessedWinkId = useRef<string | null>(null);
+  const lastActiveId = useRef<string | null>(null);
+  const processedWinkIds = useRef<Set<string>>(new Set());
   
   // Custom font styling for retro Buzzi customization
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
@@ -126,13 +127,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Monitor incoming messages for Winks to trigger the full screen play and synth sound!
   useEffect(() => {
+    if (activeId !== lastActiveId.current) {
+      // Chat switched! Mark all existing historical winks in this room as already played/processed
+      messages.forEach(msg => {
+        if (msg.isWink && msg.id) {
+          processedWinkIds.current.add(msg.id);
+        }
+      });
+      lastActiveId.current = activeId;
+      return;
+    }
+
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
+
     if (lastMsg && lastMsg.isWink && lastMsg.winkId) {
-      if (lastProcessedWinkId.current === lastMsg.id) {
+      if (processedWinkIds.current.has(lastMsg.id)) {
         return;
       }
-      lastProcessedWinkId.current = lastMsg.id;
+      processedWinkIds.current.add(lastMsg.id);
       setActiveWink(lastMsg.winkId);
 
       // Play matching synth sound
@@ -165,7 +178,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [messages]);
+  }, [messages, activeId]);
 
   const handleSend = () => {
     if (!inputText.trim()) return;

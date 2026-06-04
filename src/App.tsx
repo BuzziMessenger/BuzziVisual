@@ -704,7 +704,7 @@ export default function App() {
     };
 
     syncUsers();
-    const interval = setInterval(syncUsers, 4000);
+    const interval = setInterval(syncUsers, 6000); // Poll every 6 seconds to reduce pressure
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -758,7 +758,7 @@ export default function App() {
     };
 
     fetchChannels();
-    const intervalId = setInterval(fetchChannels, 5000);
+    const intervalId = setInterval(fetchChannels, 10000); // Channels change rarely, poll every 10s
     return () => clearInterval(intervalId);
   }, [currentUser]);
 
@@ -800,7 +800,7 @@ export default function App() {
     };
 
     fetchBugs();
-    const intervalId = setInterval(fetchBugs, 4000);
+    const intervalId = setInterval(fetchBugs, 12000); // Bugs change rarely, poll every 12s
     return () => clearInterval(intervalId);
   }, [currentUser]);
 
@@ -837,7 +837,7 @@ export default function App() {
     };
 
     fetchFriendRequestsAndFriendships();
-    const interval = setInterval(fetchFriendRequestsAndFriendships, 4000);
+    const interval = setInterval(fetchFriendRequestsAndFriendships, 7000); // Poll friend requests/status every 7s
     return () => clearInterval(interval);
   }, [currentUser, friendRequests.length]);
 
@@ -1103,7 +1103,7 @@ export default function App() {
     };
 
     syncMessages();
-    const interval = setInterval(syncMessages, 3000);
+    const interval = setInterval(syncMessages, 4500); // Poll for new messages every 4.5s (relaxed from 3s)
     return () => clearInterval(interval);
   }, [currentUser]);
 
