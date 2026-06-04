@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
@@ -180,6 +180,9 @@ export default function App() {
   const [activeType, setActiveType] = useState<"channel" | "dm">("dm");
   const [channels, setChannels] = useState<Channel[]>(INITIAL_CHANNELS);
   const [mobileActiveTab, setMobileActiveTab] = useState<"sidebar" | "chat" | "tools">("sidebar");
+  
+  // Keeps track of processed messages to only notify on new incoming ones during live polling
+  const processedMessageIds = useRef<Set<string>>(new Set());
   
   // App-status
   const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
@@ -1064,6 +1067,37 @@ export default function App() {
               }
             }
 
+            // Check for mobile push / browser notifications on new incoming messages
+            if (data.senderId !== currentUser.uid) {
+              if (processedMessageIds.current.size > 0 && !processedMessageIds.current.has(data.id)) {
+                if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                  try {
+                    let notificationBody = data.text;
+                    if (data.isBuzz) {
+                      notificationBody = "🚨 NUDGE! Stuurde je een nudge duwtje!";
+                    } else if (data.isWink) {
+                      notificationBody = "😉 KNIPOOG! Stuurde een knipoog!";
+                    }
+                    new Notification(`${data.senderName || "Buzzi Vriend"} 💬`, {
+                      body: notificationBody,
+                      icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20,50 a30,25 0 1,1 60,0 ' fill='%23ffd700'/%3E%3C/svg%3E",
+                      tag: data.id
+                    });
+
+                    // Mobile vibration if available
+                    if ("vibrate" in navigator) {
+                      navigator.vibrate([150, 50, 150]);
+                    }
+                  } catch (err) {
+                    console.warn("Failed to fire browser push notification:", err);
+                  }
+                }
+              }
+              processedMessageIds.current.add(data.id);
+            } else {
+              processedMessageIds.current.add(data.id);
+            }
+
             if (!freshMessages[conversationKey]) {
               freshMessages[conversationKey] = [];
             }
@@ -1540,6 +1574,8 @@ export default function App() {
           onUpdateAvatar={handleUpdateAvatar}
           userListeningTo={userListeningTo}
           onUpdateListeningTo={handleUpdateListeningTo}
+          activeDbMode={activeDbMode}
+          dbStatus={dbStatus}
         />
       </div>
 

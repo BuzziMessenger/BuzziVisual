@@ -264,7 +264,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </div>
           <h1 className="mt-3 text-[#1C427F] font-black text-lg tracking-tighter uppercase drop-shadow-sm flex items-center gap-1.5 justify-center">
             <span>Buzzi Messenger</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white font-mono lowercase tracking-normal">V2026</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white font-mono lowercase tracking-normal">v7.6.6</span>
           </h1>
         </div>
 

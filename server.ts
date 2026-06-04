@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { MongoClient, Db } from "mongodb";
 import https from "https";
@@ -82,11 +81,8 @@ getMongoDb().catch(e => console.warn("Initial MongoDB connection attempt failed:
 const app = express();
 app.use(express.json());
 
-async function startServer() {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
-  // Database Connection Status API
-  app.get("/api/db/status", async (req, res) => {
+// Database Connection Status API
+app.get("/api/db/status", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
       res.json({
@@ -776,8 +772,12 @@ async function startServer() {
     }
   });
 
+async function startServer() {
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
   // Serve Vite app in Dev / Serve built assets in Production
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

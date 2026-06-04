@@ -159,6 +159,8 @@ interface SidebarProps {
   friendRequests?: any[];
   onAcceptFriendRequest?: (id: string, fromName: string, fromEmail: string) => void;
   onDeclineFriendRequest?: (id: string) => void;
+  activeDbMode?: "mongodb" | "local";
+  dbStatus?: any;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -185,12 +187,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdateListeningTo,
   friendRequests = [],
   onAcceptFriendRequest,
-  onDeclineFriendRequest
+  onDeclineFriendRequest,
+  activeDbMode = "local",
+  dbStatus = null
 }) => {
   // Collapsible groups states
   const [onlineExpanded, setOnlineExpanded] = useState(true);
   const [offlineExpanded, setOfflineExpanded] = useState(true);
   const [chatbotsExpanded, setChatbotsExpanded] = useState(true);
+
+  // Mobile Web Push Notifications State
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Je browser of mobiel ondersteunt helaas geen native notificaties.");
+      return;
+    }
+    hiveAudio.playHoneyPop();
+    const result = await Notification.requestPermission();
+    setNotificationPermission(result);
+    if (result === "granted") {
+      try {
+        new Notification("Buzzi Messenger 📢", {
+          body: "Geweldig! Mobiele & Push meldingen staan nu aan voor deze telefoon/PC! 😎",
+          icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20,50 a30,25 0 1,1 60,0 ' fill='%23ffd700'/%3E%3C/svg%3E"
+        });
+        if ("vibrate" in navigator) {
+          navigator.vibrate([100, 50, 100]);
+        }
+      } catch (e) {
+        console.warn("Failed to create native notification direct test:", e);
+      }
+    }
+  };
 
   // Avatar Selection & Create Group Modals state
   const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
@@ -422,8 +458,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Buzzi</span>
             </span>
           </div>
-          <span className="text-xs font-semibold tracking-wide uppercase font-sans drop-shadow-sm text-sky-50">
-            Buzzi Messenger
+          <span className="text-xs font-semibold tracking-wide uppercase font-sans drop-shadow-sm text-sky-50 flex items-center gap-1.5">
+            Buzzi Messenger <span className="text-[9px] bg-[#d32f2f] px-1 py-0.5 rounded text-white lowercase tracking-normal font-mono font-bold leading-none">v7.6.6</span>
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -742,6 +778,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isPlaying ? "📻 ONLINE STREAM" : "📻 PAUSED"}
           </div>
         </div>
+      </div>
+
+      {/* 🛎️ Mobile & Desktop Push Notifications Activator */}
+      <div className="mx-2 mb-2 p-2 bg-gradient-to-r from-sky-50 to-[#e4ecf7] border-2 border-dashed border-[#8da7c1] rounded-lg text-slate-800 flex flex-col gap-1 shadow-sm relative overflow-hidden shrink-0">
+        <div className="flex items-center justify-between text-[10px] pb-1 border-b border-[#bad0e3]/60 mb-1">
+          <span className="font-extrabold text-[#1c5c8a] flex items-center gap-1.5 uppercase tracking-wide">
+            <span>🛎️</span> Mobiele Meldingen
+          </span>
+          <span className="text-[8.5px] px-1 bg-[#1c5c8a] text-white font-bold rounded">PUSH</span>
+        </div>
+        <p className="text-[9.5px] text-slate-600 leading-normal mb-1.5">
+          Ontvang direct een tril- of geluidsmelding op je telefoon of PC bij nieuwe chatberichten en nudges, ook als Buzzi in de achtergrond draait!
+        </p>
+        
+        {notificationPermission === "granted" ? (
+          <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-[9.5px] font-bold">
+            <span className="text-xs">✅</span>
+            <span>Mobiele meldingen zijn UITSTEKEND actief!</span>
+          </div>
+        ) : notificationPermission === "denied" ? (
+          <div className="flex flex-col gap-1">
+            <div className="text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1 text-[9.5px] font-bold">
+              <span>❌ Meldingen zijn geblokkeerd.</span>
+            </div>
+            <p className="text-[8.5px] text-slate-500 italic leading-tight">
+              Klik op het slot-icoontje linksboven in je adresbalk om meldingen weer toe te staan!
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={requestNotificationPermission}
+            className="w-full bg-gradient-to-g from-[#2c77b0] to-[#1d5c8a] hover:from-[#3a8bca] hover:to-[#2576b5] text-white text-[9.5px] border border-sky-950 font-black py-1.5 rounded shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer transition-all uppercase tracking-wider"
+          >
+            <span>✨</span>
+            <span>Zet Push Meldingen Aan</span>
+          </button>
+        )}
+      </div>
+
+      {/* 🟢 Database & MongoDB Status Panel */}
+      <div className="mx-2 mb-2 p-2 bg-gradient-to-r from-emerald-50/70 to-teal-50/50 border-2 border-emerald-200/80 rounded-lg text-slate-800 flex flex-col gap-1 shadow-sm shrink-0">
+        <div className="flex items-center justify-between text-[10px] pb-1 border-b border-emerald-100 mb-0.5">
+          <span className="font-extrabold text-emerald-800 flex items-center gap-1.5 uppercase tracking-wide">
+            <span>💾</span> Database Verbinding
+          </span>
+          <span className={`text-[8.5px] px-1 font-black text-white rounded pb-0.5 ${activeDbMode === "mongodb" ? "bg-emerald-600" : "bg-amber-600"}`}>
+            {activeDbMode === "mongodb" ? "MONGODB ATLAS" : "LOKAAL BACKUP"}
+          </span>
+        </div>
+        
+        {activeDbMode === "mongodb" ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1 text-[10px] text-emerald-850 font-extrabold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <span>Atlas DB Gekoppeld! 🟢</span>
+            </div>
+            <p className="text-[8.5px] text-slate-500 leading-tight">
+              Je gegevens worden direct realtime in MongoDB Atlas gesynchroniseerd. Veilig en persistent!
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1 text-[10px] text-amber-800 font-extrabold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>Lokaal JSON Standalone (OK) 🟡</span>
+            </div>
+            <p className="text-[8.5px] text-slate-500 leading-tight">
+              Rechtstreekse server bestandsopslag is stabiel en actief. Geen cloud-database vereist.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Buddy List (Collapsible Groups with Classic Arrows) */}
