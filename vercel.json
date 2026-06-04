@@ -6,16 +6,8 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/chat",
-      "destination": "/api/chat"
-    },
-    {
       "source": "/api/(.*)",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
+      "destination": "/dist/server.cjs"
     },
     {
       "source": "/(.*)",
