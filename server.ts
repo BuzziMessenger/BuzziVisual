@@ -36,23 +36,16 @@ function writeJsonFile<T>(filePath: string, data: T): void {
 
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
-let lastConnectAttempt = 0;
-let connectFailed = false;
 
 async function getMongoDb(): Promise<Db | null> {
   const uri = process.env.MONGODB_URI || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
   
-  if (connectFailed && Date.now() - lastConnectAttempt < 20000) {
-    return null;
-  }
-  
   try {
-    lastConnectAttempt = Date.now();
     mongoClient = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 2000,
-      connectTimeoutMS: 2000
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000
     });
     await mongoClient.connect();
     mongoDb = mongoClient.db("buzzi");
@@ -66,17 +59,14 @@ async function getMongoDb(): Promise<Db | null> {
       console.log("Did not drop index 'naam_1' (it may not exist, or permissions are restricted):", indexErr.message);
     }
 
-    connectFailed = false;
     return mongoDb;
   } catch (err) {
-    console.warn("MongoDB connection failed, falling back to local JSON files instantly:", err);
-    connectFailed = true;
+    console.warn("MongoDB connection failed, falling back to local memory database:", err);
     return null;
   }
 }
 
-// Proactive MongoDB connection attempt
-getMongoDb().catch(e => console.warn("Initial MongoDB connection attempt failed:", e));
+// Proactive MongoDB connection is disabled for serverless environments (will lazy-load on request)
 
 const app = express();
 
@@ -337,25 +327,19 @@ app.get("/api/db/status", async (req, res) => {
   app.get("/api/bugs", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
-      let bugs: any[] = [];
-      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
-      bugs = [...fileBugs];
-
       if (dbInstance) {
         try {
           const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          mongoBugs.forEach((mb: any) => {
-            if (!bugs.some(b => b.id === mb.id)) {
-              bugs.push(mb);
-            }
-          });
+          res.json(mongoBugs);
+          return;
         } catch (mongoErr) {
           console.warn("MongoDB bugs fetch failed, relying on JSON file:", mongoErr);
         }
       }
 
-      bugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      res.json(bugs);
+      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      fileBugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      res.json(fileBugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -383,34 +367,21 @@ app.get("/api/db/status", async (req, res) => {
         status: "Open"
       };
 
-      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
-      fileBugs.unshift(newBug);
-      writeJsonFile(BUGS_FILE, fileBugs);
-
       if (dbInstance) {
         try {
           await dbInstance.collection("bugs").insertOne(newBug);
+          const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
+          res.json(mongoBugs);
+          return;
         } catch (mongoErr) {
           console.warn("MongoDB bug insert failed, stored in JSON only:", mongoErr);
         }
       }
 
-      let combinedBugs = [...fileBugs];
-      if (dbInstance) {
-        try {
-          const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          mongoBugs.forEach((mb: any) => {
-            if (!combinedBugs.some(b => b.id === mb.id)) {
-              combinedBugs.push(mb);
-            }
-          });
-        } catch (mongoErr) {
-          console.warn("MongoDB bug fetch during POST failed:", mongoErr);
-        }
-      }
-
-      combinedBugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      res.json(combinedBugs);
+      const fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      fileBugs.unshift(newBug);
+      writeJsonFile(BUGS_FILE, fileBugs);
+      res.json(fileBugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -421,35 +392,22 @@ app.get("/api/db/status", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
       const bugId = req.params.id;
-      
-      let fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
-      fileBugs = fileBugs.filter((b) => b.id !== bugId);
-      writeJsonFile(BUGS_FILE, fileBugs);
 
       if (dbInstance) {
         try {
           await dbInstance.collection("bugs").deleteOne({ id: bugId });
-        } catch (mongoErr) {
-          console.warn("MongoDB bug delete failed:", mongoErr);
-        }
-      }
-
-      let combinedBugs = [...fileBugs];
-      if (dbInstance) {
-        try {
           const mongoBugs = await dbInstance.collection("bugs").find({}).sort({ timestamp: -1 }).toArray();
-          mongoBugs.forEach((mb: any) => {
-            if (!combinedBugs.some(b => b.id === mb.id)) {
-              combinedBugs.push(mb);
-            }
-          });
+          res.json(mongoBugs);
+          return;
         } catch (mongoErr) {
-          console.warn("MongoDB fetch during DELETE failed:", mongoErr);
+          console.warn("MongoDB bug delete failed, falling back to JSON:", mongoErr);
         }
       }
 
-      combinedBugs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      res.json(combinedBugs);
+      let fileBugs = readJsonFile<any[]>(BUGS_FILE, []);
+      fileBugs = fileBugs.filter((b) => b.id !== bugId);
+      writeJsonFile(BUGS_FILE, fileBugs);
+      res.json(fileBugs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

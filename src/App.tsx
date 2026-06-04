@@ -233,7 +233,8 @@ export default function App() {
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
   const handleCopyInviteLink = () => {
     const shareDomain = "https://www.buzzimessenger.nl";
-    const inviteLink = `${shareDomain}/?invitedBy=${encodeURIComponent(userDisplayName)}&inviteEmail=${encodeURIComponent(currentUser?.email || "")}`;
+    const cleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
+    const inviteLink = `${shareDomain}/?invitedBy=${encodeURIComponent(userDisplayName)}&inviteEmail=${encodeURIComponent(cleanEmail)}`;
     navigator.clipboard.writeText(inviteLink);
     hiveAudio.playNotification();
     setCopyLinkStatus(true);
@@ -714,28 +715,31 @@ export default function App() {
 
   // Combine buddy lists: if gast@buzzi.nl, show full static initial buddies. If custom email, start fresh with Buzzi Bot and only accepted friends!
   const isDemoUser = currentUser?.email === "gast@buzzi.nl" || currentUser?.email?.startsWith("gast_") || currentUser?.email?.includes("pwd_local");
+  const cleanCurrentUserEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
+  
   const currentBuddies = (isDemoUser
     ? [
         ...INITIAL_CONTACTS,
-        ...registeredUsers.filter(u => 
-          !INITIAL_CONTACTS.some(ic => ic.email === u.email) &&
-          u.email !== currentUser?.email &&
-          !u.name?.toLowerCase().includes("robbin") &&
-          !u.email?.toLowerCase().includes("robbin")
-        )
+        ...registeredUsers.filter(u => {
+          const cleanUEmail = (u.email || "").split("#pwd_")[0].trim().toLowerCase();
+          return !INITIAL_CONTACTS.some(ic => ic.email === u.email) &&
+            cleanUEmail !== cleanCurrentUserEmail &&
+            !u.name?.toLowerCase().includes("robbin") &&
+            !u.email?.toLowerCase().includes("robbin");
+        })
       ]
     : [
         INITIAL_CONTACTS[0], // Keep Buzzi Bot!
         ...registeredUsers.filter(u => {
-          if (u.id === "queen" || u.email === "buzzi_bot@live.nl" || u.email === currentUser?.email) return false;
+          const cleanUEmail = (u.email || "").split("#pwd_")[0].trim().toLowerCase();
+          if (u.id === "queen" || cleanUEmail === "buzzi_bot@live.nl" || cleanUEmail === cleanCurrentUserEmail) return false;
           
           // Check if there is an accepted friendship with this registered user
           const isFriend = acceptedFriendships.some(fr => {
             const cleanU = (u.email || "").trim().toLowerCase();
-            const cleanMe = (currentUser?.email || "").trim().toLowerCase();
             const from = (fr.fromEmail || "").trim().toLowerCase();
             const to = (fr.toEmail || "").trim().toLowerCase();
-            return (from === cleanMe && to === cleanU) || (from === cleanU && to === cleanMe);
+            return (from === cleanCurrentUserEmail && to === cleanU) || (from === cleanU && to === cleanCurrentUserEmail);
           });
           return isFriend;
         })
@@ -773,26 +777,19 @@ export default function App() {
     const fetchBugs = async () => {
       try {
         const res = await fetch("/api/bugs?t=" + Date.now());
-        let listFromSrv = [];
         if (res.ok) {
-          listFromSrv = await res.json();
+          const listFromSrv = await res.json();
+          // Update local cache to match server's official list
+          localStorage.setItem("buzzi_local_bugs", JSON.stringify(listFromSrv));
+          setBugsList(listFromSrv);
+        } else {
+          // Fallback to local cache if server is offline/error
+          let localSaved = [];
+          try {
+            localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
+          } catch {}
+          setBugsList(localSaved);
         }
-        
-        // Merge with client-side localStorage backup to guarantee instantly robust local reporting visibility
-        let localSaved: any[] = [];
-        try {
-          localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
-        } catch {}
-        
-        const combined = [...listFromSrv];
-        localSaved.forEach((lb: any) => {
-          if (!combined.some((sb: any) => sb.id === lb.id)) {
-            combined.push(lb);
-          }
-        });
-        
-        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setBugsList(combined);
       } catch (err) {
         console.warn("Fout bij ophalen van bug reports, fallback naar lokaal:", err);
         let localSaved = [];
@@ -804,7 +801,7 @@ export default function App() {
     };
 
     fetchBugs();
-    const intervalId = setInterval(fetchBugs, 12000); // Bugs change rarely, poll every 12s
+    const intervalId = setInterval(fetchBugs, 12000); // Poll bugs every 12s
     return () => clearInterval(intervalId);
   }, [currentUser]);
 
@@ -939,7 +936,7 @@ export default function App() {
       status: "Open"
     };
 
-    // Store in localStorage as instant redundant backup
+    // Store in localStorage as instant backup
     let localSaved: any[] = [];
     try {
       localSaved = JSON.parse(localStorage.getItem("buzzi_local_bugs") || "[]");
@@ -948,10 +945,7 @@ export default function App() {
     localStorage.setItem("buzzi_local_bugs", JSON.stringify(localSaved));
 
     // Instantly update state optimistically
-    setBugsList(prev => {
-      const updated = [newBugItem, ...prev];
-      return updated.filter((item, index, self) => self.findIndex(t => t.id === item.id) === index);
-    });
+    setBugsList(prev => [newBugItem, ...prev]);
 
     try {
       const res = await fetch("/api/bugs", {
@@ -976,15 +970,8 @@ export default function App() {
         const freshRes = await fetch("/api/bugs?t=" + Date.now());
         if (freshRes.ok) {
           const list = await freshRes.json();
-          // Merge with local storage
-          const combined = [...list];
-          localSaved.forEach((lb: any) => {
-            if (!combined.some((sb: any) => sb.id === lb.id)) {
-              combined.push(lb);
-            }
-          });
-          combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          setBugsList(combined);
+          localStorage.setItem("buzzi_local_bugs", JSON.stringify(list));
+          setBugsList(list);
         }
 
         setTimeout(() => {
@@ -1018,14 +1005,8 @@ export default function App() {
       });
       if (res.ok) {
         const list = await res.json();
-        const combined = [...list];
-        localSaved.forEach((lb: any) => {
-          if (!combined.some((sb: any) => sb.id === lb.id)) {
-            combined.push(lb);
-          }
-        });
-        combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setBugsList(combined);
+        localStorage.setItem("buzzi_local_bugs", JSON.stringify(list));
+        setBugsList(list);
         hiveAudio.playNotification();
       }
     } catch (err) {
