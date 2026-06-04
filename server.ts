@@ -14,7 +14,26 @@ const CHANNELS_FILE = path.join(process.cwd(), "data_channels.json");
 const BUGS_FILE = path.join(process.cwd(), "data_bugs.json");
 const FRIEND_REQUESTS_FILE = path.join(process.cwd(), "data_friend_requests.json");
 
+const isVercel = !!process.env.VERCEL;
+const inMemoryCache: Record<string, any> = {};
+
 function readJsonFile<T>(filePath: string, defaultVal: T): T {
+  if (isVercel) {
+    if (inMemoryCache[filePath] === undefined) {
+      try {
+        if (fs.existsSync(filePath)) {
+          const content = fs.readFileSync(filePath, "utf-8");
+          inMemoryCache[filePath] = JSON.parse(content);
+        } else {
+          inMemoryCache[filePath] = defaultVal;
+        }
+      } catch {
+        inMemoryCache[filePath] = defaultVal;
+      }
+    }
+    return inMemoryCache[filePath];
+  }
+
   try {
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
@@ -27,6 +46,11 @@ function readJsonFile<T>(filePath: string, defaultVal: T): T {
 }
 
 function writeJsonFile<T>(filePath: string, data: T): void {
+  if (isVercel) {
+    inMemoryCache[filePath] = data;
+    return;
+  }
+
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
@@ -44,8 +68,8 @@ async function getMongoDb(): Promise<Db | null> {
   
   try {
     mongoClient = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000
+      serverSelectionTimeoutMS: 4000,
+      connectTimeoutMS: 4000
     });
     await mongoClient.connect();
     mongoDb = mongoClient.db("buzzi");
@@ -72,7 +96,7 @@ const app = express();
 
 // Help support Vercel wildcard rewrites to individual serverless functions by correcting request URLs
 app.use((req, res, next) => {
-  const originalUrl = (req.headers["x-vercel-forwarded-path"] || req.headers["x-matched-path"]) as string;
+  const originalUrl = req.headers["x-vercel-forwarded-path"] as string;
   if (originalUrl) {
     req.url = originalUrl;
   }

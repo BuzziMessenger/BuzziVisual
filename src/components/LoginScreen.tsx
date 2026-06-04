@@ -130,34 +130,41 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         if (!existingUserDoc) {
           // AUTO-RECOVER LOGIC
           // The local database was cleared (standard during container redeploys or branch updates), so we restore them on the fly!
-          const rememberedName = localStorage.getItem("buzzi_remembered_name") || targetCleanEmail.split("@")[0];
-          
-          const newUserProfile = {
-            uid: userUid,
-            name: rememberedName,
-            email: finalizedEmail,
-            avatar: selectedAvatar || "🧑‍🚀",
-            status: "online",
-            personalMessage: personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)"
-          };
-
-          try {
-            await fetch("/api/db/users", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(newUserProfile)
-            });
+          const rememberedEmail = (localStorage.getItem("buzzi_remembered_email") || "").trim().toLowerCase();
+          if (rememberedEmail === targetCleanEmail) {
+            const rememberedName = localStorage.getItem("buzzi_remembered_name") || targetCleanEmail.split("@")[0];
             
-            localStorage.setItem("buzzi_remembered_email", targetCleanEmail);
-            localStorage.setItem("buzzi_remembered_name", rememberedName);
-          } catch (recoveryErr) {
-            console.error("Auto-recovery of user profile failed:", recoveryErr);
-          }
+            const newUserProfile = {
+              uid: userUid,
+              name: rememberedName,
+              email: finalizedEmail,
+              avatar: selectedAvatar || "🧑‍🚀",
+              status: "online",
+              personalMessage: personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)"
+            };
 
-          hiveAudio.playNotification();
-          onLoginSuccess(rememberedName, finalizedEmail);
-          setLoading(false);
-          return;
+            try {
+              await fetch("/api/db/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newUserProfile)
+              });
+              
+              localStorage.setItem("buzzi_remembered_email", targetCleanEmail);
+              localStorage.setItem("buzzi_remembered_name", rememberedName);
+            } catch (recoveryErr) {
+              console.error("Auto-recovery of user profile failed:", recoveryErr);
+            }
+
+            hiveAudio.playNotification();
+            onLoginSuccess(rememberedName, finalizedEmail);
+            setLoading(false);
+            return;
+          } else {
+            setErrorMsg("Dit Buzzi account bestaat nog niet of is niet gevonden. Klik hierboven op 'Registreren' om een account aan te maken!");
+            setLoading(false);
+            return;
+          }
         }
 
         const parts = existingUserDoc.email.split("#pwd_");
@@ -196,15 +203,22 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           personalMessage: personalMessage
         };
 
-        // Try DB write, fail elegantly without aborting the login
+        // Try DB write, throwing error on non-ok statuses to prevent false registrations when server/database is offline
         try {
-          await fetch("/api/db/users", {
+          const res = await fetch("/api/db/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(newUserProfile)
           });
-        } catch (dbErr) {
-          console.warn("DB save user failed, using local fallback state:", dbErr);
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Server fout (Status ${res.status})`);
+          }
+        } catch (dbErr: any) {
+          console.error("DB save user failed during registration:", dbErr);
+          setErrorMsg(`Registratie mislukt: De Buzzi servers konden je profiel niet opslaan (${dbErr.message || "Netwerkfout"}). Probeer het nog eens!`);
+          setLoading(false);
+          return;
         }
 
         // Save to local backup list so consecutive fetches match immediately
