@@ -7,11 +7,11 @@
   "rewrites": [
     {
       "source": "/api/chat",
-      "destination": "/api/chat.ts"
+      "destination": "/api/chat"
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index"
     },
     {
       "source": "/assets/(.*)",

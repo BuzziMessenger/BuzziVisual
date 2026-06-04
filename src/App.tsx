@@ -372,7 +372,8 @@ export default function App() {
       }
 
       // Fetch friendships immediately to get live synchronization
-      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+      const cleanMyEmail = (currentUser.email || "").split("#pwd_")[0].trim().toLowerCase();
+      const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(cleanMyEmail)}&status=accepted&t=${Date.now()}`);
       if (acceptedRes.ok) {
         const alist = await acceptedRes.json();
         if (Array.isArray(alist)) {
@@ -813,8 +814,9 @@ export default function App() {
 
     const fetchFriendRequestsAndFriendships = async () => {
       try {
+        const cleanMyEmail = (currentUser.email || "").split("#pwd_")[0].trim().toLowerCase();
         // 1. Pending requests to me (default GET is pending)
-        const res = await fetch(`/api/friend-requests?toEmail=${encodeURIComponent(currentUser.email)}&status=pending&t=${Date.now()}`);
+        const res = await fetch(`/api/friend-requests?toEmail=${encodeURIComponent(cleanMyEmail)}&status=pending&t=${Date.now()}`);
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list)) {
@@ -827,7 +829,7 @@ export default function App() {
         }
 
         // 2. Accepted friendships (where I am recipient or sender)
-        const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(currentUser.email)}&status=accepted&t=${Date.now()}`);
+        const acceptedRes = await fetch(`/api/friend-requests?email=${encodeURIComponent(cleanMyEmail)}&status=accepted&t=${Date.now()}`);
         if (acceptedRes.ok) {
           const alist = await acceptedRes.json();
           if (Array.isArray(alist)) {
@@ -1819,7 +1821,7 @@ export default function App() {
             /* Bug Reporting panel */
             <div className="space-y-4 font-sans text-xs">
               {/* Beheerders Controlepaneel Block */}
-              {(currentUser?.email?.toLowerCase() === "prinsrobbin@gmail.com" || 
+              {((currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase() === "prinsrobbin@gmail.com" || 
                 userDisplayName?.toLowerCase().includes("robbin") ||
                 userDisplayName?.toLowerCase().includes("admin") ||
                 userDisplayName?.toLowerCase().includes("operator")) && (
@@ -2022,7 +2024,8 @@ export default function App() {
                       if (bug.category === "Profiel") catEmoji = "👤";
                       if (bug.category === "Minesweeper") catEmoji = "💣";
 
-                      const isAdmin = currentUser?.email?.toLowerCase() === "prinsrobbin@gmail.com" || 
+                      const cleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
+                      const isAdmin = cleanEmail === "prinsrobbin@gmail.com" || 
                                       userDisplayName.toLowerCase().includes("robbin");
 
                       return (

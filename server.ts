@@ -40,7 +40,7 @@ let lastConnectAttempt = 0;
 let connectFailed = false;
 
 async function getMongoDb(): Promise<Db | null> {
-  const uri = process.env.MONGODB_URI;
+  const uri = process.env.MONGODB_URI || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
   
@@ -79,18 +79,29 @@ async function getMongoDb(): Promise<Db | null> {
 getMongoDb().catch(e => console.warn("Initial MongoDB connection attempt failed:", e));
 
 const app = express();
+
+// Help support Vercel wildcard rewrites to individual serverless functions by correcting request URLs
+app.use((req, res, next) => {
+  const originalUrl = (req.headers["x-vercel-forwarded-path"] || req.headers["x-matched-path"]) as string;
+  if (originalUrl) {
+    req.url = originalUrl;
+  }
+  next();
+});
+
 app.use(express.json());
 
 // Database Connection Status API
 app.get("/api/db/status", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
+      const rawUri = process.env.MONGODB_URI || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
       res.json({
         mongodb: {
-          configured: !!process.env.MONGODB_URI,
+          configured: !!rawUri,
           connected: !!dbInstance,
-          uriMasked: process.env.MONGODB_URI 
-            ? process.env.MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, "mongodb+srv://***:***@") 
+          uriMasked: rawUri 
+            ? rawUri.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, "mongodb+srv://***:***@") 
             : null
         },
         localDb: {
@@ -458,14 +469,14 @@ app.get("/api/db/status", async (req, res) => {
       }
 
       if (email) {
-        const cleanEmail = (email as string).trim().toLowerCase();
+        const cleanEmail = (email as string).split("#pwd_")[0].trim().toLowerCase();
         query.$or = [{ fromEmail: cleanEmail }, { toEmail: cleanEmail }];
       } else {
         if (toEmail) {
-          query.toEmail = (toEmail as string).trim().toLowerCase();
+          query.toEmail = (toEmail as string).split("#pwd_")[0].trim().toLowerCase();
         }
         if (fromEmail) {
-          query.fromEmail = (fromEmail as string).trim().toLowerCase();
+          query.fromEmail = (fromEmail as string).split("#pwd_")[0].trim().toLowerCase();
         }
       }
 
@@ -477,11 +488,11 @@ app.get("/api/db/status", async (req, res) => {
           const statusMatch = targetStatus === "all" || r.status === targetStatus;
           let emailMatch = true;
           if (email) {
-            const cleanEmail = (email as string).trim().toLowerCase();
+            const cleanEmail = (email as string).split("#pwd_")[0].trim().toLowerCase();
             emailMatch = r.fromEmail === cleanEmail || r.toEmail === cleanEmail;
           } else {
-            if (toEmail && r.toEmail !== (toEmail as string).trim().toLowerCase()) emailMatch = false;
-            if (fromEmail && r.fromEmail !== (fromEmail as string).trim().toLowerCase()) emailMatch = false;
+            if (toEmail && r.toEmail !== (toEmail as string).split("#pwd_")[0].trim().toLowerCase()) emailMatch = false;
+            if (fromEmail && r.fromEmail !== (fromEmail as string).split("#pwd_")[0].trim().toLowerCase()) emailMatch = false;
           }
           return statusMatch && emailMatch;
         });
@@ -501,8 +512,8 @@ app.get("/api/db/status", async (req, res) => {
         return;
       }
 
-      const cleanFromEmail = fromEmail.trim().toLowerCase();
-      const cleanToEmail = toEmail.trim().toLowerCase();
+      const cleanFromEmail = fromEmail.split("#pwd_")[0].trim().toLowerCase();
+      const cleanToEmail = toEmail.split("#pwd_")[0].trim().toLowerCase();
 
       if (cleanFromEmail === cleanToEmail) {
         res.status(400).json({ error: "Je kunt jezelf niet toevoegen" });
