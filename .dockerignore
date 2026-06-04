@@ -1,7 +1,0 @@
-node_modules
-npm-debug.log
-.env
-public/config.js
-coverage
-dist
-*.log
