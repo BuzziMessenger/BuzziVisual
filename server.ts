@@ -60,13 +60,22 @@ function writeJsonFile<T>(filePath: string, data: T): void {
 
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
+let lastConnectAttempt = 0;
+const CONNECT_COOLDOWN_MS = 25000; // Wait 25 seconds before retrying to avoid spamming timeouts
 
 async function getMongoDb(): Promise<Db | null> {
-  const uri = process.env.MONGODB_URI || "mongodb+srv://BuzziMessenger_db_user:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?retryWrites=true&w=majority&appName=BuzziMessenger";
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
+
+  const now = Date.now();
+  if (now - lastConnectAttempt < CONNECT_COOLDOWN_MS) {
+    // Under cooldown to keep backend snappy and avoid blocking incoming requests
+    return null;
+  }
   
   try {
+    lastConnectAttempt = now;
     mongoClient = new MongoClient(uri, {
       serverSelectionTimeoutMS: 4000,
       connectTimeoutMS: 4000
@@ -109,7 +118,7 @@ app.use(express.json());
 app.get("/api/db/status", async (req, res) => {
     try {
       const dbInstance = await getMongoDb();
-      const rawUri = process.env.MONGODB_URI || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
+      const rawUri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
       res.json({
         mongodb: {
           configured: !!rawUri,

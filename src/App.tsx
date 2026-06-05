@@ -206,6 +206,11 @@ export default function App() {
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
 
+  // Utility tools collapsible/foldable states
+  const [isNaamVersierderExpanded, setIsNaamVersierderExpanded] = useState(false);
+  const [isBlockCheckerExpanded, setIsBlockCheckerExpanded] = useState(false);
+  const [isInviteExpanded, setIsInviteExpanded] = useState(false);
+
   // Buzzi Clone interactive tools state
   const [generatedName, setGeneratedName] = useState("");
   const [checkResult, setCheckResult] = useState<string | null>(null);
@@ -1621,157 +1626,212 @@ export default function App() {
           {activeUtilityTab === "tools" ? (
             <div className="space-y-4">
               {/* Box 1: Buzzi Retro Customizer Tool */}
-              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+              <div className="bg-white border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#1d5c8a]"></div>
                 
-                <h3 className="font-sans font-extrabold text-[#1d5c8a] text-sm flex items-center gap-1.5 pt-1 uppercase tracking-wide">
-                  <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
-                  <span>Buzzi Naam Versierder</span>
-                </h3>
-                
-                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                  Verander je statusnaam in een flitsende Buzzi-naam vol met glitters en vette retrotekens!
-                </p>
-
-                <button
-                  onClick={generateRetroName}
-                  className="mt-3.5 w-full bg-gradient-to-r from-[#2c77b0] to-[#1e5881] hover:from-[#3a8bca] hover:to-[#22679a] text-white text-xs font-bold py-2 rounded-lg shadow-sm border border-sky-900 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsNaamVersierderExpanded(!isNaamVersierderExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 select-none pb-3"
                 >
-                  <span>Genereer vette Buzzi Naam!</span>
-                </button>
-
-                {generatedName && (
-                  <div className="mt-3 bg-slate-50 p-2.5 rounded border border-dashed border-[#abc4df] text-center">
-                    <span className="text-xs font-bold text-slate-800 font-mono block break-all selection:bg-yellow-200">
-                      {generatedName}
+                  <h3 className="font-sans font-extrabold text-[#1d5c8a] text-sm flex items-center gap-1.5 uppercase tracking-wide">
+                    <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
+                    <span>Buzzi Naam Versierder</span>
+                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    {!isNaamVersierderExpanded && generatedName && (
+                      <span className="text-[8px] bg-sky-200 text-[#1d5c8a] font-bold px-1 rounded truncate max-w-[80px]">
+                        Nieuw
+                      </span>
+                    )}
+                    <span className="text-slate-400 font-mono text-xs font-bold">
+                      {isNaamVersierderExpanded ? "▲" : "▼"}
                     </span>
-                    
+                  </div>
+                </div>
+
+                {isNaamVersierderExpanded && (
+                  <div className="px-4 pb-4 pt-1 border-t border-slate-100 animate-fade-in space-y-3">
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Verander je statusnaam in een flitsende Buzzi-naam vol met glitters en vette retrotekens!
+                    </p>
+
                     <button
-                      onClick={applyGeneratedName}
-                      className="mt-2 text-[10px] text-sky-600 hover:underline font-bold uppercase tracking-wider block mx-auto cursor-pointer"
+                      onClick={generateRetroName}
+                      className="w-full bg-gradient-to-r from-[#2c77b0] to-[#1e5881] hover:from-[#3a8bca] hover:to-[#22679a] text-white text-xs font-bold py-2 rounded-lg shadow-sm border border-sky-900 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      Toepassen als Buzzi Naam! ✏️
+                      <span>Genereer vette Buzzi Naam!</span>
                     </button>
+
+                    {generatedName && (
+                      <div className="bg-slate-50 p-2.5 rounded border border-dashed border-[#abc4df] text-center">
+                        <span className="text-xs font-bold text-slate-800 font-mono block break-all selection:bg-yellow-200">
+                          {generatedName}
+                        </span>
+                        
+                        <button
+                          onClick={applyGeneratedName}
+                          className="mt-2 text-[10px] text-sky-600 hover:underline font-bold uppercase tracking-wider block mx-auto cursor-pointer"
+                        >
+                          Toepassen als Buzzi Naam! ✏️
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Box 2: Wie heeft mij geblokkeerd? */}
-              <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+              <div className="bg-white border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#e31e24]"></div>
                 
-                <h3 className="font-sans font-extrabold text-[#e31e24] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span>Buzzi Block Checker (V2)</span>
-                </h3>
-                
-                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                  Benieuwd of je klasgenoten je stiekem offline hebben geblokkeerd? Voer hier de scan uit!
-                </p>
-
-                <div className="mt-3.5 space-y-1.5">
-                  <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {currentBuddies.filter(c => c.id !== "queen").map(c => (
-                      <button
-                        key={c.id}
-                        onClick={() => testBlockStatus(c.name)}
-                        disabled={checking}
-                        className="text-[10px] font-medium bg-[#f0f4f9] hover:bg-sky-100 border border-slate-200 px-2 py-1.5 rounded truncate text-slate-700 active:scale-95 cursor-pointer transition-all disabled:opacity-50 text-left"
-                      >
-                        🔍 {c.name.split(" ")[0]}
-                      </button>
-                    ))}
-                  </div>
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsBlockCheckerExpanded(!isBlockCheckerExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-[#e31e24] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    <span>Buzzi Block Checker (V2)</span>
+                  </h3>
+                  <span className="text-slate-400 font-mono text-xs font-bold">
+                    {isBlockCheckerExpanded ? "▲" : "▼"}
+                  </span>
                 </div>
 
-                {checking && (
-                  <div className="mt-3 text-center space-y-1 py-1.5">
-                    <div className="text-[10px] text-slate-500 font-medium animate-pulse">
-                      Checken van block status via Buzzi servers...
-                    </div>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-red-500 h-1.5 rounded-full animate-[progress_1.5s_ease-out_infinite]" style={{ width: "60%" }} />
-                    </div>
-                  </div>
-                )}
+                {isBlockCheckerExpanded && (
+                  <div className="px-4 pb-4 pt-1 border-t border-slate-100 animate-fade-in space-y-3">
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Benieuwd of je klasgenoten je stiekem offline hebben geblokkeerd? Voer hier de scan uit!
+                    </p>
 
-                {checkResult && (
-                  <div className="mt-3 bg-red-50 p-2.5 rounded border border-red-200 text-xs text-red-950 font-bold leading-normal">
-                    {checkResult}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {currentBuddies.filter(c => c.id !== "queen").map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => testBlockStatus(c.name)}
+                            disabled={checking}
+                            className="text-[10px] font-medium bg-[#f0f4f9] hover:bg-sky-100 border border-slate-200 px-2 py-1.5 rounded truncate text-slate-700 active:scale-95 cursor-pointer transition-all disabled:opacity-50 text-left"
+                          >
+                            🔍 {c.name.split(" ")[0]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {checking && (
+                      <div className="text-center space-y-1 py-1.5">
+                        <div className="text-[10px] text-slate-500 font-medium animate-pulse">
+                          Checken van block status via Buzzi servers...
+                        </div>
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-red-500 h-1.5 rounded-full animate-[progress_1.5s_ease-out_infinite]" style={{ width: "60%" }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {checkResult && (
+                      <div className="bg-red-50 p-2.5 rounded border border-red-200 text-xs text-red-950 font-bold leading-normal">
+                        {checkResult}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Box 3: Contacten Uitnodigen */}
-              <div className="bg-gradient-to-b from-emerald-50 to-[#edf7e7] border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
+              <div className="bg-gradient-to-b from-white to-[#f4faf0] border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#8cc63f]"></div>
                 
-                <h3 className="font-sans font-extrabold text-[#235817] text-xs flex items-center gap-1.5 pt-1 uppercase tracking-wider">
-                  <Share2 className="w-4 h-4 text-[#8cc63f]" />
-                  <span>Contacten Uitnodigen 💬</span>
-                </h3>
-                
-                <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
-                  Deel deze retrograde Buzzi Messenger met je vrienden of klasgenoten om direct live samen te kletsen via WhatsApp of Facebook!
-                </p>
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsInviteExpanded(!isInviteExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:brightness-95/80 bg-gradient-to-b from-emerald-50 to-[#edf7e7] select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-[#235817] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Share2 className="w-4 h-4 text-[#8cc63f]" />
+                    <span>Contacten Uitnodigen 💬</span>
+                  </h3>
+                  <span className="text-slate-500 font-mono text-xs font-bold">
+                    {isInviteExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
 
-                <div className="mt-4 space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wide block">Jouw unieke uitnodigingslink:</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`}
-                        className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
-                      />
-                      <button
-                        onClick={handleCopyInviteLink}
-                        className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10.5px] px-2.5 py-1.5 rounded font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                {isInviteExpanded && (
+                  <div className="px-4 pb-4 pt-3 border-t border-[#abc4df]/40 bg-white/70 animate-fade-in space-y-3">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                      Deel deze retrograde Buzzi Messenger met je vrienden of klasgenoten om direct live samen te kletsen via WhatsApp of Facebook!
+                    </p>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wide block">Jouw unieke uitnodigingslink:</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            readOnly
+                            value={`https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`}
+                            className="flex-1 text-[10px] bg-white border border-[#abc4df] rounded px-2 py-1.5 text-slate-700 select-all font-mono font-medium truncate"
+                          />
+                          <button
+                            onClick={handleCopyInviteLink}
+                            className="bg-[#2C629E] hover:bg-[#1f4a7c] text-white text-[10.5px] px-2.5 py-1.5 rounded font-black flex items-center gap-1 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                          >
+                            <Link className="w-3.5 h-3.5" />
+                            <span>{copyLinkStatus ? "Gekopieerd! ✓" : "Kopieer 🔗"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => hiveAudio.playNotification()}
+                          className="bg-[#25D366] hover:bg-[#20ba59] text-white text-[10.5px] py-1.5 rounded-lg font-black border-2 border-[#1ca34e] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                        >
+                          <Send className="w-3.5 h-3.5 fill-current" />
+                          <span>WhatsApp 🟢</span>
+                        </a>
+                        <a
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                            `https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => hiveAudio.playNotification()}
+                          className="bg-[#1877F2] hover:bg-[#1465cf] text-white text-[10.5px] py-1.5 rounded-lg font-black border-2 border-[#0e5bc5] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
+                        >
+                          <span>👥 Facebook 🔵</span>
+                        </a>
+                      </div>
+
+                      <a
+                        href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
+                          `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
+                        )}`}
+                        onClick={() => hiveAudio.playNotification()}
+                        className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
                       >
-                        <Link className="w-3.5 h-3.5" />
-                        <span>{copyLinkStatus ? "Gekopieerd! ✓" : "Kopieer 🔗"}</span>
-                      </button>
+                        <span>✉️ Uitnodigen via E-mail</span>
+                      </a>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
-                    <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                        `Heey! Kom gezellig met mij chatten op Buzzi Messenger! 💬 Mijn schermnaam is: ${userDisplayName}. Klik op deze link om direct verbinding te maken: https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => hiveAudio.playNotification()}
-                      className="bg-[#25D366] hover:bg-[#20ba59] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#1ca34e] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
-                    >
-                      <Send className="w-3.5 h-3.5 fill-current" />
-                      <span>WhatsApp 🟢</span>
-                    </a>
-                    <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-                        `https://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => hiveAudio.playNotification()}
-                      className="bg-[#1877F2] hover:bg-[#1465cf] text-white text-[10.5px] py-2 rounded-lg font-black border-2 border-[#0e5bc5] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer text-center"
-                    >
-                      <span>👥 Facebook 🔵</span>
-                    </a>
-                  </div>
-
-                  <a
-                    href={`mailto:?subject=${encodeURIComponent("Kom chatten op Buzzi Messenger! 💬")}&body=${encodeURIComponent(
-                      `Hoi!\n\nKom gezellig met mij chatten op Buzzi Messenger, de leukste retro chatroom van nu!\n\nMijn gebruikersnaam is: ${userDisplayName}\n\nKlik op de link om direct verbinding te maken:\nhttps://www.buzzimessenger.nl/?invitedBy=${encodeURIComponent(userDisplayName)}\n\nGroetjes!`
-                    )}`}
-                    onClick={() => hiveAudio.playNotification()}
-                    className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>✉️ Uitnodigen via E-mail</span>
-                  </a>
-                </div>
+                )}
               </div>
 
               {/* Classic Games Box */}
@@ -2113,21 +2173,21 @@ export default function App() {
 
       {/* Classic MSN / Windows XP Bubble Notice Toast */}
       {buzziToast && buzziToast.show && (
-        <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[9999] bg-gradient-to-b from-[#FFFDF0] via-[#FFFFED] to-[#FFEAA1] border border-[#DE9E1F] rounded-xl shadow-2xl p-4 max-w-[325px] flex items-start gap-3 border-l-[6px] border-l-[#EAA406] animate-bounce select-none">
+        <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[9999] bg-gradient-to-b from-[#FFFDF0] via-[#FFFFED] to-[#FFEAA1] border border-[#DE9E1F] rounded-xl shadow-2xl p-2.5 md:p-4 max-w-[260px] sm:max-w-[300px] md:max-w-[325px] flex items-start gap-2 md:gap-3 border-l-[4px] md:border-l-[6px] border-l-[#EAA406] animate-bounce select-none">
           {buzziToast.avatar && (
-            <div className="text-3xl shrink-0 select-none">{buzziToast.avatar}</div>
+            <div className="text-xl md:text-3xl shrink-0 select-none">{buzziToast.avatar}</div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-[10.5px] font-black text-[#855B04] uppercase tracking-wider mb-0.5 flex items-center justify-between">
-              <span>{buzziToast.title}</span>
+            <div className="text-[9.5px] md:text-[10.5px] font-black text-[#855B04] uppercase tracking-wider mb-0.5 flex items-center justify-between gap-2">
+              <span className="truncate">{buzziToast.title}</span>
               <button 
                 onClick={() => setBuzziToast(null)}
-                className="hover:text-red-600 font-extrabold text-[12px] px-1.5 py-0.5 cursor-pointer leading-none"
+                className="hover:text-red-600 font-extrabold text-[11px] md:text-[12px] px-1 md:px-1.5 py-0.5 cursor-pointer leading-none"
               >
                 ✕
               </button>
             </div>
-            <p className="text-[11px] font-bold text-slate-700 leading-normal text-left">{buzziToast.message}</p>
+            <p className="text-[10px] md:text-[11px] font-bold text-slate-700 leading-normal text-left">{buzziToast.message}</p>
           </div>
         </div>
       )}

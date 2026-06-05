@@ -195,6 +195,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [onlineExpanded, setOnlineExpanded] = useState(true);
   const [offlineExpanded, setOfflineExpanded] = useState(true);
   const [chatbotsExpanded, setChatbotsExpanded] = useState(true);
+  const [winampExpanded, setWinampExpanded] = useState(false);
+  const [notificationsExpanded, setNotificationsExpanded] = useState(false);
 
   const cleanAdminEmail = (userEmail || "").split("#pwd_")[0].trim().toLowerCase();
 
@@ -680,175 +682,175 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* 📻 Winamp 2004 Buzzi Stereo Player */}
-      <div className="mx-2 my-2 p-2 bg-[#1b2533] border border-[#2d3a4e] rounded shadow-md text-emerald-400 font-mono text-[11px] select-none">
-        <div className="flex items-center justify-between mb-1 text-slate-400 text-[10px] border-b border-[#2d3a4e] pb-1">
-          <span className="flex items-center gap-1">
-            <Radio className={`w-3 h-3 text-sky-400 ${isPlaying ? "animate-pulse" : ""}`} />
-            <span>BUZZI STEREO (WINAMP v2.82)</span>
+      <div className="mx-2 my-1 bg-[#1b2533] border border-[#2d3a4e] rounded shadow-md text-emerald-400 font-mono select-none overflow-hidden shrink-0">
+        <div 
+          onClick={() => setWinampExpanded(!winampExpanded)}
+          className="p-1.5 px-2 flex items-center justify-between text-slate-400 text-[9.5px] bg-[#121a24] hover:bg-[#182230] cursor-pointer"
+        >
+          <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
+            <Radio className={`w-3.5 h-3.5 text-sky-400 ${isPlaying ? "animate-pulse" : ""}`} />
+            <span>BUZZI STEREO (WINAMP)</span>
           </span>
-          <span className="text-[9px] bg-sky-950 px-1 py-0.5 rounded text-sky-300 font-bold">STEREO</span>
-        </div>
-
-        {/* LCD-style visualization area */}
-        <div className="bg-[#0c121d] border border-[#2d3a4e] p-1.5 rounded flex items-center justify-between mb-1.5 relative overflow-hidden">
-          <div className="flex-1 min-w-0 pr-2">
-            <div className="text-emerald-500 font-bold truncate tracking-tight text-[11px]">
-              {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].title : "MUTED / IDLE"}
-            </div>
-            <div className="text-[9px] text-[#4d6a85] flex gap-2 mt-0.5">
-              <span>GENRE: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].genre : "NONE"}</span>
-              <span>BY: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].artist : "OFFLINE"}</span>
-            </div>
-          </div>
-
-          {/* Bouncing visualizer vertical frequencies */}
-          <div className="flex items-end gap-0.5 h-6 w-12 justify-end flex-shrink-0">
-            {visualizerHeights.map((h, i) => (
-              <span 
-                key={i} 
-                className="w-1.5 bg-gradient-to-t from-emerald-600 via-emerald-400 to-green-300 transition-all duration-100"
-                style={{ height: `${isPlaying ? h : 2}px` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Volume controller slider bar */}
-        <div className="flex items-center gap-2 mb-1.5 text-slate-400 text-[9px] px-0.5">
-          <Sliders className="w-3 h-3 text-sky-500 flex-shrink-0" />
-          <span className="w-8">VOL: {volume}%</span>
-          <input 
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400 focus:outline-none"
-            title="Systeembediening Volume"
-          />
-        </div>
-
-        {/* Buttons & controllers */}
-        <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#1f2b3b]">
-          <div className="flex gap-1">
-            <button
-              onClick={() => {
-                const prevIdx = currentTrackIdx > 0 ? currentTrackIdx - 1 : RETRO_PLAYLIST.length - 1;
-                playTrackDirect(prevIdx);
-              }}
-              className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
-              title="Vorige nummer"
-            >
-              ◀◀
-            </button>
-
-            {isPlaying ? (
-              <button
-                onClick={() => {
-                  pauseTrackDirect();
-                }}
-                className="px-2 py-0.5 bg-gradient-to-b from-amber-600 to-amber-900 border border-amber-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
-                title="Pauzeren"
-              >
-                ❚❚
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  playTrackDirect(currentTrackIdx);
-                }}
-                className="px-2 py-0.5 bg-gradient-to-b from-emerald-600 to-emerald-900 border border-emerald-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
-                title="Afspelen"
-              >
-                ▶
-              </button>
+          <div className="flex items-center gap-1.5">
+            {isPlaying && !winampExpanded && (
+              <span className="text-[8px] bg-emerald-950 text-emerald-300 font-bold px-1 rounded uppercase tracking-wider animate-pulse">
+                📻 AFSPELEN
+              </span>
             )}
-
-            <button
-              onClick={() => {
-                const nextIdx = (currentTrackIdx + 1) % RETRO_PLAYLIST.length;
-                playTrackDirect(nextIdx);
-              }}
-              className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
-              title="Volgende nummer"
-            >
-              ▶▶
-            </button>
-          </div>
-
-          <div className="text-[9px] text-slate-400 font-bold">
-            {isPlaying ? "📻 ONLINE STREAM" : "📻 PAUSED"}
+            <span className="text-sky-400 font-bold font-mono text-xs">
+              {winampExpanded ? "▲" : "▼"}
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* 🛎️ Mobile & Desktop Push Notifications Activator */}
-      <div className="mx-2 mb-2 p-2 bg-gradient-to-r from-sky-50 to-[#e4ecf7] border-2 border-dashed border-[#8da7c1] rounded-lg text-slate-800 flex flex-col gap-1 shadow-sm relative overflow-hidden shrink-0">
-        <div className="flex items-center justify-between text-[10px] pb-1 border-b border-[#bad0e3]/60 mb-1">
-          <span className="font-extrabold text-[#1c5c8a] flex items-center gap-1.5 uppercase tracking-wide">
-            <span>🛎️</span> Mobiele Meldingen
-          </span>
-          <span className="text-[8.5px] px-1 bg-[#1c5c8a] text-white font-bold rounded">PUSH</span>
-        </div>
-        <p className="text-[9.5px] text-slate-600 leading-normal mb-1.5">
-          Ontvang direct een tril- of geluidsmelding op je telefoon of PC bij nieuwe chatberichten en nudges, ook als Buzzi in de achtergrond draait!
-        </p>
-        
-        {notificationPermission === "granted" ? (
-          <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-[9.5px] font-bold">
-            <span className="text-xs">✅</span>
-            <span>Mobiele meldingen zijn UITSTEKEND actief!</span>
-          </div>
-        ) : notificationPermission === "denied" ? (
-          <div className="flex flex-col gap-1">
-            <div className="text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1 text-[9.5px] font-bold">
-              <span>❌ Meldingen zijn geblokkeerd.</span>
+        {winampExpanded && (
+          <div className="p-2 border-t border-[#121a24] flex flex-col gap-1.5 transition-all animate-fade-in">
+            {/* LCD-style visualization area */}
+            <div className="bg-[#0c121d] border border-[#2d3a4e] p-1.5 rounded flex items-center justify-between mb-1 relative overflow-hidden">
+              <div className="flex-1 min-w-0 pr-2">
+                <div className="text-emerald-500 font-bold truncate tracking-tight text-[11px]">
+                  {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].title : "MUTED / IDLE"}
+                </div>
+                <div className="text-[9px] text-[#4d6a85] flex gap-2 mt-0.5">
+                  <span>GENRE: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].genre : "NONE"}</span>
+                  <span>BY: {isPlaying ? RETRO_PLAYLIST[currentTrackIdx].artist : "OFFLINE"}</span>
+                </div>
+              </div>
+
+              {/* Bouncing visualizer vertical frequencies */}
+              <div className="flex items-end gap-0.5 h-6 w-12 justify-end flex-shrink-0">
+                {visualizerHeights.map((h, i) => (
+                  <span 
+                    key={i} 
+                    className="w-1.5 bg-gradient-to-t from-emerald-600 via-emerald-400 to-green-300 transition-all duration-100"
+                    style={{ height: `${isPlaying ? h : 2}px` }}
+                  />
+                ))}
+              </div>
             </div>
-            <p className="text-[8.5px] text-slate-500 italic leading-tight">
-              Klik op het slot-icoontje linksboven in je adresbalk om meldingen weer toe te staan!
-            </p>
+
+            {/* Volume controller slider bar */}
+            <div className="flex items-center gap-2 mb-1 text-slate-400 text-[9px] px-0.5">
+              <Sliders className="w-3 h-3 text-sky-500 flex-shrink-0" />
+              <span className="w-8">VOL: {volume}%</span>
+              <input 
+                type="range"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400 focus:outline-none"
+                title="Systeembediening Volume"
+              />
+            </div>
+
+            {/* Buttons & controllers */}
+            <div className="flex items-center justify-between mt-0.5 pt-1.5 border-t border-[#1f2b3b]">
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    const prevIdx = currentTrackIdx > 0 ? currentTrackIdx - 1 : RETRO_PLAYLIST.length - 1;
+                    playTrackDirect(prevIdx);
+                  }}
+                  className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
+                  title="Vorige nummer"
+                >
+                  ◀◀
+                </button>
+
+                {isPlaying ? (
+                  <button
+                    onClick={() => {
+                      pauseTrackDirect();
+                    }}
+                    className="px-2 py-0.5 bg-gradient-to-b from-amber-600 to-amber-900 border border-amber-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
+                    title="Pauzeren"
+                  >
+                    ❚❚
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      playTrackDirect(currentTrackIdx);
+                    }}
+                    className="px-2 py-0.5 bg-gradient-to-b from-emerald-600 to-emerald-950 border border-emerald-500 text-white rounded cursor-pointer hover:brightness-110 flex items-center justify-center font-bold text-[10px]"
+                    title="Afspelen"
+                  >
+                    ▶
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    const nextIdx = (currentTrackIdx + 1) % RETRO_PLAYLIST.length;
+                    playTrackDirect(nextIdx);
+                  }}
+                  className="px-1.5 py-0.5 bg-gradient-to-b from-[#2d3c52] to-[#141b25] border border-slate-600 text-slate-100 hover:text-white rounded cursor-pointer hover:border-slate-400 flex items-center justify-center text-[10px]"
+                  title="Volgende nummer"
+                >
+                  ▶▶
+                </button>
+              </div>
+
+              <div className="text-[9px] text-slate-400 font-bold">
+                {isPlaying ? "📻 ONLINE STREAM" : "📻 PAUSED"}
+              </div>
+            </div>
           </div>
-        ) : (
-          <button
-            onClick={requestNotificationPermission}
-            className="w-full bg-gradient-to-g from-[#2c77b0] to-[#1d5c8a] hover:from-[#3a8bca] hover:to-[#2576b5] text-white text-[9.5px] border border-sky-950 font-black py-1.5 rounded shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer transition-all uppercase tracking-wider"
-          >
-            <span>✨</span>
-            <span>Zet Push Meldingen Aan</span>
-          </button>
         )}
       </div>
 
-      {/* 🟢 Database & MongoDB Status Panel */}
-      <div className="mx-2 mb-2 p-2 bg-gradient-to-r from-emerald-50/70 to-teal-50/50 border-2 border-emerald-200/80 rounded-lg text-slate-800 flex flex-col gap-1 shadow-sm shrink-0">
-        <div className="flex items-center justify-between text-[10px] pb-1 border-b border-emerald-100 mb-0.5">
-          <span className="font-extrabold text-emerald-800 flex items-center gap-1.5 uppercase tracking-wide">
-            <span>💾</span> Database Verbinding
+      {/* 🛎️ Mobile & Desktop Push Notifications Activator */}
+      <div className="mx-2 mb-2 bg-[#f0f4f9] hover:bg-[#e4ecf7] border border-[#bad0e3] rounded-lg text-slate-800 flex flex-col shadow-sm relative overflow-hidden shrink-0 transition-all">
+        <div 
+          onClick={() => setNotificationsExpanded(!notificationsExpanded)}
+          className="p-1.5 px-2 flex items-center justify-between text-[9.5px] cursor-pointer select-none"
+        >
+          <span className="font-extrabold text-[#1c5c8a] flex items-center gap-1.5 uppercase tracking-wide">
+            <span>🛎️</span> Mobiele Meldingen
           </span>
-          <span className={`text-[8.5px] px-1 font-black text-white rounded pb-0.5 ${activeDbMode === "mongodb" ? "bg-emerald-600" : "bg-amber-600"}`}>
-            {activeDbMode === "mongodb" ? "MONGODB ATLAS" : "LOKAAL BACKUP"}
-          </span>
-        </div>
-        
-        {activeDbMode === "mongodb" ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1 text-[10px] text-emerald-850 font-extrabold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span>Atlas DB Gekoppeld! 🟢</span>
-            </div>
-            <p className="text-[8.5px] text-slate-500 leading-tight">
-              Je gegevens worden direct realtime in MongoDB Atlas gesynchroniseerd. Veilig en persistent!
-            </p>
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[8.5px] px-1 font-bold rounded text-white ${notificationPermission === "granted" ? "bg-emerald-600" : "bg-sky-700"}`}>
+              {notificationPermission === "granted" ? "ACTIEF" : "TIK EN STEL IN"}
+            </span>
+            <span className="text-slate-500 font-mono text-[10px]">
+              {notificationsExpanded ? "▲" : "▼"}
+            </span>
           </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1 text-[10px] text-amber-800 font-extrabold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span>Lokaal JSON Standalone (OK) 🟡</span>
-            </div>
-            <p className="text-[8.5px] text-slate-500 leading-tight">
-              Rechtstreekse server bestandsopslag is stabiel en actief. Geen cloud-database vereist.
+        </div>
+
+        {notificationsExpanded && (
+          <div className="p-2 border-t border-[#bad0e3] bg-gradient-to-r from-sky-50 to-[#e4ecf7] flex flex-col gap-1 transition-all animate-fade-in">
+            <p className="text-[9.5px] text-slate-600 leading-normal mb-1 bg-white/45 p-1 rounded font-medium">
+              Ontvang trillingen en geluiden direct op je mobiel bij direct messages of nudges!
             </p>
+            
+            {notificationPermission === "granted" ? (
+              <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-[9.5px] font-bold">
+                <span className="text-xs">✅</span>
+                <span>Mobiele meldingen zijn UITSTEKEND actief!</span>
+              </div>
+            ) : notificationPermission === "denied" ? (
+              <div className="flex flex-col gap-1">
+                <div className="text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1 text-[9.5px] font-bold">
+                  <span>❌ Meldingen zijn geblokkeerd.</span>
+                </div>
+                <p className="text-[8.5px] text-slate-500 italic leading-tight">
+                  Handmatig toestaan in de browser/app instellingen.
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  requestNotificationPermission();
+                }}
+                className="w-full bg-gradient-to-g from-[#2c77b0] to-[#1d5c8a] hover:from-[#3a8bca] hover:to-[#2576b5] text-white text-[9px] border border-sky-950 font-black py-1 rounded shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer transition-all uppercase tracking-wider"
+              >
+                <span>✨</span>
+                <span>Zet Push Meldingen Aan</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1120,10 +1122,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* User Info footer (Classic Windows XP bottom status line) */}
-      <div className="p-3 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700">
+      <div className="p-2 bg-[#cbdcf0] border-t border-[#8ca7c1] flex items-center justify-between text-xs text-slate-700 shrink-0 select-none">
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm" />
-          <span className="font-semibold text-[11px] font-sans">Buzzi Service: Verbonden</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-700 shadow-sm animate-pulse" />
+          <span className="font-semibold text-[11px] font-sans">Buzzi Service: Live</span>
+        </div>
+        
+        {/* Sleek, space-saving Database connection status pill */}
+        <div 
+          title={activeDbMode === "mongodb" ? "MongoDB Atlas DB Gekoppeld! Gegevens worden veilig gesynchroniseerd in de cloud." : "Lokaal bestandssysteem backup actief (server-side)."}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black cursor-help hover:brightness-105 transition-all shadow-xs ${
+            activeDbMode === "mongodb" 
+              ? "bg-emerald-600/10 text-emerald-800 border-emerald-400" 
+              : "bg-amber-600/10 text-amber-800 border-amber-400"
+          }`}
+        >
+          <span className={`w-1 h-1 rounded-full ${activeDbMode === "mongodb" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+          <span>{activeDbMode === "mongodb" ? "MongoDB Atlas" : "Lokaal Backup"}</span>
         </div>
       </div>
 

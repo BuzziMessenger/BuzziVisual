@@ -17,7 +17,13 @@ import {
   Users,
   Image as ImageIcon,
   Palette,
-  BellRing
+  BellRing,
+  Music,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Headphones
 } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 
@@ -117,6 +123,163 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
   const [mmsFont, setMmsFont] = useState<string>("Comic Sans MS"); // Comic Sans default lol
   const [isBold, setIsBold] = useState(true);
+
+  // Music Ticker Playlists & Dynamic States
+  const CONTACT_PLAYLISTS: Record<string, string[]> = {
+    queen: [
+      "Linkin Park - In The End",
+      "Evanescence - Bring Me To Life",
+      "Eminem - Lose Yourself",
+      "O-Zone - Dragostea Din Tei"
+    ],
+    wouter: [
+      "Linkin Park - Numb",
+      "Slipknot - Duality",
+      "Green Day - American Idiot",
+      "The Rasmus - In the Shadows"
+    ],
+    kelly: [
+      "Britney Spears - Toxic",
+      "Kylie Minogue - Can't Get You Out Of My Head",
+      "Beyoncé - Crazy In Love",
+      "OutKast - Hey Ya!"
+    ],
+    danny: [
+      "System Of A Down - Chop Suey!",
+      "Limp Bizkit - Behind Blue Eyes",
+      "Sum 41 - Still Waiting",
+      "Blink-182 - I Miss You"
+    ],
+    sanne: [
+      "Las Ketchup - The Ketchup Song",
+      "Avril Lavigne - Sk8er Boi",
+      "Anastacia - Left Outside Alone",
+      "Black Eyed Peas - Where Is The Love?"
+    ]
+  };
+
+  const CHANNEL_PLAYLIST = [
+    "Tiësto - Traffic (Live at Innercity 2003)",
+    "DJ Jean - The Launch (Remix)",
+    "ATB - 9 PM (Till I Come)",
+    "Alice Deejay - Better Off Alone",
+    "Armin van Buuren - Shivers"
+  ];
+
+  const [contactMusic, setContactMusic] = useState<Record<string, { trackIndex: number; isPlaying: boolean }>>({
+    queen: { trackIndex: 0, isPlaying: true },
+    wouter: { trackIndex: 0, isPlaying: true },
+    kelly: { trackIndex: 0, isPlaying: true },
+    danny: { trackIndex: 0, isPlaying: true },
+    sanne: { trackIndex: 0, isPlaying: true },
+  });
+
+  const [channelMusic, setChannelMusic] = useState<{ trackIndex: number; isPlaying: boolean }>({
+    trackIndex: 0,
+    isPlaying: true
+  });
+
+  const getMusicStatus = () => {
+    if (activeType === "channel") {
+      return {
+        track: CHANNEL_PLAYLIST[channelMusic.trackIndex],
+        isPlaying: channelMusic.isPlaying,
+        type: "radio"
+      };
+    }
+
+    const playlist = CONTACT_PLAYLISTS[activeId] || [
+      activeContact?.listeningTo || "Krezip - I Would Stay",
+      "Eminem - Lose Yourself",
+      "Keane - Somewhere Only We Know"
+    ];
+
+    const state = contactMusic[activeId] || { trackIndex: 0, isPlaying: true };
+    
+    let track = playlist[state.trackIndex % playlist.length];
+    if (state.trackIndex === 0 && activeContact?.listeningTo) {
+      track = activeContact.listeningTo;
+    }
+
+    return {
+      track,
+      isPlaying: state.isPlaying,
+      type: "contact"
+    };
+  };
+
+  const handleMusicPrev = () => {
+    hiveAudio.playHoneyPop();
+    if (activeType === "channel") {
+      setChannelMusic(prev => ({
+        ...prev,
+        trackIndex: (prev.trackIndex - 1 + CHANNEL_PLAYLIST.length) % CHANNEL_PLAYLIST.length
+      }));
+    } else {
+      const playlist = CONTACT_PLAYLISTS[activeId] || [
+        activeContact?.listeningTo || "Krezip - I Would Stay",
+        "Eminem - Lose Yourself",
+        "Keane - Somewhere Only We Know"
+      ];
+      setContactMusic(prev => {
+        const current = prev[activeId] || { trackIndex: 0, isPlaying: true };
+        return {
+          ...prev,
+          [activeId]: {
+            ...current,
+            trackIndex: (current.trackIndex - 1 + playlist.length) % playlist.length
+          }
+        };
+      });
+    }
+  };
+
+  const handleMusicNext = () => {
+    hiveAudio.playHoneyPop();
+    if (activeType === "channel") {
+      setChannelMusic(prev => ({
+        ...prev,
+        trackIndex: (prev.trackIndex + 1) % CHANNEL_PLAYLIST.length
+      }));
+    } else {
+      const playlist = CONTACT_PLAYLISTS[activeId] || [
+        activeContact?.listeningTo || "Krezip - I Would Stay",
+        "Eminem - Lose Yourself",
+        "Keane - Somewhere Only We Know"
+      ];
+      setContactMusic(prev => {
+        const current = prev[activeId] || { trackIndex: 0, isPlaying: true };
+        return {
+          ...prev,
+          [activeId]: {
+            ...current,
+            trackIndex: (current.trackIndex + 1) % playlist.length
+          }
+        };
+      });
+    }
+  };
+
+  const handleMusicTogglePlay = () => {
+    hiveAudio.playHoneyPop();
+    if (activeType === "channel") {
+      setChannelMusic(prev => ({
+        ...prev,
+        isPlaying: !prev.isPlaying
+      }));
+    } else {
+      setContactMusic(prev => {
+        const current = prev[activeId] || { trackIndex: 0, isPlaying: true };
+        return {
+          ...prev,
+          [activeId]: {
+            ...current,
+            isPlaying: !current.isPlaying
+          }
+        };
+      });
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -971,6 +1134,108 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
 
+      </div>
+
+      {/* 2004 MSN Messenger style "Now Listening" ("Nu Luisterend") music status bar */}
+      <div className="bg-[#f0f6fc] border-t border-[#bad0e3] px-4 py-1.5 flex items-center justify-between text-[11px] text-slate-700 font-sans shadow-inner shrink-0 select-none">
+        
+        {/* Style Tag inside ChatArea to guarantee self-contained, working CSS keyframes */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes visualizer-bar-dance {
+            0%, 100% { height: 3px; }
+            50% { height: 13px; }
+          }
+          .animate-visualizer-1 { animation: visualizer-bar-dance 0.75s ease-in-out infinite; }
+          .animate-visualizer-2 { animation: visualizer-bar-dance 0.45s ease-in-out infinite; }
+          .animate-visualizer-3 { animation: visualizer-bar-dance 0.85s ease-in-out infinite; }
+          .animate-visualizer-4 { animation: visualizer-bar-dance 0.55s ease-in-out infinite; }
+
+          @keyframes marquee-scroll-left {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+          }
+          .animate-marquee-scroll-left {
+            display: inline-block;
+            animation: marquee-scroll-left 14s linear infinite;
+          }
+        `}} />
+
+        {/* Music status label and progress/visualizer */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-4">
+          
+          {/* Animated Retro Music Note or Visualizer */}
+          <div className="bg-emerald-500 text-white rounded p-1 shadow-sm flex items-center justify-center flex-shrink-0 relative overflow-hidden h-6 w-6">
+            {getMusicStatus().isPlaying ? (
+              <div className="flex items-end gap-[1.5px] h-3.5 w-4 justify-center">
+                <div className="w-[2.5px] bg-white animate-visualizer-1 rounded-t-xs" />
+                <div className="w-[2.5px] bg-white animate-visualizer-2 rounded-t-xs" style={{ animationDelay: '0.1s' }} />
+                <div className="w-[2.5px] bg-white animate-visualizer-3 rounded-t-xs" style={{ animationDelay: '0.2s' }} />
+                <div className="w-[2.5px] bg-white animate-visualizer-4 rounded-t-xs" style={{ animationDelay: '0.05s' }} />
+              </div>
+            ) : (
+              <Music className="w-3.5 h-3.5 text-white/95" />
+            )}
+          </div>
+
+          {/* Ticker marquee container */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-emerald-700 uppercase tracking-wide text-[9px] flex items-center gap-1 shrink-0 bg-emerald-50 border border-emerald-200/50 px-1 rounded">
+                <Headphones className="w-2.5 h-2.5" />
+                <span>NU LUISTEREND naar</span>
+              </span>
+              
+              <span className="text-[10px] text-slate-400 font-medium truncate shrink-0">
+                ({activeType === "channel" ? "Groepsradio" : activeContact?.name || "Buzzi"}) -
+              </span>
+            </div>
+
+            {/* Marquee effect wrapper */}
+            <div className="relative overflow-hidden w-full h-4 mt-0.5 bg-white border border-[#abc4df]/30 rounded px-2 flex items-center shadow-inner">
+              <div 
+                className={`text-[11px] font-bold text-slate-800 font-mono whitespace-nowrap select-all cursor-copy ${getMusicStatus().isPlaying ? 'animate-marquee-scroll-left' : ''}`}
+                style={!getMusicStatus().isPlaying ? { transform: 'translateX(0)' } : undefined}
+                title="Dubbelklik om nummer te kopiëren"
+              >
+                🎵 {getMusicStatus().track} 🚀 {getMusicStatus().isPlaying ? "[ LIVE RETRO STREAM ]" : "[ GEPAUZEERD - Walkman sluit af... ]"} 🎵
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Media Controls */}
+        <div className="flex items-center gap-1 shrink-0 bg-[#cbdcf0]/40 border border-[#bad0e3]/45 rounded-lg p-0.5 shadow-xs">
+          {/* Skip Back */}
+          <button
+            onClick={handleMusicPrev}
+            className="hover:bg-white text-slate-600 hover:text-emerald-600 p-1 rounded-md active:scale-90 transition-all cursor-pointer"
+            title="Vorig nummer"
+          >
+            <SkipBack className="w-3 h-3" />
+          </button>
+
+          {/* Play / Pause Toggle */}
+          <button
+            onClick={handleMusicTogglePlay}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white p-1 rounded-md active:scale-95 transition-all shadow-sm cursor-pointer"
+            title={getMusicStatus().isPlaying ? "Pauzeer muziek" : "Speel muziek af"}
+          >
+            {getMusicStatus().isPlaying ? (
+              <Pause className="w-3 h-3 fill-current" />
+            ) : (
+              <Play className="w-3 h-3 fill-current ml-[1px]" />
+            )}
+          </button>
+
+          {/* Skip Forward */}
+          <button
+            onClick={handleMusicNext}
+            className="hover:bg-white text-slate-600 hover:text-emerald-600 p-1 rounded-md active:scale-90 transition-all cursor-pointer"
+            title="Volgend nummer"
+          >
+            <SkipForward className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {/* Input Action Panel (Separated into rich area text in MSI clone) */}
