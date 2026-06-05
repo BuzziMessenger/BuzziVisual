@@ -261,6 +261,52 @@ export default function App() {
 
   // Copy Link State
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
+  const [activeAppTab, setActiveAppTab] = useState<"info" | "windows" | "android">("info");
+
+  const downloadWindowsLauncher = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const batContent = `@echo off
+title Buzzi Messenger
+color 0b
+echo ====================================================
+echo   BUZZI MESSENGER CLIENT - WINDOWS DESKTOP LAUNCHER
+echo ====================================================
+echo.
+echo Bezig met opstarten in standalone venster-modus...
+echo Web app: ${origin}
+echo.
+
+:: Zoek naar Microsoft Edge (werkt het best in standalone app-modus op Windows)
+where msedge >nul 2>nul
+if %errorlevel% equ 0 (
+    start msedge --app=${origin}
+    exit
+)
+
+:: Zoek naar Google Chrome
+where chrome >nul 2>nul
+if %errorlevel% equ 0 (
+    start chrome --app=${origin}
+    exit
+)
+
+:: Als beide ontbreken, open in de standaardbrowser
+start ${origin}
+exit
+`;
+
+    const blob = new Blob([batContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "BuzziMessenger.bat";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    hiveAudio.playNotification();
+  };
+
   const handleCopyInviteLink = () => {
     const shareDomain = "https://www.buzzimessenger.nl";
     const cleanEmail = (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase();
@@ -2029,62 +2075,134 @@ export default function App() {
 
                 {isAppsExpanded && (
                   <div className="px-4 pb-4 pt-3 border-t border-[#abc4df]/40 bg-white/70 animate-fade-in space-y-3.5">
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                      Wil je Buzzi Messenger altijd bij de hand hebben? Installeer de app nu direct op je mobiel of Windows pc!
-                    </p>
-
-                    {/* Download Buttons Container */}
-                    <div className="space-y-2">
-                      {/* Windows Desktop Client Download */}
-                      <a
-                        href="/api/download/exe"
-                        download="BuzziMessenger.exe"
-                        onClick={() => hiveAudio.playNotification()}
-                        className="w-full bg-gradient-to-r from-sky-500 to-[#00aeef] hover:to-sky-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#0089bd] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                    
+                    {/* Platform Selector Tabs */}
+                    <div className="flex border-b border-[#abc4df] -mx-1">
+                      <button
+                        type="button"
+                        onClick={() => { setActiveAppTab("info"); hiveAudio.playHoneyPop(); }}
+                        className={`flex-1 py-1 px-1.5 text-[10px] font-bold border-t border-x rounded-t-md -mb-[1px] transition-all cursor-pointer text-center ${activeAppTab === "info" ? "bg-white border-[#abc4df] border-b-white text-[#113a69] shadow-xs" : "bg-slate-100/70 border-transparent text-slate-500 hover:bg-slate-100"}`}
                       >
-                        <div className="flex items-center gap-2">
-                          <Laptop className="w-4 h-4 shrink-0 text-sky-100" />
-                          <div className="text-left">
-                            <span className="block font-bold leading-none">Buzzi Messenger voor Windows (.exe)</span>
-                            <span className="text-[9px] text-sky-100 font-normal">v1.2.0-XP (DirectX 9.0c)</span>
-                          </div>
-                        </div>
-                        <span className="text-[9px] bg-sky-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">4.2 MB ⬇️</span>
-                      </a>
-
-                      {/* Android APK Download */}
-                      <a
-                        href="/api/download/apk"
-                        download="BuzziMessenger.apk"
-                        onClick={() => hiveAudio.playNotification()}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-[#8cc63f] hover:to-emerald-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#76aa2f] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                        ℹ️ Updates info
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveAppTab("windows"); hiveAudio.playHoneyPop(); }}
+                        className={`flex-1 py-1 px-1.5 text-[10px] font-bold border-t border-x rounded-t-md -mb-[1px] transition-all cursor-pointer text-center ${activeAppTab === "windows" ? "bg-white border-[#abc4df] border-b-white text-[#113a69] shadow-xs" : "bg-slate-100/70 border-transparent text-slate-500 hover:bg-slate-100"}`}
                       >
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="w-4 h-4 shrink-0 text-emerald-100" />
-                          <div className="text-left">
-                            <span className="block font-bold leading-none">Android Installatiepakket (.apk)</span>
-                            <span className="text-[9px] text-emerald-100 font-normal">v1.2.0-Buzzi (Onbekende bronnen)</span>
-                          </div>
-                        </div>
-                        <span className="text-[9px] bg-emerald-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">1.8 MB ⬇️</span>
-                      </a>
+                        💻 Windows Desktop
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveAppTab("android"); hiveAudio.playHoneyPop(); }}
+                        className={`flex-1 py-1 px-1.5 text-[10px] font-bold border-t border-x rounded-t-md -mb-[1px] transition-all cursor-pointer text-center ${activeAppTab === "android" ? "bg-white border-[#abc4df] border-b-white text-[#113a69] shadow-xs" : "bg-slate-100/70 border-transparent text-slate-500 hover:bg-slate-100"}`}
+                      >
+                        📱 Android Mobiel
+                      </button>
                     </div>
 
-                    {/* Fun retro instructions */}
-                    <div className="bg-[#f0f6fc] border border-[#bcd2e8] rounded-md p-2 text-[10px] text-slate-500 leading-normal space-y-1 font-mono">
-                      <div className="font-extrabold text-blue-900 border-b border-[#abc4df]/50 pb-0.5 uppercase tracking-wider text-[8px] flex items-center gap-1">
-                        <span>💿 Snelle Installatie Handleiding:</span>
+                    {/* Tab 1: Info (Real-time updates explanation) */}
+                    {activeAppTab === "info" && (
+                      <div className="space-y-3 pt-1">
+                        <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-3 text-[11px] text-slate-700 space-y-2">
+                          <h4 className="font-extrabold text-emerald-950 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Worden wijzigingen automatisch meegenomen?</span>
+                          </h4>
+                          <p className="leading-relaxed">
+                            <strong>JA, ALLES INSTANT EN AUTOMATISCH!</strong> 🚀 Omdat de standalone apps de live messenger inladen via een beveiligde <strong>WebView-wrapper</strong> (omdat we live communiceren met <code className="bg-emerald-100 text-emerald-900 border border-emerald-200 px-1 rounded font-mono text-[9.5px]">{typeof window !== 'undefined' ? window.location.host : 'Buzzi'}</code>), worden <strong>alle aanpassingen</strong> die wij in de code maken direct en direct getoond!
+                          </p>
+                          <p className="leading-relaxed">
+                            Je hoeft de app of de launcher dus <strong>nooit opnieuw te downloaden of handmatig te updaten</strong>! Zodra je hem opstart, draait hij realtime de splinternieuwe versie!
+                          </p>
+                        </div>
+                        
+                        <div className="bg-[#f0f6fc] border border-[#abc4df] rounded-lg p-2.5 text-[10px] text-slate-600 leading-relaxed shadow-inner">
+                          <span className="font-extrabold text-[#113a69] block mb-1 uppercase tracking-wider text-[9px]">💡 Waarom deden de downloadbestanden voorheen niets?</span>
+                          De oude downloads waren simulaties (platte tekstbestanden). Nu hebben we échte WebView-functionaliteit toegevoegd zodat de Messenger écht als een standalone app buiten je browser kan functioneren! Selecteer de tabbladen hierboven om dit te installeren.
+                        </div>
                       </div>
-                      <p>
-                        ⚡ <strong className="text-slate-700">Windows:</strong> Voer <code className="bg-white px-1 py-0.2 rounded border">BuzziMessenger.exe</code> uit. Negeer Windows SmartScreen en schakel inbelmodem aan!
-                      </p>
-                      <p>
-                        📱 <strong className="text-slate-700">Android:</strong> Open het gedownloade <code className="bg-white px-1 py-0.2 rounded border">.apk</code> bestand, sta 'Installeren uit onbekende bronnen' toe onder Beveiligingsinstellingen!
-                      </p>
-                      <div className="text-[8px] text-slate-400 italic pt-1 border-t border-[#abc4df]/35">
-                        * Minimaal 64MB RAM en DirectX 9.0c aanbevolen. SoundBlaster Live-geluidskaart aangeraden voor nudge trillingen!
+                    )}
+
+                    {/* Tab 2: Windows Webview App Mode */}
+                    {activeAppTab === "windows" && (
+                      <div className="space-y-3 pt-1">
+                        <p className="text-[11px] text-slate-600 leading-normal font-medium">
+                          We hebben een <strong>Buzzi Windows WebView Launcher</strong> gemaakt! Deze start de messenger op in een <strong>echt losstaand venster</strong> zonder adresbalken, tabbladen of browser-afleidingen.
+                        </p>
+
+                        {/* Custom Launcher Download Block */}
+                        <button
+                          type="button"
+                          onClick={downloadWindowsLauncher}
+                          className="w-full bg-gradient-to-r from-sky-500 to-[#00aeef] hover:to-sky-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#0089bd] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Laptop className="w-4 h-4 shrink-0 text-sky-100" />
+                            <div className="text-left">
+                              <span className="block font-bold leading-none">Download Windows Standalone Launcher (.bat)</span>
+                              <span className="text-[9px] text-sky-100 font-normal">Opent direct als standalone app</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] bg-sky-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">1 KB ⬇️</span>
+                        </button>
+
+                        <div className="bg-[#f0f6fc] border border-[#bcd2e8] rounded-md p-2.5 text-[10px] text-slate-600 leading-normal space-y-1.5 font-mono">
+                          <div className="font-extrabold text-blue-900 border-b border-[#abc4df]/50 pb-1 uppercase tracking-wider text-[8px] flex items-center gap-1">
+                            <span>💿 Eenvoudige Handleiding:</span>
+                          </div>
+                          <ol className="list-decimal pl-3.5 space-y-1 text-[9.5px]">
+                            <li>Klik op de blauwe knop om de launcher downloaden (<code className="bg-white px-1 rounded border">BuzziMessenger.bat</code>).</li>
+                            <li>Zet de launcher gerust op je <strong>Bureaublad</strong> voor die klassieke MSN snelkoppeling!</li>
+                            <li>Dubbelklik op de launcher. Microsoft Windows kan een SmartScreen melding geven omdat het een zelfgemaakt script is - kik op <strong>"Meer informatie"</strong> en daarna op <strong>"Toch uitvoeren"</strong>.</li>
+                          </ol>
+                          <div className="text-[8.5px] text-slate-400 italic pt-1 border-t border-[#abc4df]/35">
+                            * Dit start Microsoft Edge automatisch op in veilige app-modus (zonder browseromgeving), zodat de messenger volledig onafhankelijk draait!
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Tab 3: Android WebView / PWA Install */}
+                    {activeAppTab === "android" && (
+                      <div className="space-y-3 pt-1">
+                        <p className="text-[11px] text-slate-600 leading-normal font-medium">
+                          Zet Buzzi Messenger op je telefoon als een standalone WebView app via de officiële Progressive Web App (PWA) installatiemethode!
+                        </p>
+
+                        <div className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-2.5 text-[10px] text-slate-700 space-y-1.5 font-sans leading-normal">
+                          <div className="font-extrabold text-emerald-800 uppercase tracking-wider text-[9px] flex items-center gap-1">
+                            <span>✨ Telefoon Installatie (Binnen 10 seconden):</span>
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[10px]">
+                            <li><strong>Stap 1:</strong> Open deze website in de <strong>Google Chrome</strong>-browser op je Android-telefoon.</li>
+                            <li><strong>Stap 2:</strong> Tik rechtsboven in de Chrome adresbalk op de <strong>drie puntjes</strong> (het menu).</li>
+                            <li><strong>Stap 3:</strong> Selecteer <strong>"App installeren"</strong> of <strong>"Toevoegen aan startscherm"</strong>.</li>
+                            <li><strong>Klaar!</strong> Er staat een echt app-icoontje op je mobiel die de messenger opent in zijn eigen op zichzelf staande WebView, zonder storende browserbalken!</li>
+                          </ul>
+                        </div>
+
+                        <div className="bg-[#f0f6fc] border border-[#abc4df] rounded-lg p-2.5 text-[10px] text-slate-500 leading-normal space-y-1.5 font-mono">
+                          <div className="font-extrabold text-[#113a69] border-b border-[#abc4df]/50 pb-0.5 uppercase tracking-wider text-[8px] flex items-center gap-1">
+                            <span>🛠️ Zelf een losse Android Studio APK bouwen?</span>
+                          </div>
+                          <p className="text-[9.5px]">
+                            Als je een echte losse <code className="bg-white px-1 rounded border">.apk</code> wilt compileren via Android Studio, kun je eenvoudig <strong>Capacitor</strong> installeren:
+                          </p>
+                          <pre className="bg-slate-900 text-slate-200 p-1.5 rounded text-[8px] overflow-x-auto select-all leading-tight">
+{`npm install @capacitor/core @capacitor/cli
+npx cap init "Buzzi Messenger" "com.buzzi.messenger" --web-dir=dist
+npm install @capacitor/android
+npx cap add android
+# Voeg in capacitor.config.json de live-koppeling naar de webview toe:
+# "server": { "url": "${typeof window !== 'undefined' ? window.location.origin : 'https://...'}", "cleartext": true }
+npx cap sync
+npx cap open android`}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 )}
               </div>
