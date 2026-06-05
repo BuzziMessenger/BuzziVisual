@@ -22,8 +22,15 @@ import {
   SkipBack,
   Disc,
   Radio,
-  Sliders
+  Sliders,
+  Camera,
+  Upload
 } from "lucide-react";
+
+const isCustomAvatar = (avatar: string) => {
+  if (!avatar) return false;
+  return avatar.length > 5 || avatar.startsWith("data:") || avatar.startsWith("http") || avatar.startsWith("/");
+};
 
 interface TrackItem {
   title: string;
@@ -234,6 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Avatar Selection & Create Group Modals state
   const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDesc, setNewGroupDesc] = useState("");
@@ -404,6 +412,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setIsEditingListening(false);
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 120;
+        const MAX_HEIGHT = 120;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          onUpdateAvatar(dataUrl);
+          hiveAudio.playNotification();
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Get status color & label
   const getStatusIcon = (status: StatusType) => {
     switch (status) {
@@ -489,10 +538,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-14 h-14 bg-white p-0.5 rounded-md border-2 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden hover:scale-105 transition-all cursor-pointer"
             title="Klik om weergaveafbeelding te selecteren of te dobbelen"
           >
-            <span className="text-3xl select-none">{userAvatar}</span>
+            {isCustomAvatar(userAvatar) ? (
+              <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover rounded-sm" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="text-3xl select-none">{userAvatar}</span>
+            )}
           </div>
           {/* Custom Avatar quick picker popup (click to open avatar manager dialog) */}
           <button 
+            type="button"
             onClick={() => {
               setIsAvatarSelectorOpen(true);
               hiveAudio.playHoneyPop();
@@ -537,6 +591,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Custom Status Bullet Selector inside Profile block */}
             <div className="relative group">
               <button 
+                type="button"
                 className="hover:scale-110 active:scale-95 transition-transform translate-y-0.5 cursor-pointer flex items-center"
                 title={`Status: ${getStatusLabelText(userStatus)}`}
               >
@@ -544,12 +599,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <DropdownIcon className="w-3 h-3 text-slate-500 -ml-0.5" />
               </button>
               
-              {/* Dropdown Menu block */}
+              {/* Dropdown Menu block (Hover-active on Desktop, clean & compact) */}
               <div className="hidden group-hover:block absolute left-0 top-full bg-white border border-[#8da7c1] rounded bg-white shadow-lg py-1 w-40 z-50 text-xs text-slate-700 animate-fade-in">
                 {(["online", "bezet", "afwezig", "offline"] as StatusType[]).map((st) => (
                   <button
                     key={st}
-                    onClick={() => onUpdateStatus(st)}
+                    type="button"
+                    onClick={() => {
+                      onUpdateStatus(st);
+                      hiveAudio.playHoneyPop();
+                    }}
                     className="w-full text-left px-2.5 py-1.5 hover:bg-[#e4ecf7] flex items-center gap-2"
                   >
                     {getStatusIcon(st)}
@@ -916,7 +975,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <div className="relative">
-                        <span className="text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none">{contact.avatar}</span>
+                        {isCustomAvatar(contact.avatar) ? (
+                          <img src={contact.avatar} alt="Avatar" className="w-[28px] h-[28px] object-cover rounded border border-slate-300" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none">{contact.avatar}</span>
+                        )}
                         <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon(contact.status)}</span>
                       </div>
                       
@@ -969,7 +1032,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <div className="relative">
-                        <span className="text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none">{contact.avatar}</span>
+                        {isCustomAvatar(contact.avatar) ? (
+                          <img src={contact.avatar} alt="Avatar" className="w-[28px] h-[28px] object-cover rounded border border-slate-300" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none">{contact.avatar}</span>
+                        )}
                         <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon(contact.status)}</span>
                       </div>
                       
@@ -1032,7 +1099,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onClick={() => onSelectDM(contact.id)}
                     >
                       <div className="relative">
-                        <span className="text-lg bg-slate-100 border border-slate-200 py-0.5 px-1 rounded block leading-none saturate-50">{contact.avatar}</span>
+                        {isCustomAvatar(contact.avatar) ? (
+                          <img src={contact.avatar} alt="Avatar" className="w-[28px] h-[28px] object-cover rounded border border-slate-300 saturate-50 opacity-75" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="text-lg bg-slate-100 border border-slate-200 py-0.5 px-1 rounded block leading-none saturate-50">{contact.avatar}</span>
+                        )}
                         <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon("offline")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1150,7 +1221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="bg-gradient-to-r from-[#1d5c8a] via-[#3a8bca] to-[#1d5c8a] px-3 py-2 flex items-center justify-between text-white border-b border-[#0f3c5e] shrink-0">
               <div className="flex items-center gap-1.5 select-none text-xs font-black uppercase tracking-wide">
                 <span>🧩</span>
-                <span>Kies je Buzzi Afbeelding</span>
+                <span>Kies je Buzzi Afbeelding & Status</span>
               </div>
               <button 
                 type="button"
@@ -1166,8 +1237,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Menu options help bar */}
             <div className="px-3 py-1 bg-[#efebd8]/30 border-b border-[#bad0e3] flex justify-between items-center text-[10px] font-bold text-[#1C427F]">
-              <span>Typische retro-plaatjes</span>
+              <span>Kies een plaatje of upload je eigen foto</span>
               <button 
+                type="button"
                 onClick={() => {
                   const fullAvatars = [
                     "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
@@ -1187,31 +1259,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Body */}
             <div className="p-4 flex flex-col items-center">
               {/* Current Preview */}
-              <div className="w-16 h-16 bg-white p-1 rounded-md border-3 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden mb-3 animate-[pulse_3s_infinite]">
-                <span className="text-4xl">{userAvatar}</span>
+              <div className="w-16 h-16 bg-white p-1 rounded-md border-3 border-[#86a8cf] shadow-md flex items-center justify-center overflow-hidden mb-2 relative">
+                {isCustomAvatar(userAvatar) ? (
+                  <img src={userAvatar} alt="Buzzi Avatar" className="w-full h-full object-cover rounded-sm" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="text-4xl">{userAvatar}</span>
+                )}
+              </div>
+
+              {/* Custom Photo Uploader */}
+              <div className="w-full mb-3.5 flex flex-col items-center">
+                <label className="w-full cursor-pointer bg-gradient-to-r from-sky-600 to-[#1d5c8a] hover:brightness-110 text-white border border-sky-800 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider text-center">
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>📷 Eigen foto of Buzzi afbeelding uploaden</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                    className="hidden" 
+                  />
+                </label>
+                <span className="text-[9px] text-slate-500 mt-1 italic leading-none">Bestanden worden direct verkleind en opgeslagen</span>
               </div>
 
               {/* Grid of 48 Emojis */}
-              <div className="bg-[#DCE7F3] p-2 rounded-lg border border-[#bad0e3] grid grid-cols-8 gap-1.5 w-full max-h-[170px] overflow-y-auto custom-scrollbar">
-                {[
-                  "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
-                  "🍟", "🍦", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "🎈", "💎", "👑", "🍀", "🎃", "💩", "👻"
-                ].map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => {
-                      onUpdateAvatar(emoji);
-                      hiveAudio.playHoneyPop();
-                    }}
-                    className={`aspect-square text-lg rounded bg-white hover:bg-sky-100 border flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
-                      userAvatar === emoji
-                        ? "border-[#1C427F] bg-[#CFE1F5] outline-none ring-2 ring-sky-500 scale-110"
-                        : "border-slate-300"
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+              <div className="w-full">
+                <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block mb-1">
+                  Klassieke Buzzi avatars:
+                </label>
+                <div className="bg-[#DCE7F3] p-2 rounded-lg border border-[#bad0e3] grid grid-cols-8 gap-1.5 w-full max-h-[120px] overflow-y-auto custom-scrollbar">
+                  {[
+                    "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕",
+                    "🍟", "🍦", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "🎈", "💎", "👑", "🍀", "🎃", "💩", "👻"
+                  ].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        onUpdateAvatar(emoji);
+                        hiveAudio.playHoneyPop();
+                      }}
+                      className={`aspect-square text-lg rounded bg-white hover:bg-sky-100 border flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                        userAvatar === emoji
+                          ? "border-[#1C427F] bg-[#CFE1F5] outline-none ring-2 ring-sky-500 scale-110"
+                          : "border-slate-300"
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Wijzigen Section for Mobile comfort */}
+              <div className="w-full mt-3.5 pt-3 border-t border-[#bad0e3]/60">
+                <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block mb-1.5">
+                  ⚡ Snel je status wijzigen (Mobiel-vriendelijk):
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(["online", "bezet", "afwezig", "offline"] as StatusType[]).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        onUpdateStatus(st);
+                        hiveAudio.playHoneyPop();
+                      }}
+                      className={`flex items-center gap-2 px-2.5 py-2.5 border rounded-lg text-[11px] font-bold active:scale-95 transition-all text-left ${
+                        userStatus === st
+                          ? "bg-[#2C629E] text-white border-[#1c5c8a] shadow-inner"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-[#e4ecf7]"
+                      }`}
+                    >
+                      {getStatusIcon(st)}
+                      <span>{getStatusLabelText(st)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1412,7 +1536,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Header */}
             <div className="bg-gradient-to-r from-[#2c77b0] to-[#1e5881] text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0">
               <span className="font-extrabold text-sm uppercase tracking-wide flex items-center gap-1.5">
-                <span>👤</span> MSN Vriend Toevoegen
+                <span>👤</span> Nieuwe Vriend Toevoegen
               </span>
               <button
                 type="button"
@@ -1477,7 +1601,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {addContactMode === "username" ? (
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider block">
-                        MSN Schermnaam van je vriend
+                        Buzzi Schermnaam van je vriend
                       </label>
                       <input
                         type="text"

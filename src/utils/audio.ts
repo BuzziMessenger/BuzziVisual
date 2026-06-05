@@ -20,48 +20,102 @@ class BuzziAudioSynthesizer {
     }
   }
 
+  private getActiveScheme(): string {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("buzzi_sound_scheme") || "default";
+    }
+    return "default";
+  }
+
   // Authentic retro Buzzi notification/message chime: a gorgeous "ba-ding!" bell ring
   public playHoneyPop() {
     this.playNotification();
   }
 
   public playNotification() {
+    const scheme = this.getActiveScheme();
+    if (scheme === "mute") return;
+
     try {
       this.initCtx();
       if (!this.ctx) return;
-
       const actx = this.ctx;
       const now = actx.currentTime;
 
-      // Note 1: soft bell chime
-      const osc1 = actx.createOscillator();
-      const gain1 = actx.createGain();
-      osc1.type = "sine";
-      osc1.frequency.setValueAtTime(880, now); // A5 note
-      gain1.gain.setValueAtTime(0.001, now);
-      gain1.gain.linearRampToValueAtTime(0.12, now + 0.02);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      if (scheme === "classic_messenger") {
+        // Authentic Retro Messenger receive message tone ("tu-dut!")
+        const osc1 = actx.createOscillator();
+        const gain1 = actx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(1046.50, now); // C6 note
+        gain1.gain.setValueAtTime(0.001, now);
+        gain1.gain.linearRampToValueAtTime(0.12, now + 0.02);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
-      osc1.connect(gain1);
-      gain1.connect(actx.destination);
+        osc1.connect(gain1);
+        gain1.connect(actx.destination);
 
-      // Note 2: high bright chime "ding" (staggered slightly for "ba-ding" effect)
-      const osc2 = actx.createOscillator();
-      const gain2 = actx.createGain();
-      osc2.type = "triangle";
-      osc2.frequency.setValueAtTime(1318.51, now + 0.05); // E6 note
-      gain2.gain.setValueAtTime(0.001, now + 0.05);
-      gain2.gain.linearRampToValueAtTime(0.15, now + 0.07);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+        const osc2 = actx.createOscillator();
+        const gain2 = actx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(1318.51, now + 0.07); // E6 note
+        gain2.gain.setValueAtTime(0.001, now + 0.07);
+        gain2.gain.linearRampToValueAtTime(0.12, now + 0.09);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
 
-      osc2.connect(gain2);
-      gain2.connect(actx.destination);
+        osc2.connect(gain2);
+        gain2.connect(actx.destination);
 
-      osc1.start(now);
-      osc1.stop(now + 0.15);
+        osc1.start(now);
+        osc1.stop(now + 0.2);
+        osc2.start(now + 0.07);
+        osc2.stop(now + 0.4);
+      } else if (scheme === "retro_synth") {
+        // Electronic bubble pop / coin ring
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.15);
 
-      osc2.start(now + 0.05);
-      osc2.stop(now + 0.35);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.06, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } else {
+        // Standard Buzzi Chime
+        const osc1 = actx.createOscillator();
+        const gain1 = actx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(880, now); // A5 note
+        gain1.gain.setValueAtTime(0.001, now);
+        gain1.gain.linearRampToValueAtTime(0.12, now + 0.02);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc1.connect(gain1);
+        gain1.connect(actx.destination);
+
+        // Note 2: high bright chime "ding" (staggered slightly for "ba-ding" effect)
+        const osc2 = actx.createOscillator();
+        const gain2 = actx.createGain();
+        osc2.type = "triangle";
+        osc2.frequency.setValueAtTime(1318.51, now + 0.05); // E6 note
+        gain2.gain.setValueAtTime(0.001, now + 0.05);
+        gain2.gain.linearRampToValueAtTime(0.15, now + 0.07);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+        osc2.connect(gain2);
+        gain2.connect(actx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.15);
+        osc2.start(now + 0.05);
+        osc2.stop(now + 0.35);
+      }
     } catch (e) {
       console.warn("Buzzi notification sound failed:", e);
     }
@@ -73,62 +127,258 @@ class BuzziAudioSynthesizer {
   }
 
   public playNudge(duration = 0.65) {
+    const scheme = this.getActiveScheme();
+    if (scheme === "mute") return;
+
     try {
       this.initCtx();
       if (!this.ctx) return;
-
       const actx = this.ctx;
       const now = actx.currentTime;
 
-      // Primary vibration oscillator
-      const osc = actx.createOscillator();
-      const gainNode = actx.createGain();
-      const lfo = actx.createOscillator();
-      const lfoGain = actx.createGain();
+      if (scheme === "classic_messenger") {
+        // Authentic Retro Messenger Nudge - shaking rattle with alarm chimes
+        const bufferSize = actx.sampleRate * 0.4;
+        const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
 
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(130, now); // base frequency rattle
-      osc.frequency.linearRampToValueAtTime(150, now + duration / 2);
-      osc.frequency.linearRampToValueAtTime(110, now + duration);
+        const noise = actx.createBufferSource();
+        noise.buffer = buffer;
 
-      // Fast modulation for rattle effect
-      lfo.type = "square";
-      lfo.frequency.setValueAtTime(35, now); // 35Hz vibration pulses
-      lfoGain.gain.setValueAtTime(0.35, now);
+        const filter = actx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(600, now);
+        filter.frequency.linearRampToValueAtTime(1600, now + 0.38);
 
-      gainNode.gain.setValueAtTime(0.001, now);
-      gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); // very snappy onset
-      gainNode.gain.setValueAtTime(0.25, now + duration - 0.08);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        const noiseGain = actx.createGain();
+        noiseGain.gain.setValueAtTime(0.12, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
 
-      lfo.connect(lfoGain);
-      lfoGain.connect(gainNode.gain);
-      osc.connect(gainNode);
-      gainNode.connect(actx.destination);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(actx.destination);
+        noise.start(now);
 
-      // High pitch alarm element overlay to make the shake noticeable
-      const warningOsc = actx.createOscillator();
-      const warningGain = actx.createGain();
-      warningOsc.type = "sine";
-      warningOsc.frequency.setValueAtTime(320, now);
-      warningOsc.frequency.linearRampToValueAtTime(280, now + duration);
-      
-      warningGain.gain.setValueAtTime(0.001, now);
-      warningGain.gain.linearRampToValueAtTime(0.07, now + 0.05);
-      warningGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        // Fast pitch modulation shaker
+        const osc1 = actx.createOscillator();
+        const osc2 = actx.createOscillator();
+        const gainNode = actx.createGain();
 
-      warningOsc.connect(warningGain);
-      warningGain.connect(actx.destination);
+        osc1.type = "sawtooth";
+        osc1.frequency.setValueAtTime(180, now);
+        osc1.frequency.linearRampToValueAtTime(130, now + 0.35);
 
-      osc.start(now);
-      lfo.start(now);
-      warningOsc.start(now);
+        osc2.type = "square";
+        osc2.frequency.setValueAtTime(200, now);
+        osc2.frequency.linearRampToValueAtTime(150, now + 0.35);
 
-      osc.stop(now + duration);
-      lfo.stop(now + duration);
-      warningOsc.stop(now + duration);
+        const lfo = actx.createOscillator();
+        const lfoGain = actx.createGain();
+        lfo.frequency.setValueAtTime(48, now);
+        lfoGain.gain.setValueAtTime(32, now);
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc1.frequency);
+        lfoGain.connect(osc2.frequency);
+
+        gainNode.gain.setValueAtTime(0.15, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(actx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        lfo.start(now);
+
+        osc1.stop(now + 0.4);
+        osc2.stop(now + 0.4);
+        lfo.stop(now + 0.4);
+
+        // Retro nudge double accent bells
+        const bell1 = actx.createOscillator();
+        const bgain1 = actx.createGain();
+        bell1.type = "triangle";
+        bell1.frequency.setValueAtTime(880, now + 0.12);
+        bgain1.gain.setValueAtTime(0.001, now + 0.12);
+        bgain1.gain.linearRampToValueAtTime(0.15, now + 0.14);
+        bgain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        bell1.connect(bgain1);
+        bgain1.connect(actx.destination);
+        bell1.start(now + 0.12);
+        bell1.stop(now + 0.45);
+
+        const bell2 = actx.createOscillator();
+        const bgain2 = actx.createGain();
+        bell2.type = "sine";
+        bell2.frequency.setValueAtTime(1174.66, now + 0.2); // D6
+        bgain2.gain.setValueAtTime(0.001, now + 0.2);
+        bgain2.gain.linearRampToValueAtTime(0.12, now + 0.22);
+        bgain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        bell2.connect(bgain2);
+        bgain2.connect(actx.destination);
+        bell2.start(now + 0.2);
+        bell2.stop(now + 0.55);
+
+      } else if (scheme === "retro_synth") {
+        // Chunky 8-bit crash/power-bump
+        const osc = actx.createOscillator();
+        const gainNode = actx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.linearRampToValueAtTime(50, now + duration);
+
+        const lfo = actx.createOscillator();
+        const lfoGain = actx.createGain();
+        lfo.frequency.setValueAtTime(12, now);
+        lfoGain.gain.setValueAtTime(100, now);
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(gainNode);
+        gainNode.connect(actx.destination);
+
+        osc.start(now);
+        lfo.start(now);
+        osc.stop(now + duration);
+        lfo.stop(now + duration);
+      } else {
+        // Base Buzzi vibration rattle
+        const osc = actx.createOscillator();
+        const gainNode = actx.createGain();
+        const lfo = actx.createOscillator();
+        const lfoGain = actx.createGain();
+
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(130, now); // base frequency rattle
+        osc.frequency.linearRampToValueAtTime(150, now + duration / 2);
+        osc.frequency.linearRampToValueAtTime(110, now + duration);
+
+        // Fast modulation for rattle effect
+        lfo.type = "square";
+        lfo.frequency.setValueAtTime(35, now); // 35Hz vibration pulses
+        lfoGain.gain.setValueAtTime(0.35, now);
+
+        gainNode.gain.setValueAtTime(0.001, now);
+        gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); // very snappy onset
+        gainNode.gain.setValueAtTime(0.25, now + duration - 0.08);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(gainNode.gain);
+        osc.connect(gainNode);
+        gainNode.connect(actx.destination);
+
+        // High pitch alarm element overlay to make the shake noticeable
+        const warningOsc = actx.createOscillator();
+        const warningGain = actx.createGain();
+        warningOsc.type = "sine";
+        warningOsc.frequency.setValueAtTime(320, now);
+        warningOsc.frequency.linearRampToValueAtTime(280, now + duration);
+        
+        warningGain.gain.setValueAtTime(0.001, now);
+        warningGain.gain.linearRampToValueAtTime(0.07, now + 0.05);
+        warningGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        warningOsc.connect(warningGain);
+        warningGain.connect(actx.destination);
+
+        osc.start(now);
+        lfo.start(now);
+        warningOsc.start(now);
+
+        osc.stop(now + duration);
+        lfo.stop(now + duration);
+        warningOsc.stop(now + duration);
+      }
     } catch (e) {
       console.warn("Buzzi nudge sound failed to synthesize:", e);
+    }
+  }
+
+  // Authentic/Nostalgic sign-in sounds played upon connection / authentication success
+  public playLogin() {
+    const scheme = this.getActiveScheme();
+    if (scheme === "mute") return;
+
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+
+      if (scheme === "classic_messenger") {
+        // Beautiful ascending chime arpeggio - classic online messenger sound!
+        const notes = [659.25, 783.99, 987.77, 1318.51, 1567.98, 1975.53]; // E5, G5, B5, E6, G6, B6
+        notes.forEach((freq, idx) => {
+          const t = now + (idx * 0.038);
+          const osc = actx.createOscillator();
+          const gain = actx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t);
+          
+          gain.gain.setValueAtTime(0.001, t);
+          gain.gain.linearRampToValueAtTime(0.09, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+          osc.connect(gain);
+          gain.connect(actx.destination);
+          
+          osc.start(t);
+          osc.stop(t + 0.38);
+        });
+      } else if (scheme === "retro_synth") {
+        // Retro chiptune victory level-up chord
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const t = now + (idx * 0.08);
+          const osc = actx.createOscillator();
+          const gain = actx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, t);
+          
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+          
+          osc.connect(gain);
+          gain.connect(actx.destination);
+          osc.start(t);
+          osc.stop(t + 0.3);
+        });
+      } else {
+        // Buzzi standard sign-in (cheerful double chime)
+        const osc1 = actx.createOscillator();
+        const gain1 = actx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(523.25, now); // C5
+        gain1.gain.setValueAtTime(0.1, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc1.connect(gain1);
+        gain1.connect(actx.destination);
+
+        const osc2 = actx.createOscillator();
+        const gain2 = actx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(783.99, now + 0.1); // G5
+        gain2.gain.setValueAtTime(0.12, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc2.connect(gain2);
+        gain2.connect(actx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.21);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.5);
+      }
+    } catch (e) {
+      console.warn("Buzzi login sound failed:", e);
     }
   }
 

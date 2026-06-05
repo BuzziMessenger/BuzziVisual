@@ -17,6 +17,9 @@ const FRIEND_REQUESTS_FILE = path.join(process.cwd(), "data_friend_requests.json
 const isVercel = !!process.env.VERCEL;
 const inMemoryCache: Record<string, any> = {};
 
+// In-memory store for active typing statuses: senderUid -> { typingTo, lastActive: number }
+const activeTypingState: Record<string, { typingTo: string; lastActive: number }> = {};
+
 function readJsonFile<T>(filePath: string, defaultVal: T): T {
   if (isVercel) {
     if (inMemoryCache[filePath] === undefined) {
@@ -138,6 +141,39 @@ app.get("/api/db/status", async (req, res) => {
     }
   });
 
+  // DOWNLOAD API: Download simulate retro APK for Android
+  app.get("/api/download/apk", (req, res) => {
+    const fileContent = "BUZZIMESSENGER_MOBILE_CLIENT v1.2.0-Buzzi\n\n" +
+      "Hallo retro chatter! Dit is de officiële mobiele Buzzi Messenger APK voor Android!\n\n" +
+      "Schakel 'Onbekende bronnen' in bij de beveiligingsinstellingen van je GSM om deze retro-ervaring direct op je telefoon te installeren!\n\n" +
+      "💬 Veel plezier met inbellen, nudges sturen en Buzzi-geluiden!\n\n" +
+      "www.buzzimessenger.nl";
+    
+    const buffer = Buffer.from(fileContent, "utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger.apk");
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Length", buffer.length);
+    res.status(200).send(buffer);
+  });
+
+  // DOWNLOAD API: Download simulate retro EXE for Windows
+  app.get("/api/download/exe", (req, res) => {
+    const fileContent = "BUZZIMESSENGER_DESKTOP_CLIENT v1.2.0-XP\n\n" +
+      "Hallo retro chatter! Dit is de Windows Desktop-versie van Buzzi Messenger!\n\n" +
+      "Systeemvereisten:\n" +
+      "- Windows 98, ME, 2000, XP, Vista, of Windows 11 met inbelverbinding (56k modem recommended).\n" +
+      "- DirectX 9.0c en minimaal 64MB RAM.\n" +
+      "- Optioneel: Creative Labs SoundBlaster Live! geluidskaart voor kristalheldere Nudge-trillingen!\n\n" +
+      "💬 Veel plezier met inbellen en chatten!\n\n" +
+      "www.buzzimessenger.nl";
+
+    const buffer = Buffer.from(fileContent, "utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger.exe");
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Length", buffer.length);
+    res.status(200).send(buffer);
+  });
+
   // DB API: Get Messages (MongoDB or Local File backup)
   app.get("/api/db/messages", async (req, res) => {
     try {
@@ -203,6 +239,57 @@ app.get("/api/db/status", async (req, res) => {
     }
   });
 
+  // DB API: Post User Typing Status
+  app.post("/api/db/typing", (req, res) => {
+    try {
+      const { senderUid, typingTo, isTyping } = req.body;
+      if (!senderUid) {
+        res.status(400).json({ error: "Missing senderUid" });
+        return;
+      }
+
+      if (isTyping) {
+        activeTypingState[senderUid] = {
+          typingTo: typingTo || "",
+          lastActive: Date.now()
+        };
+      } else {
+        delete activeTypingState[senderUid];
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Get Active Typing Statuses for a recipient
+  app.get("/api/db/typing", (req, res) => {
+    try {
+      const recipient = req.query.recipient as string;
+      if (!recipient) {
+        res.status(400).json({ error: "Missing recipient query parameter" });
+        return;
+      }
+
+      const now = Date.now();
+      const typingUsers: string[] = [];
+
+      // Prune inactive typing records (older than 2.5 seconds to make sure it respects the 2 second threshold but allows slight debounce network margin)
+      Object.entries(activeTypingState).forEach(([senderUid, data]) => {
+        if (now - data.lastActive > 2500) {
+          delete activeTypingState[senderUid];
+        } else if (data.typingTo === recipient) {
+          typingUsers.push(senderUid);
+        }
+      });
+
+      res.json({ typingUsers });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // DB API: Get Users (MongoDB or Local File backup)
   app.get("/api/db/users", async (req, res) => {
     try {
@@ -235,23 +322,29 @@ app.get("/api/db/status", async (req, res) => {
 
       const docToInsert = {
         ...userData,
-        // Fallback: set 'naam' (the Dutch term for name) to a unique value (the user's uid)
-        // so that if dropping the unique index 'naam_1' failed, MongoDB encounters no duplicate keys
         naam: userData.uid,
         updatedAtTimestamp: Date.now()
       };
+      
+      // Remove Mongo _id field if it was passed from the frontend to avoid immutable field update errors
+      if (docToInsert._id !== undefined) {
+        delete docToInsert._id;
+      }
 
       let savedOk = false;
       if (dbInstance) {
         try {
+          console.log(`[DB] Saving profile for UID ${userData.uid} (Name: ${userData.name}) to MongoDB...`);
           await dbInstance.collection("users").updateOne(
             { uid: userData.uid },
             { $set: docToInsert },
             { upsert: true }
           );
+          console.log(`[DB] Successfully saved profile for UID ${userData.uid} to MongoDB.`);
           savedOk = true;
-        } catch (mongoErr) {
-          console.warn("MongoDB save user failed, falling back to local storage:", mongoErr);
+        } catch (mongoErr: any) {
+          console.warn("[DB] MongoDB save user failed with error:", mongoErr.message || mongoErr);
+          console.warn("[DB] Falling back to local/JSON storage...");
         }
       }
 
@@ -322,7 +415,7 @@ app.get("/api/db/status", async (req, res) => {
         return;
       }
 
-      // Sanitize group name to look like classic MSN channels: lowercased, hyphens, no special symbols
+      // Sanitize group name to look like classic chat channels: lowercased, hyphens, no special symbols
       const sanitizedName = name
         .toLowerCase()
         .replace(/[^a-z0-9-_ ]/g, "")

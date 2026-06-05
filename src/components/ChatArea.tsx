@@ -27,6 +27,11 @@ import {
 } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 
+const isCustomAvatar = (avatar: string) => {
+  if (!avatar) return false;
+  return avatar.length > 5 || avatar.startsWith("data:") || avatar.startsWith("http") || avatar.startsWith("/");
+};
+
 interface ChatAreaProps {
   activeId: string;
   activeType: "channel" | "dm";
@@ -39,6 +44,7 @@ interface ChatAreaProps {
   myDisplayName: string;
   myAvatar: string;
   myUserId?: string;
+  onUserTyping?: () => void;
 }
 
 const BUZZI_EMOTICONS = [
@@ -90,12 +96,12 @@ const WINKS_LIST = [
   { id: "water", title: "Waterballon", icon: "🎈", desc: "Gooi een waterballon tegen het scherm en laat het druipen!" },
   { id: "guitar", title: "Luchtgitaar", icon: "🎸", desc: "Scheur op een vette elektrische gitaar met bliksem en sterren!" },
   { id: "heart", title: "Hartjes Explosie", icon: "💖", desc: "Een groot kloppend hart dat kapot schiet in tientallen harten." },
-  { id: "ghost", title: "MSN Spookje", icon: "👻", desc: "Een spooky groen Buzzi-spookje dat over je scherm zweeft!" },
+  { id: "ghost", title: "Buzzi Spookje", icon: "👻", desc: "Een spooky groen Buzzi-spookje dat over je scherm zweeft!" },
   { id: "kiss", title: "Klop Kus-afdruk", icon: "💋", desc: "Een grote lippenstift-kusafdruk die op je scherm stempelt!" },
   { id: "disco", title: "Retro Disco Bal", icon: "🪩", desc: "Laat een flitsende neon discobal over je scherm draaien!" },
   { id: "laser", title: "Neon Laser Ogen", icon: "👁️", desc: "Zet je laserblik op scherp en splits het scherm in tweeën!" },
   { id: "alien", title: "Spaceship UFO", icon: "🛸", desc: "Laat een buitenaards ruimteschip de boel ontvoeren met felle lichten!" },
-  { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende MSN-banaan swingt over je scherm!" }
+  { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende banaan swingt over je scherm!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -109,7 +115,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onBuzzIncoming,
   myDisplayName,
   myAvatar,
-  myUserId
+  myUserId,
+  onUserTyping
 }) => {
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
@@ -702,9 +709,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="flex flex-col items-center">
             <span className="text-[10px] text-slate-400 font-bold tracking-tight uppercase mb-1">Hun DP</span>
             <div className="w-[82px] h-[82px] bg-white p-1 rounded border-2 border-[#aabed4] shadow flex items-center justify-center overflow-hidden">
-              <span className="text-4xl filter drop-shadow-sm select-none">
-                {activeContact ? activeContact.avatar : "👥"}
-              </span>
+              {activeContact && isCustomAvatar(activeContact.avatar) ? (
+                <img src={activeContact.avatar} alt="Active Contact" className="w-full h-full object-cover rounded-xs" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="text-4xl filter drop-shadow-sm select-none">
+                  {activeContact ? activeContact.avatar : "👥"}
+                </span>
+              )}
             </div>
             <span className="text-[9.5px] font-semibold text-slate-600 truncate max-w-[80px] mt-1 text-center font-mono">
               {activeContact ? activeContact.name.split(" ")[0] : "Groep"}
@@ -716,7 +727,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* My Avatar */}
           <div className="flex flex-col items-center">
             <div className="w-[82px] h-[82px] bg-white p-1 rounded border-2 border-[#aabed4] shadow flex items-center justify-center overflow-hidden hover:rotate-2 transition-transform">
-              <span className="text-4xl filter drop-shadow-sm select-none">{myAvatar}</span>
+              {isCustomAvatar(myAvatar) ? (
+                <img src={myAvatar} alt="My Avatar" className="w-full h-full object-cover rounded-xs" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="text-4xl filter drop-shadow-sm select-none">{myAvatar}</span>
+              )}
             </div>
             <span className="text-[9.5px] font-semibold text-slate-600 truncate max-w-[80px] mt-1 text-center font-mono">
               {myDisplayName.split(" ")[0]}
@@ -1136,107 +1151,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       </div>
 
-      {/* 2004 MSN Messenger style "Now Listening" ("Nu Luisterend") music status bar */}
-      <div className="bg-[#f0f6fc] border-t border-[#bad0e3] px-4 py-1.5 flex items-center justify-between text-[11px] text-slate-700 font-sans shadow-inner shrink-0 select-none">
-        
-        {/* Style Tag inside ChatArea to guarantee self-contained, working CSS keyframes */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          @keyframes visualizer-bar-dance {
-            0%, 100% { height: 3px; }
-            50% { height: 13px; }
-          }
-          .animate-visualizer-1 { animation: visualizer-bar-dance 0.75s ease-in-out infinite; }
-          .animate-visualizer-2 { animation: visualizer-bar-dance 0.45s ease-in-out infinite; }
-          .animate-visualizer-3 { animation: visualizer-bar-dance 0.85s ease-in-out infinite; }
-          .animate-visualizer-4 { animation: visualizer-bar-dance 0.55s ease-in-out infinite; }
 
-          @keyframes marquee-scroll-left {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
-          }
-          .animate-marquee-scroll-left {
-            display: inline-block;
-            animation: marquee-scroll-left 14s linear infinite;
-          }
-        `}} />
-
-        {/* Music status label and progress/visualizer */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-4">
-          
-          {/* Animated Retro Music Note or Visualizer */}
-          <div className="bg-emerald-500 text-white rounded p-1 shadow-sm flex items-center justify-center flex-shrink-0 relative overflow-hidden h-6 w-6">
-            {getMusicStatus().isPlaying ? (
-              <div className="flex items-end gap-[1.5px] h-3.5 w-4 justify-center">
-                <div className="w-[2.5px] bg-white animate-visualizer-1 rounded-t-xs" />
-                <div className="w-[2.5px] bg-white animate-visualizer-2 rounded-t-xs" style={{ animationDelay: '0.1s' }} />
-                <div className="w-[2.5px] bg-white animate-visualizer-3 rounded-t-xs" style={{ animationDelay: '0.2s' }} />
-                <div className="w-[2.5px] bg-white animate-visualizer-4 rounded-t-xs" style={{ animationDelay: '0.05s' }} />
-              </div>
-            ) : (
-              <Music className="w-3.5 h-3.5 text-white/95" />
-            )}
-          </div>
-
-          {/* Ticker marquee container */}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-emerald-700 uppercase tracking-wide text-[9px] flex items-center gap-1 shrink-0 bg-emerald-50 border border-emerald-200/50 px-1 rounded">
-                <Headphones className="w-2.5 h-2.5" />
-                <span>NU LUISTEREND naar</span>
-              </span>
-              
-              <span className="text-[10px] text-slate-400 font-medium truncate shrink-0">
-                ({activeType === "channel" ? "Groepsradio" : activeContact?.name || "Buzzi"}) -
-              </span>
-            </div>
-
-            {/* Marquee effect wrapper */}
-            <div className="relative overflow-hidden w-full h-4 mt-0.5 bg-white border border-[#abc4df]/30 rounded px-2 flex items-center shadow-inner">
-              <div 
-                className={`text-[11px] font-bold text-slate-800 font-mono whitespace-nowrap select-all cursor-copy ${getMusicStatus().isPlaying ? 'animate-marquee-scroll-left' : ''}`}
-                style={!getMusicStatus().isPlaying ? { transform: 'translateX(0)' } : undefined}
-                title="Dubbelklik om nummer te kopiëren"
-              >
-                🎵 {getMusicStatus().track} 🚀 {getMusicStatus().isPlaying ? "[ LIVE RETRO STREAM ]" : "[ GEPAUZEERD - Walkman sluit af... ]"} 🎵
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Media Controls */}
-        <div className="flex items-center gap-1 shrink-0 bg-[#cbdcf0]/40 border border-[#bad0e3]/45 rounded-lg p-0.5 shadow-xs">
-          {/* Skip Back */}
-          <button
-            onClick={handleMusicPrev}
-            className="hover:bg-white text-slate-600 hover:text-emerald-600 p-1 rounded-md active:scale-90 transition-all cursor-pointer"
-            title="Vorig nummer"
-          >
-            <SkipBack className="w-3 h-3" />
-          </button>
-
-          {/* Play / Pause Toggle */}
-          <button
-            onClick={handleMusicTogglePlay}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white p-1 rounded-md active:scale-95 transition-all shadow-sm cursor-pointer"
-            title={getMusicStatus().isPlaying ? "Pauzeer muziek" : "Speel muziek af"}
-          >
-            {getMusicStatus().isPlaying ? (
-              <Pause className="w-3 h-3 fill-current" />
-            ) : (
-              <Play className="w-3 h-3 fill-current ml-[1px]" />
-            )}
-          </button>
-
-          {/* Skip Forward */}
-          <button
-            onClick={handleMusicNext}
-            className="hover:bg-white text-slate-600 hover:text-emerald-600 p-1 rounded-md active:scale-90 transition-all cursor-pointer"
-            title="Volgend nummer"
-          >
-            <SkipForward className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
 
       {/* Input Action Panel (Separated into rich area text in MSI clone) */}
       <div className="p-4 bg-white border-t border-[#bad0e3] shadow-inner-lg">
@@ -1257,7 +1172,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <input
               type="text"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                if (onUserTyping) {
+                  onUserTyping();
+                }
+              }}
               onKeyDown={handleKeyPress}
               placeholder={
                 activeId === "queen"

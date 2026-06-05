@@ -8,9 +8,10 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
 import { hiveAudio } from "./utils/audio";
-import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send } from "lucide-react";
+import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send, Smartphone, Laptop, Volume2 } from "lucide-react";
 import { LoginScreen } from "./components/LoginScreen";
 import { Minesweeper } from "./components/Minesweeper";
+import { LegalModal } from "./components/LegalModal";
 
 function simpleHash(str: string): string {
   let hash = 0;
@@ -186,7 +187,12 @@ export default function App() {
   
   // App-status
   const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
-  const [isTyping, setIsTyping] = useState(false);
+  const [serverTypingUsers, setServerTypingUsers] = useState<string[]>([]);
+  const [simulatedTyping, setSimulatedTyping] = useState<Record<string, boolean>>({});
+  const isCurrentChatPartnerTyping = !!(simulatedTyping[activeId] || serverTypingUsers.includes(activeId));
+  const setIsTyping = (typing: boolean) => {
+    setSimulatedTyping(prev => ({ ...prev, [activeId]: typing }));
+  };
   const [isBuzzingFlash, setIsBuzzingFlash] = useState(false);
 
   // Custom User Profile configuration for Buzzi Clone
@@ -210,6 +216,25 @@ export default function App() {
   const [isNaamVersierderExpanded, setIsNaamVersierderExpanded] = useState(false);
   const [isBlockCheckerExpanded, setIsBlockCheckerExpanded] = useState(false);
   const [isInviteExpanded, setIsInviteExpanded] = useState(false);
+  const [isAppsExpanded, setIsAppsExpanded] = useState(false);
+  const [isSoundSchemeExpanded, setIsSoundSchemeExpanded] = useState(false); // Default collapsed
+
+  // Retro sound scheme preference loaded/saved
+  const [soundScheme, setSoundScheme] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("buzzi_sound_scheme") || "default";
+    }
+    return "default";
+  });
+
+  // GDPR Cookie consent and legal disclaimer state
+  const [showCookieBanner, setShowCookieBanner] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("buzzi_legal_cookies_accepted") !== "true";
+    }
+    return false;
+  });
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
 
   // Buzzi Clone interactive tools state
   const [generatedName, setGeneratedName] = useState("");
@@ -429,24 +454,43 @@ export default function App() {
         setUserStatus("online");
         setUserListeningTo("");
       } else {
-        // Load existing saved profile details securely!
-        setUserDisplayName(currentProfile.name || defaultName);
+        // Load existing saved profile details securely, preferring local changes to prevent stale server overrides!
+        const localSavedName = localStorage.getItem("buzzi_remembered_name") || user.displayName || user.name || "";
+        const finalName = localSavedName || currentProfile.name || defaultName;
+        setUserDisplayName(finalName);
+
         setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)");
         setUserAvatar(currentProfile.avatar || "🧑‍🚀");
         setUserStatus((currentProfile.status as StatusType) || "online");
         setUserListeningTo(currentProfile.listeningTo || "");
 
         // Keep local storage synchronized for persistent seamless log-ins
-        if (currentProfile.name) {
-          localStorage.setItem("buzzi_remembered_name", currentProfile.name);
-          const savedUser = localStorage.getItem("buzzi_user");
-          if (savedUser) {
-            try {
-              const parsed = JSON.parse(savedUser);
-              parsed.displayName = currentProfile.name;
-              localStorage.setItem("buzzi_user", JSON.stringify(parsed));
-            } catch (e) {}
-          }
+        localStorage.setItem("buzzi_remembered_name", finalName);
+        const savedUser = localStorage.getItem("buzzi_user");
+        if (savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            parsed.displayName = finalName;
+            localStorage.setItem("buzzi_user", JSON.stringify(parsed));
+          } catch (e) {}
+        }
+
+        // Self-heal: If database and local storage disagreed on the name, push the local preferred name to database!
+        if (currentProfile.name !== finalName) {
+          console.log(`[Sync] Self-healing name sync: Local "${finalName}" -> Database was "${currentProfile.name}"`);
+          fetch("/api/db/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: user.uid,
+              name: finalName,
+              email: user.email || "",
+              avatar: currentProfile.avatar || "🧑‍🚀",
+              status: currentProfile.status || "online",
+              personalMessage: currentProfile.personalMessage || "",
+              listeningTo: currentProfile.listeningTo || ""
+            })
+          }).catch(err => console.warn("Failed self-healing update:", err));
         }
       }
     } catch (err) {
@@ -873,17 +917,6 @@ export default function App() {
           })
         });
         
-        // Also send a reciprocal request back so they see us instantly too!
-        await fetch("/api/friend-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fromEmail: currentUser?.email || "",
-            fromName: userDisplayName,
-            toEmail: fromEmail
-          })
-        });
-        
         // Sync users list immediately
         const syncRes = await fetch("/api/db/users?t=" + Date.now());
         if (syncRes.status === 200) {
@@ -1192,7 +1225,20 @@ export default function App() {
     localStorage.setItem("buzzi_user", JSON.stringify(mockUser));
     setCurrentUser(mockUser);
     setUserDisplayName(name);
+    // Play connection / login jingle based on chosen sound scheme !
+    setTimeout(() => {
+      hiveAudio.playLogin();
+    }, 150);
     await initUserProfile(mockUser, name);
+  };
+
+  const handleUpdateSoundScheme = (scheme: string) => {
+    localStorage.setItem("buzzi_sound_scheme", scheme);
+    setSoundScheme(scheme);
+    // Play a test chime corresponding to the newly selected scheme
+    setTimeout(() => {
+      hiveAudio.playNotification();
+    }, 80);
   };
 
   // Sound and Visual screen shake triggers
@@ -1312,9 +1358,91 @@ export default function App() {
     }
   };
 
+  // Handle user typing state and sync to server-side
+  const isLocallyTyping = useRef(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const sendTypingStatusToServer = async (typing: boolean) => {
+    if (!currentUser || activeType !== "dm" || !activeId) return;
+    try {
+      await fetch("/api/db/typing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          senderUid: currentUser.uid,
+          typingTo: activeId,
+          isTyping: typing
+        })
+      });
+    } catch (err) {
+      console.warn("Failed to update server typing status:", err);
+    }
+  };
+
+  const handleUserTyping = () => {
+    if (!currentUser || activeType !== "dm" || !activeId) return;
+
+    if (!isLocallyTyping.current) {
+      isLocallyTyping.current = true;
+      sendTypingStatusToServer(true);
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      isLocallyTyping.current = false;
+      sendTypingStatusToServer(false);
+    }, 2000); // 2 seconds of inactivity
+  };
+
+  // Clean up user typing state when switching conversations
+  useEffect(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    if (isLocallyTyping.current) {
+      isLocallyTyping.current = false;
+      sendTypingStatusToServer(false);
+    }
+  }, [activeId, activeType]);
+
+  // Poll typing statuses from other players to current user
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchTyping = async () => {
+      try {
+        const res = await fetch(`/api/db/typing?recipient=${encodeURIComponent(currentUser.uid)}&t=${Date.now()}`);
+        if (res.status === 200) {
+          const { typingUsers } = await res.json();
+          setServerTypingUsers(typingUsers || []);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch typing status:", err);
+      }
+    };
+
+    fetchTyping();
+    const interval = setInterval(fetchTyping, 1800);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   // Sending a message
   const handleSendMessage = async (text: string, isBuzz: boolean = false, isWink: boolean = false, winkId?: string) => {
     if (!currentUser) return;
+
+    // Reset local typing state immediately on message send
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    if (isLocallyTyping.current) {
+      isLocallyTyping.current = false;
+      sendTypingStatusToServer(false);
+    }
 
     // Save to Database server-side first (MongoDB or Local File backup)
     await saveMessageToDatabase({
@@ -1512,12 +1640,55 @@ export default function App() {
   }
 
   return (
-    <div 
-      className={`flex h-screen w-screen overflow-hidden bg-slate-100 relative transition-transform duration-100 pb-14 md:pb-0 ${
-        isBuzzingFlash ? "bg-red-50 animate-pulse scale-[0.99]" : ""
-      }`}
-      id="buzzi_workspace"
-    >
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100">
+      {showCookieBanner && (
+        <div className="bg-[#FFFFE1] border-b-2 border-[#D6C176] shadow-sm flex items-center justify-between px-4 py-2.5 text-[10.5px] font-sans text-[#5c4a1e] select-none shrink-0 relative z-[999] gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">🍪</span>
+            <div className="text-left leading-relaxed">
+              <span className="font-bold">Buzzi Privacy &amp; Cookies:</span> We gebruiken functionele, tijdelijke browser-cookies om je aanmelding, profiel en retro geluidsschema te onthouden. Door deze site te gebruiken stem je in met onze{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLegalModalOpen(true);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="underline font-black text-[#1c427f] hover:text-blue-950 cursor-pointer inline-block"
+              >
+                Gebruikersvoorwaarden &amp; Privacyverklaring
+              </button>.
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                localStorage.setItem("buzzi_legal_cookies_accepted", "true");
+                setShowCookieBanner(false);
+                hiveAudio.playLogin();
+              }}
+              className="bg-[#1C427F] hover:bg-[#153466] text-white font-extrabold px-3 py-1 rounded text-[9.5px] border border-[#0d2242] uppercase shadow-sm cursor-pointer select-none active:scale-95 transition-all text-center shrink-0"
+            >
+              ✓ Akkoord
+            </button>
+            <button
+              onClick={() => {
+                setIsLegalModalOpen(true);
+                hiveAudio.playHoneyPop();
+              }}
+              className="bg-white hover:bg-slate-100 text-slate-700 font-extrabold px-3 py-1 rounded text-[9.5px] border border-slate-300 shadow-sm cursor-pointer select-none active:scale-95 transition-all text-center shrink-0"
+            >
+              Lees voorwaarden
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div 
+        className={`flex-1 flex overflow-hidden relative transition-transform duration-100 pb-14 md:pb-0 ${
+          isBuzzingFlash ? "bg-red-50 animate-pulse scale-[0.99] animate-buzziShake" : ""
+        }`}
+        id="buzzi_workspace"
+      >
       {/* Golden Flash Alert Overlay for Nudges */}
       {isBuzzingFlash && (
         <div className="absolute inset-0 bg-red-500/10 pointer-events-none z-50 animate-pulse border-4 border-red-500" />
@@ -1575,12 +1746,13 @@ export default function App() {
           activeChannel={activeChannel}
           activeContact={activeContact}
           messages={messages[activeId] || []}
-          isTyping={isTyping}
+          isTyping={isCurrentChatPartnerTyping}
           onSendMessage={handleSendMessage}
           onBuzzIncoming={handleBuzzIncoming}
           myDisplayName={userDisplayName}
           myAvatar={userAvatar}
           myUserId={currentUser.uid}
+          onUserTyping={handleUserTyping}
         />
       </div>
 
@@ -1829,6 +2001,194 @@ export default function App() {
                       >
                         <span>✉️ Uitnodigen via E-mail</span>
                       </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Box 3.5: Buzzi App & Desktop Downloads */}
+              <div className="bg-gradient-to-b from-white to-[#f0f7ff] border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#00aeef]"></div>
+                
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsAppsExpanded(!isAppsExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:brightness-95/80 bg-gradient-to-b from-sky-50 to-[#e4f3ff] select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-[#113a69] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Smartphone className="w-4 h-4 text-[#00aeef]" />
+                    <span>Buzzi Messenger App installeren (APK / EXE) 📱💻</span>
+                  </h3>
+                  <span className="text-slate-500 font-mono text-xs font-bold">
+                    {isAppsExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {isAppsExpanded && (
+                  <div className="px-4 pb-4 pt-3 border-t border-[#abc4df]/40 bg-white/70 animate-fade-in space-y-3.5">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                      Wil je Buzzi Messenger altijd bij de hand hebben? Installeer de app nu direct op je mobiel of Windows pc!
+                    </p>
+
+                    {/* Download Buttons Container */}
+                    <div className="space-y-2">
+                      {/* Windows Desktop Client Download */}
+                      <a
+                        href="/api/download/exe"
+                        download="BuzziMessenger.exe"
+                        onClick={() => hiveAudio.playNotification()}
+                        className="w-full bg-gradient-to-r from-sky-500 to-[#00aeef] hover:to-sky-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#0089bd] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Laptop className="w-4 h-4 shrink-0 text-sky-100" />
+                          <div className="text-left">
+                            <span className="block font-bold leading-none">Buzzi Messenger voor Windows (.exe)</span>
+                            <span className="text-[9px] text-sky-100 font-normal">v1.2.0-XP (DirectX 9.0c)</span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] bg-sky-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">4.2 MB ⬇️</span>
+                      </a>
+
+                      {/* Android APK Download */}
+                      <a
+                        href="/api/download/apk"
+                        download="BuzziMessenger.apk"
+                        onClick={() => hiveAudio.playNotification()}
+                        className="w-full bg-gradient-to-r from-emerald-500 to-[#8cc63f] hover:to-emerald-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#76aa2f] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Smartphone className="w-4 h-4 shrink-0 text-emerald-100" />
+                          <div className="text-left">
+                            <span className="block font-bold leading-none">Android Installatiepakket (.apk)</span>
+                            <span className="text-[9px] text-emerald-100 font-normal">v1.2.0-Buzzi (Onbekende bronnen)</span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] bg-emerald-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">1.8 MB ⬇️</span>
+                      </a>
+                    </div>
+
+                    {/* Fun retro instructions */}
+                    <div className="bg-[#f0f6fc] border border-[#bcd2e8] rounded-md p-2 text-[10px] text-slate-500 leading-normal space-y-1 font-mono">
+                      <div className="font-extrabold text-blue-900 border-b border-[#abc4df]/50 pb-0.5 uppercase tracking-wider text-[8px] flex items-center gap-1">
+                        <span>💿 Snelle Installatie Handleiding:</span>
+                      </div>
+                      <p>
+                        ⚡ <strong className="text-slate-700">Windows:</strong> Voer <code className="bg-white px-1 py-0.2 rounded border">BuzziMessenger.exe</code> uit. Negeer Windows SmartScreen en schakel inbelmodem aan!
+                      </p>
+                      <p>
+                        📱 <strong className="text-slate-700">Android:</strong> Open het gedownloade <code className="bg-white px-1 py-0.2 rounded border">.apk</code> bestand, sta 'Installeren uit onbekende bronnen' toe onder Beveiligingsinstellingen!
+                      </p>
+                      <div className="text-[8px] text-slate-400 italic pt-1 border-t border-[#abc4df]/35">
+                        * Minimaal 64MB RAM en DirectX 9.0c aanbevolen. SoundBlaster Live-geluidskaart aangeraden voor nudge trillingen!
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Box 3.6: Retro Geluidsschema's (Sound Schemes) */}
+              <div className="bg-gradient-to-b from-white to-[#fdf9f2] border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
+                
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsSoundSchemeExpanded(!isSoundSchemeExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:brightness-95/85 bg-gradient-to-b from-amber-50 to-[#fcf0dc] select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-[#7c5011] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Volume2 className="w-4 h-4 text-amber-500 animate-pulse" />
+                    <span>Retro Geluidsschema's 🎵</span>
+                  </h3>
+                  <span className="text-slate-500 font-mono text-xs font-bold">
+                    {isSoundSchemeExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {isSoundSchemeExpanded && (
+                  <div className="px-4 pb-4 pt-3 border-t border-[#abc4df]/40 bg-white/70 animate-fade-in space-y-4">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                      Kies jouw favoriete retro geluidsstijl voor chatberichten, nudge-trillingen en inloggeluiden:
+                    </p>
+
+                    {/* Options List */}
+                    <div className="space-y-2">
+                      {[
+                        { id: "default", name: "🐝 Buzzi Origineel", desc: "Polyfone alarmbellen en retro trillingen op je pc" },
+                        { id: "classic_messenger", name: "💬 Klassieke Retro Messenger", desc: "De bekende 'tu-dut' chat-tune, sign-in harp en nudge alarm" },
+                        { id: "retro_synth", name: "👾 Retro 8-Bit / Synth", desc: "Coole space geluidseffecten en arcade synth-sweeps" },
+                        { id: "mute", name: "🔇 Dempen / Geen geluid", desc: "Helemaal stil, ideaal tijdens lessen of op werk!" }
+                      ].map((scheme) => (
+                        <label 
+                          key={scheme.id}
+                          className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer select-none transition-colors ${
+                            soundScheme === scheme.id 
+                              ? "bg-amber-500/10 border-amber-500/70" 
+                              : "bg-slate-50/70 border-slate-200 hover:bg-slate-100/60"
+                          }`}
+                        >
+                          <input 
+                            type="radio"
+                            name="soundSchemeOption"
+                            value={scheme.id}
+                            checked={soundScheme === scheme.id}
+                            onChange={() => handleUpdateSoundScheme(scheme.id)}
+                            className="mt-1 h-3.5 w-3.5 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <div className="space-y-0.5 pointer-events-none">
+                            <span className="text-[11px] font-black text-slate-800 tracking-tight leading-none block">
+                              {scheme.name}
+                            </span>
+                            <span className="text-[9px] text-slate-500 block leading-tight font-medium font-sans">
+                              {scheme.desc}
+                            </span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Preview Tests (Only show if not muted) */}
+                    {soundScheme !== "mute" && (
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                        <div className="text-[8.5px] font-black text-[#7c5011] uppercase tracking-wider">
+                          🔊 Luister en test geluiden direct:
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => hiveAudio.playNotification()}
+                            className="bg-white hover:bg-[#e4ecf7] border border-slate-300 rounded py-1 px-1.5 text-[9px] font-black text-slate-700 flex items-center justify-center gap-0.5 shadow-xs transition-colors active:scale-95 cursor-pointer truncate"
+                            title="Test Bericht Chime"
+                          >
+                            <span>🔔 Chime</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => hiveAudio.playNudge()}
+                            className="bg-white hover:bg-[#e4ecf7] border border-slate-300 rounded py-1 px-1.5 text-[9px] font-black text-slate-700 flex items-center justify-center gap-0.5 shadow-xs transition-colors active:scale-95 cursor-pointer truncate"
+                            title="Test Nudge Vibration"
+                          >
+                            <span>📳 Nudge</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => hiveAudio.playLogin()}
+                            className="bg-white hover:bg-[#e4ecf7] border border-slate-300 rounded py-1 px-1.5 text-[9px] font-black text-slate-700 flex items-center justify-center gap-0.5 shadow-xs transition-colors active:scale-95 cursor-pointer truncate"
+                            title="Test Sign-in Harp"
+                          >
+                            <span>🚪 Sign-In</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-[8.5px] text-slate-400 font-mono text-center pt-0.5 border-t border-dashed">
+                      Schema's direct gesynchroniseerd met lokaal backup-geheugen 💾
                     </div>
                   </div>
                 )}
@@ -2171,7 +2531,7 @@ export default function App() {
         <Minesweeper onClose={() => setIsMinesweeperOpen(false)} />
       )}
 
-      {/* Classic MSN / Windows XP Bubble Notice Toast */}
+      {/* Classic Windows XP Style Bubble Notice Toast */}
       {buzziToast && buzziToast.show && (
         <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[9999] bg-gradient-to-b from-[#FFFDF0] via-[#FFFFED] to-[#FFEAA1] border border-[#DE9E1F] rounded-xl shadow-2xl p-2.5 md:p-4 max-w-[260px] sm:max-w-[300px] md:max-w-[325px] flex items-start gap-2 md:gap-3 border-l-[4px] md:border-l-[6px] border-l-[#EAA406] animate-bounce select-none">
           {buzziToast.avatar && (
@@ -2191,6 +2551,9 @@ export default function App() {
           </div>
         </div>
       )}
+      </div>
+
+      <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
     </div>
   );
 }

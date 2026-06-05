@@ -1,8 +1,8 @@
 @echo off
 :: ==========================================
-:: MSN RETRO MESSENGER - DEPLOYMENT TOOL (2004 Style)
+:: RETRO MESSENGER - DEPLOYMENT TOOL (2004 Style)
 :: ==========================================
-title MSN Messenger Deployer (2004) - w00t!
+title Buzzi Messenger Deployer (2004) - w00t!
 color 0b
 
 echo.
@@ -84,7 +84,7 @@ echo.
 echo  3. Koppel je GitHub repository.
 echo.
 echo  4. Vul deze instellingen in:
-echo     - Name: msn-buzzi
+echo     - Name: buzzi-messenger
 echo     - Runtime: Node
 echo     - Build Command: npm install && npm run build
 echo     - Start Command: npm run start
@@ -118,9 +118,9 @@ goto menu
 :mongo
 echo.
 echo ==============================================================
-echo           RETRO MSN INTEGRATIE MET MONGODB GIDS
+echo           RETRO MESSENGER INTEGRATIE MET MONGODB GIDS
 echo ==============================================================
-echo  Om deze MSN Messenger groots te maken en berichten en buddy's echt
+echo  Om deze Buzzi Messenger groots te maken en berichten en buddy's echt
 echo  op te slaan, voeg je MongoDB toe als database in server.ts!
 echo.
 echo  1. Installeer mongoose lokaal:
@@ -158,6 +158,6 @@ goto exit
 
 :exit
 echo.
-echo Bedankt voor het gebruiken van de MSN Messenger Deployment Tool!
-echo Snel weer inloggen op MSN hoor! :-P
+echo Bedankt voor het gebruiken van de Buzzi Messenger Deployment Tool!
+echo Snel weer inloggen op Buzzi hoor! :-P
 pause

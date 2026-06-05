@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Smile, CircleAlert, ShieldCheck, Mail, User, Phone, CheckCircle2, ChevronRight, MessageSquareCode } from "lucide-react";
+import { Smile, CircleAlert, ShieldCheck, Mail, User, Phone, CheckCircle2, ChevronRight, MessageSquareCode, Camera, Upload } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
+import { LegalModal } from "./LegalModal";
+
+const isCustomAvatar = (avatar: string) => {
+  if (!avatar) return false;
+  return avatar.length > 5 || avatar.startsWith("data:") || avatar.startsWith("http") || avatar.startsWith("/");
+};
 
 interface LoginScreenProps {
   onLoginSuccess: (name: string, email: string) => void;
@@ -21,6 +27,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [activeTab, setActiveTab ] = useState<"custom" | "guest">("custom");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
   // Parse invite details from URL parameters
   const [invitedBy, setInvitedBy] = useState<string | null>(null);
@@ -33,6 +40,47 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [emailFlow, setEmailFlow] = useState<"login" | "register">("login");
   const [selectedAvatar, setSelectedAvatar] = useState("🧑‍🚀");
   const [personalMessage, setPersonalMessage] = useState("Lekker chatten op Buzzi met Buzzi Bot! B-)");
+
+  const handleRegisterAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 100;
+        const MAX_HEIGHT = 100;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setSelectedAvatar(dataUrl);
+          hiveAudio.playNotification();
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -427,11 +475,11 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     </div>
 
                     {/* Choose Emoji Avatar */}
-                    <div className="flex flex-col gap-1 text-left animate-fade-in">
+                    <div className="flex flex-col gap-1.5 text-left animate-fade-in">
                       <div className="flex items-center justify-between">
                         <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                           <span>🧩</span>
-                          <span>Kies je Buzzi Avatar (24 favorieten)</span>
+                          <span>Buzzi Avatar of Eigen Foto uploaden</span>
                         </label>
                         <button
                           type="button"
@@ -450,6 +498,31 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                           <span>🎲 Dobbelen!</span>
                         </button>
                       </div>
+
+                      {/* Custom Image Upload during Registration block */}
+                      <div className="flex items-center gap-3 bg-[#EAF2FA] p-2.5 rounded-xl border-2 border-[#B9CEDF] mb-1">
+                        <div className="w-12 h-12 bg-white rounded-lg border-2 border-[#1C427F] shadow-inner shrink-0 flex items-center justify-center overflow-hidden">
+                          {isCustomAvatar(selectedAvatar) ? (
+                            <img src={selectedAvatar} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className="text-2xl">{selectedAvatar}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <label className="cursor-pointer bg-[#1C427F] hover:bg-sky-800 text-white font-black text-[9px] uppercase tracking-wider px-2.5 py-1.5 rounded-md text-center max-w-fit flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow">
+                            <Camera className="w-3 h-3" />
+                            <span>📷 Upload Eigen Foto</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleRegisterAvatarUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+                          <p className="text-[9px] text-[#1C427F] font-bold leading-none">Of klik hieronder op een retro Buzzi avatar:</p>
+                        </div>
+                      </div>
+
                       <div className="bg-[#DCE7F3] p-1.5 rounded-lg border border-[#B9CEDF] grid grid-cols-8 gap-1.5 justify-center">
                         {[
                           "🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾",
@@ -473,8 +546,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                         ))}
                       </div>
                       {/* Show current selection if it is a rolled custom one from the deep list of 48 */}
-                      {!["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "👑"].includes(selectedAvatar) && (
-                        <div className="mt-1 flex items-center gap-1.5 bg-[#CFE1F5] p-1 rounded border border-[#16427E] text-[10px] text-slate-800 font-bold self-start">
+                      {!isCustomAvatar(selectedAvatar) && !["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "👑"].includes(selectedAvatar) && (
+                        <div className="mt-1 flex items-center gap-1.5 bg-[#CFE1F5] p-1 rounded border border-[#16427E] text-[10px] text-slate-800 font-bold self-start animate-fade-in">
                           <span>Gedobbeld:</span>
                           <span className="text-sm bg-white aspect-square h-5 rounded flex items-center justify-center border">{selectedAvatar}</span>
                         </div>
@@ -593,8 +666,44 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         )}
 
         {/* Footer info containing terms */}
-        <div className="bg-[#E4ECF4] py-3 text-center border-t border-[#C7D7E9] text-[9.5px] font-mono text-slate-500 font-bold uppercase tracking-wider shrink-0">
-          © Buzzi Messenger Corporation 2026
+        <div className="bg-[#E4ECF4] py-2.5 px-4 text-center border-t border-[#C7D7E9] text-[9.5px] font-sans text-slate-500 font-bold flex flex-col gap-1.5 shrink-0 select-none">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[#1D5C8A]">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLegalModalOpen(true);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
+            >
+              📄 Gebruikersvoorwaarden & Privacy
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsLegalModalOpen(true);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
+            >
+              🍪 Cookiebeleid
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsLegalModalOpen(true);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
+            >
+              ⚖️ Juridische Disclaimer
+            </button>
+          </div>
+          <div className="text-[8.5px] font-mono text-slate-400 uppercase tracking-widest mt-0.5">
+            © Buzzi Messenger Parody 2026
+          </div>
         </div>
       </div>
 
@@ -602,6 +711,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center text-white/50 text-[9px] uppercase tracking-wider font-bold">
         Beveiligd door 128-bit SSL & Buzzi Gateways Ltd™
       </div>
+
+      <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
     </div>
   );
 }
