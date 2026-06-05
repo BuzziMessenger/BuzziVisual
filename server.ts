@@ -62,7 +62,7 @@ let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
 
 async function getMongoDb(): Promise<Db | null> {
-  const uri = process.env.MONGODB_URI || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
+  const uri = process.env.MONGODB_URI || "mongodb+srv://BuzziMessenger_db_user:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?retryWrites=true&w=majority&appName=BuzziMessenger";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
   
