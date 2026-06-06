@@ -24,7 +24,9 @@ import {
   Radio,
   Sliders,
   Camera,
-  Upload
+  Upload,
+  CheckCircle,
+  Slash
 } from "lucide-react";
 
 const isCustomAvatar = (avatar: string) => {
@@ -168,6 +170,13 @@ interface SidebarProps {
   onDeclineFriendRequest?: (id: string) => void;
   activeDbMode?: "mongodb" | "local";
   dbStatus?: any;
+
+  isUserPremium?: boolean;
+  onOpenPremiumModal?: () => void;
+  onToggleBlockContact?: (contactId: string) => void;
+
+  isSyncMusicEnabled?: boolean;
+  onToggleSyncMusic?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -196,7 +205,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAcceptFriendRequest,
   onDeclineFriendRequest,
   activeDbMode = "local",
-  dbStatus = null
+  dbStatus = null,
+  isUserPremium = false,
+  onOpenPremiumModal,
+  onToggleBlockContact,
+  isSyncMusicEnabled = false,
+  onToggleSyncMusic
 }) => {
   // Collapsible groups states
   const [onlineExpanded, setOnlineExpanded] = useState(true);
@@ -262,10 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Edit fields visibility
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
-  const [isEditingListening, setIsEditingListening] = useState(false);
   const [tempName, setTempName] = useState(userDisplayName);
   const [tempMessage, setTempMessage] = useState(userPersonalMessage);
-  const [tempListening, setTempListening] = useState(userListeningTo);
 
   // Live Contact Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,8 +302,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (isPlaying) {
       const track = RETRO_PLAYLIST[currentTrackIdx];
+      
+      // Update standard navigator.mediaSession metadata
+      if (typeof window !== "undefined" && "mediaSession" in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title,
+            artist: track.artist || "Buzzi Retro Player",
+            album: "Buzzi Messenger Hitlist",
+            artwork: [
+              { src: "https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=128&h=128&fit=crop", sizes: "128x128", type: "image/jpeg" }
+            ]
+          });
+          navigator.mediaSession.playbackState = "playing";
+        } catch {
+          // Ignore legacy environment issues
+        }
+      }
+
       onUpdateListeningTo(track.title);
     } else {
+      if (typeof window !== "undefined" && "mediaSession" in navigator) {
+        try {
+          navigator.mediaSession.playbackState = "paused";
+        } catch {}
+      }
       onUpdateListeningTo("");
     }
   }, [isPlaying, currentTrackIdx]);
@@ -393,10 +428,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setTempMessage(userPersonalMessage);
   }, [userPersonalMessage]);
 
-  useEffect(() => {
-    setTempListening(userListeningTo);
-  }, [userListeningTo]);
-
   const handleUpdateName = () => {
     onUpdateDisplayName(tempName.trim() || userEmail.split("#pwd_")[0].split("@")[0]);
     setIsEditingName(false);
@@ -405,11 +436,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleUpdateMessage = () => {
     onUpdatePersonalMessage(tempMessage.trim() || "Typ hier je weergavenaam of statusbericht...");
     setIsEditingMessage(false);
-  };
-
-  const handleUpdateListening = () => {
-    onUpdateListeningTo(tempListening.trim());
-    setIsEditingListening(false);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -584,7 +610,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {(cleanAdminEmail === "prinsrobbin@gmail.com" || userDisplayName?.toLowerCase().includes("robbin") || userDisplayName?.toLowerCase().includes("admin")) && (
                   <span className="text-amber-500 animate-pulse text-xs" title="Buzzi Systeem Administrator 👑">👑</span>
                 )}
-                <span>{userDisplayName}</span>
+                {isUserPremium && (
+                  <span className="text-amber-500 drop-shadow font-bold text-xs animate-bounce" title="Buzzi Premium VIP 👑">👑</span>
+                )}
+                <span className={isUserPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse drop-shadow-xs" : ""}>{userDisplayName}</span>
               </span>
             )}
 
@@ -646,60 +675,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {isEditingListening ? (
-            <input
-              type="text"
-              value={tempListening}
-              onChange={(e) => setTempListening(e.target.value)}
-              onBlur={handleUpdateListening}
-              onKeyDown={(e) => e.key === "Enter" && handleUpdateListening()}
-              className="w-full mt-1 text-[10px] bg-white border border-sky-400 rounded px-1 py-0.5 focus:outline-none"
-              autoFocus
-              placeholder="Typ status of muziek..."
-              maxLength={60}
-            />
-          ) : (
-            <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-500 truncate group/music">
-              <Music className={`w-3 h-3 flex-shrink-0 ${userListeningTo ? "text-sky-600 animate-pulse" : "text-slate-400"}`} />
-              {userListeningTo ? (
-                <span 
-                  onClick={() => {
-                    setTempListening(userListeningTo);
-                    setIsEditingListening(true);
-                  }}
-                  className="truncate text-slate-600 hover:text-[#1d5c8a] hover:bg-[#cfe1f5]/80 px-1 rounded cursor-pointer font-sans"
-                  title="Klik om muziekstatus te wijzigen"
-                >
-                  Luistert nu naar: <em className="text-sky-800 font-bold font-sans not-italic">{userListeningTo}</em>
-                </span>
-              ) : (
-                <span 
-                  onClick={() => {
-                    setTempListening("");
-                    setIsEditingListening(true);
-                  }}
-                  className="text-slate-400 hover:text-[#1d5c8a] cursor-pointer italic font-sans"
-                  title="Klik om muziek toe te voegen"
-                >
-                  Muziekstatus instellen...
-                </span>
-              )}
-              {userListeningTo && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTempListening("");
-                    onUpdateListeningTo("");
-                  }}
-                  className="text-[9px] text-rose-500 hover:text-rose-800 font-black cursor-pointer px-1 ml-0.5 opacity-40 hover:opacity-100"
-                  title="Muziekstatus leegmaken"
-                >
-                  ✕
-                </button>
-              )}
+          {userListeningTo && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500 truncate bg-sky-50/50 border border-sky-100 px-1.5 py-1 rounded">
+              <Music className="w-3.5 h-3.5 flex-shrink-0 text-sky-600 animate-pulse" />
+              <span className="truncate text-slate-600 font-sans" title={userListeningTo}>
+                Luistert nu naar: <em className="text-sky-800 font-bold font-sans not-italic">{userListeningTo}</em>
+              </span>
+              <button
+                type="button"
+                onClick={() => onUpdateListeningTo("")}
+                className="text-[10px] text-rose-500 hover:text-rose-800 font-black cursor-pointer px-1 ml-auto opacity-70 hover:opacity-100"
+                title="Muziekstatus wissen"
+              >
+                ✕
+              </button>
             </div>
           )}
+
+          {/* Sync music status toggle */}
+          <div className="mt-1 flex items-center gap-1.5 select-none shrink-0 text-[9.5px] text-slate-500 font-bold font-sans">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof hiveAudio !== "undefined") {
+                  hiveAudio.playNotification();
+                }
+                if (onToggleSyncMusic) {
+                  onToggleSyncMusic();
+                }
+              }}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border transition-all cursor-pointer ${
+                isSyncMusicEnabled
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-extrabold"
+                  : "bg-slate-50 text-slate-500 border-slate-300 hover:border-slate-400"
+              }`}
+              title="Automatisch muziek detecteren die je in je browser afspeelt"
+            >
+              <span>{isSyncMusicEnabled ? "🟢 Muziek Sync: AAN" : "⚪ Muziek Sync: UIT"}</span>
+            </button>
+            {isSyncMusicEnabled && (
+              <span className="text-[8.5px] text-emerald-600 animate-pulse font-normal italic shrink-0">
+                (luistert...)
+              </span>
+            )}
+          </div>
+
+          {/* Buzzi Premium Badge/Button */}
+          <div className="mt-1 flex items-center shrink-0">
+            {isUserPremium ? (
+              <div 
+                onClick={onOpenPremiumModal}
+                className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-300 rounded px-2 py-0.5 text-[9px] text-amber-800 font-extrabold shadow-sm select-none animate-pulse cursor-pointer hover:scale-105 transition-transform"
+                title="Buzzi Premium VIP is actief! Klik om voordelen te bekijken 👑"
+              >
+                <span>👑 Premium VIP Actief</span>
+              </div>
+            ) : (
+              <button 
+                type="button"
+                onClick={onOpenPremiumModal}
+                className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-600 text-slate-900 font-black border border-amber-600 rounded px-2 py-0.5 text-[9px] uppercase tracking-wider shadow-sm hover:brightness-110 cursor-pointer active:scale-95 transition-all"
+                title="Word Premium VIP! Klik om te upgraden 👑"
+              >
+                <span>👑 Word Premium VIP</span>
+              </button>
+            )}
+          </div>
 
           {onSignOut && (
             <button
@@ -1021,6 +1062,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <ul className="mt-1 space-y-0.5 pl-2">
               {onlineContacts.map((contact) => {
                 const isActive = activeType === "dm" && activeId === contact.id;
+                const isBlocked = (contact as any).isBlocked;
                 return (
                   <li key={contact.id} className="group/buddy relative flex items-center justify-between hover:bg-[#f0f4f9] rounded transition-all">
                     <button
@@ -1033,42 +1075,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <div className="relative">
                         {isCustomAvatar(contact.avatar) ? (
-                          <img src={contact.avatar} alt="Avatar" className="w-[28px] h-[28px] object-cover rounded border border-slate-300" referrerPolicy="no-referrer" />
+                          <img src={contact.avatar} alt="Avatar" className={`w-[28px] h-[28px] object-cover rounded border border-slate-300 ${isBlocked ? "opacity-40 grayscale" : ""}`} referrerPolicy="no-referrer" />
                         ) : (
-                          <span className="text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none">{contact.avatar}</span>
+                          <span className={`text-lg bg-slate-50 border border-slate-200 py-0.5 px-1 rounded block leading-none ${isBlocked ? "opacity-40 grayscale" : ""}`}>{contact.avatar}</span>
                         )}
-                        <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon(contact.status)}</span>
+                        <span className="absolute -bottom-1 -right-1 leading-none">{isBlocked ? "🚫" : getStatusIcon(contact.status)}</span>
                       </div>
                       
                       <div className="flex-1 min-w-0 pr-1">
-                        <span className="text-xs font-bold text-slate-800 truncate block flex items-center gap-1">
+                        <span className={`text-xs font-bold truncate block flex items-center gap-1 ${isBlocked ? "line-through text-slate-400" : "text-slate-800"}`}>
                           {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
                             <span className="text-amber-500 animate-pulse text-[10px]" title="Buzzi Systeem Administrator 👑">👑</span>
                           )}
-                          <span>{contact.name}</span>
+                          {contact.isPremium && (
+                            <span className="text-amber-500 drop-shadow font-bold text-[10px] animate-bounce shrink-0" title="Buzzi Premium VIP 👑">👑</span>
+                          )}
+                          <span className={contact.isPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse drop-shadow-xs" : ""}>
+                            {contact.name}
+                          </span>
+                          {isBlocked && (
+                            <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded-sm border border-red-200 font-extrabold shrink-0 uppercase tracking-wide">Geblokkeerd</span>
+                          )}
                         </span>
-                        <p className="text-[10.5px] text-slate-400 italic truncate leading-none mt-0.5">
+                        
+                        <p className={`text-[10.5px] italic truncate leading-none mt-0.5 ${isBlocked ? "text-slate-300" : "text-slate-400"}`}>
                           &ldquo;{contact.personalMessage}&rdquo;
                         </p>
-                      </div>
 
-                      {contact.listeningTo && (
-                        <Music className="w-3 h-3 text-sky-600 flex-shrink-0" title={`Luistert naar: ${contact.listeningTo}`} />
-                      )}
+                        {contact.listeningTo && !isBlocked && (
+                          <div className="text-[9.5px] text-[#0f679e] font-semibold flex items-center gap-1 mt-1 truncate">
+                            <Music className="w-2.5 h-2.5 shrink-0 text-sky-600 animate-pulse" />
+                            <span>Luistert nu naar: <span className="font-bold underline decoration-sky-300">{contact.listeningTo}</span></span>
+                          </div>
+                        )}
+                      </div>
                     </button>
 
-                    {onDeleteContact && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteContact(contact.id);
-                        }}
-                        className="opacity-0 group-hover/buddy:opacity-100 hover:text-red-600 p-1.5 text-slate-400 rounded-md transition-all mr-1 cursor-pointer hover:bg-red-50"
-                        title="Vriend Verwijderen"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-0.5 shrink-0 select-none">
+                      {onToggleBlockContact && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleBlockContact(contact.id);
+                          }}
+                          className={`${isBlocked ? "opacity-100" : "opacity-0 group-hover/buddy:opacity-100"} hover:bg-slate-200/50 p-1 rounded transition-all cursor-pointer`}
+                          title={isBlocked ? "Deblokkeer contact" : "Blokkeer contact"}
+                        >
+                          {isBlocked ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                          ) : (
+                            <Slash className="w-3.5 h-3.5 text-red-500" />
+                          )}
+                        </button>
+                      )}
+
+                      {onDeleteContact && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteContact(contact.id);
+                          }}
+                          className="opacity-0 group-hover/buddy:opacity-100 hover:text-red-600 p-1.5 text-slate-400 rounded-md transition-all mr-1 cursor-pointer hover:bg-red-50"
+                          title="Vriend Verwijderen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </li>
                 );
               })}

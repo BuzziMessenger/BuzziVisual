@@ -23,9 +23,15 @@ import {
   Pause,
   SkipForward,
   SkipBack,
-  Headphones
+  Headphones,
+  Video,
+  Paperclip,
+  Gamepad2
 } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
+import { WebcamCall } from "./WebcamCall";
+import { ChatGameDuel } from "./ChatGameDuel";
+import { FileTransfer } from "./FileTransfer";
 
 const isCustomAvatar = (avatar: string) => {
   if (!avatar) return false;
@@ -45,15 +51,21 @@ interface ChatAreaProps {
   myAvatar: string;
   myUserId?: string;
   onUserTyping?: () => void;
+  isBlocked?: boolean;
+  onToggleBlock?: () => void;
+  isUserPremium?: boolean;
+  onOpenPremiumModal?: () => void;
 }
 
 const BUZZI_EMOTICONS = [
   { code: ":-D", char: "😃", name: "Blij" },
+  { code: ":D", char: "😃", name: "Blij" },
   { code: "(H)", char: "😎", name: "Cool" },
   { code: "(A)", char: "😇", name: "Engeltje" },
   { code: "(L)", char: "❤️", name: "Hartje" },
   { code: "(U)", char: "💔", name: "Gebroken Hart" },
   { code: ":-P", char: "😜", name: "Tong" },
+  { code: ":P", char: "😜", name: "Tong" },
   { code: "(K)", char: "💋", name: "Kus" },
   { code: "(F)", char: "🌹", name: "Roos" },
   { code: "(W)", char: "🥀", name: "Verwelkt" },
@@ -63,8 +75,11 @@ const BUZZI_EMOTICONS = [
   { code: "(Y)", char: "👍", name: "Duim op" },
   { code: "(N)", char: "👎", name: "Duim neer" },
   { code: ":-O", char: "😲", name: "Verrast" },
+  { code: ":O", char: "😲", name: "Verrast" },
   { code: ";-)", char: "😉", name: "Knipoog" },
+  { code: ";)", char: "😉", name: "Knipoog" },
   { code: ":-(", char: "😢", name: "Verdrietig" },
+  { code: ":(", char: "😢", name: "Verdrietig" },
   { code: "(8)", char: "🎵", name: "Muziek" },
   { code: "(pl)", char: "🛹", name: "Skateboard" },
   { code: "(pi)", char: "🍕", name: "Pizza" },
@@ -101,7 +116,11 @@ const WINKS_LIST = [
   { id: "disco", title: "Retro Disco Bal", icon: "🪩", desc: "Laat een flitsende neon discobal over je scherm draaien!" },
   { id: "laser", title: "Neon Laser Ogen", icon: "👁️", desc: "Zet je laserblik op scherp en splits het scherm in tweeën!" },
   { id: "alien", title: "Spaceship UFO", icon: "🛸", desc: "Laat een buitenaards ruimteschip de boel ontvoeren met felle lichten!" },
-  { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende banaan swingt over je scherm!" }
+  { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende banaan swingt over je scherm!" },
+  { id: "cat", title: "Miauwend Poesje", icon: "🐱", desc: "Een schattig oranje katje dat spint en over je scherm huppelt!", isPremium: true },
+  { id: "dog", title: "Kwispelend Hondje", icon: "🐶", desc: "Een dolenthousiaste puppy die je beeldscherm aflikt!", isPremium: true },
+  { id: "poop", title: "Draaiende Drol", icon: "💩", desc: "Een maffe lachende drol met retro-synthesizer scheetgeluiden!", isPremium: true },
+  { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!", isPremium: true }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -116,7 +135,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   myDisplayName,
   myAvatar,
   myUserId,
-  onUserTyping
+  onUserTyping,
+  isBlocked = false,
+  onToggleBlock,
+  isUserPremium = false,
+  onOpenPremiumModal
 }) => {
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
@@ -125,6 +148,50 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [activeWink, setActiveWink] = useState<string | null>(null);
   const lastActiveId = useRef<string | null>(null);
   const processedWinkIds = useRef<Set<string>>(new Set());
+
+  // Webcam, spellen en bestand overdracht
+  const [showWebcamCall, setShowWebcamCall] = useState(false);
+  const [showGameDuel, setShowGameDuel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Reset webcam call en game duel bij gespreks-wisseling
+    setShowWebcamCall(false);
+    setShowGameDuel(false);
+  }, [activeId]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formattedSize = file.size > 1024 * 1024 
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+      : `${(file.size / 1024).toFixed(0)} KB`;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // Triggers MSN file transfer card in history logs
+      onSendMessage(
+        `*Verstuurt bestand: ${file.name} (${formattedSize})*`,
+        false,
+        false,
+        undefined,
+        {
+          name: file.name,
+          size: formattedSize,
+          progress: 0,
+          status: "sending",
+          dataUrl: dataUrl
+        }
+      );
+    };
+    reader.readAsDataURL(file);
+
+    if (e.target) {
+      e.target.value = "";
+    }
+  };
   
   // Custom font styling for retro Buzzi customization
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
@@ -341,6 +408,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         hiveAudio.playAlienWink();
       } else if (lastMsg.winkId === "banana") {
         hiveAudio.playBananaWink();
+      } else if (lastMsg.winkId === "cat") {
+        hiveAudio.playCatWink();
+      } else if (lastMsg.winkId === "dog") {
+        hiveAudio.playDogWink();
+      } else if (lastMsg.winkId === "poop") {
+        hiveAudio.playPoopWink();
+      } else if (lastMsg.winkId === "money") {
+        hiveAudio.playMoneyWink();
       }
 
       const timer = setTimeout(() => {
@@ -362,6 +437,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleSendWink = (winkId: string, title: string) => {
+    const wink = WINKS_LIST.find(w => w.id === winkId);
+    if (wink?.isPremium && !isUserPremium) {
+      if (onOpenPremiumModal) {
+        onOpenPremiumModal();
+      } else {
+        alert("Upgrade naar Buzzi Premium om deze wink te sturen! 👑");
+      }
+      return;
+    }
     onSendMessage(`*Stuurt knipoog: ${title}*`, false, true, winkId);
     setShowWinksPicker(false);
   };
@@ -374,6 +458,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Direct Nudge (Duwtje) Trigger
   const triggerNudge = () => {
+    if (isBlocked) return;
     hiveAudio.playNudge();
     
     // Animate local shake
@@ -392,33 +477,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Helper to highlight emoticon codes in text with beautiful 2xl emojis for that nostalgic feel
   const renderMessageContent = (text: string) => {
-    let result: React.ReactNode = text;
+    if (!text) return "";
     
-    // Simple inline matching of Buzzi emoticons
-    BUZZI_EMOTICONS.forEach(em => {
-      // Escape for regex safe
-      const escapedCode = em.code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const parts = text.split(new RegExp(`(${escapedCode})`, 'g'));
-      
-      if (parts.length > 1) {
-        result = parts.map((part, i) => {
-          if (part === em.code) {
-            return (
-              <span 
-                key={i} 
-                className="inline-block text-lg hover:scale-125 transition-transform cursor-help"
-                title={em.code}
-              >
-                {em.char}
-              </span>
-            );
-          }
-          return part;
-        }) as any;
+    // Sort emoticons by code length descending to match longer ones first (e.g. :-D before :D)
+    const sortedEmoticonCodes = [...BUZZI_EMOTICONS].sort((a, b) => b.code.length - a.code.length);
+    
+    // Create direct regex matcher for codes
+    const escapedCodes = sortedEmoticonCodes.map(em => em.code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    const regex = new RegExp(`(${escapedCodes.join('|')})`, 'gi');
+    
+    const parts = text.split(regex);
+    return parts.map((part, index) => {
+      const match = sortedEmoticonCodes.find(em => em.code.toLowerCase() === part.toLowerCase());
+      if (match) {
+        return (
+          <span
+            key={index}
+            className="inline-block text-lg hover:scale-125 transition-transform cursor-help align-middle mx-0.5"
+            title={match.code}
+          >
+            {match.char}
+          </span>
+        );
       }
+      return part;
     });
-
-    return result;
   };
 
   return (
@@ -435,10 +518,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="bg-[#cbdcf0] border-b border-[#9ebcd1] px-5 py-3 flex items-center justify-between shadow-inner">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-800">
+            <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
               {activeType === "channel" 
                 ? `👥 Groep: #${activeChannel?.name}` 
-                : `💬 ${activeContact?.name} <${activeContact?.email}>`}
+                : <>
+                    💬 
+                    {activeContact?.isPremium && (
+                      <span className="text-amber-500 animate-bounce text-xs" title="Buzzi Premium VIP 👑">👑</span>
+                    )}
+                    <span className={activeContact?.isPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse" : ""}>
+                      {activeContact?.name}
+                    </span>
+                    <span className="text-xs text-slate-500 font-normal truncate">&lt;{activeContact?.email}&gt;</span>
+                    {activeContact?.listeningTo && (
+                      <span className="bg-sky-50 border border-sky-200 text-sky-800 text-[10px] font-bold py-0.5 px-1.5 rounded-full flex items-center gap-1 shrink-0">
+                        <Music className="w-2.5 h-2.5 text-sky-600 animate-pulse" />
+                        Luistert nu: {activeContact.listeningTo}
+                      </span>
+                    )}
+                  </>}
             </span>
             <span className={`w-2 h-2 rounded-full ${
               activeContact?.status === "online" ? "bg-green-500" :
@@ -453,6 +551,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-shrink-0">
+          {activeType === "dm" && onToggleBlock && (
+            <button
+              onClick={onToggleBlock}
+              className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors shadow-xs ${
+                isBlocked
+                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
+                  : "bg-red-100 hover:bg-red-200 text-red-800 border border-red-300"
+              }`}
+            >
+              {isBlocked ? "🔓 Deblokkeer contact" : "🚫 Blokkeer contact"}
+            </button>
+          )}
           <div className="bg-white/80 border border-emerald-200 rounded px-2.5 py-1 flex items-center gap-1 text-[10px] text-emerald-700 font-bold font-mono">
             <Wifi className="w-3 h-3 text-emerald-600" />
             <span>BUZZI SECURE DIRECT</span>
@@ -474,6 +584,69 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </button>
 
           <div className="w-px h-4 bg-slate-300 mx-1" />
+
+          {/* Hidden File Input for transfers */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+          />
+
+          {/* Cameragesprek (Video calling) */}
+          {activeType === "dm" && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowWebcamCall(true);
+                setShowGameDuel(false);
+                hiveAudio.playHoneyPop();
+              }}
+              disabled={activeContact?.status === "offline"}
+              className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 transition-all active:scale-95 border border-transparent hover:border-[#9ebcd1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Start een retro videocall / webcam-gesprek!"
+            >
+              <Video className="w-3.5 h-3.5 text-sky-600" />
+              <span className="font-semibold text-sky-800">Videobellen</span>
+            </button>
+          )}
+
+          {/* Bestand versturen (File Sharing) */}
+          {activeType === "dm" && (
+            <button
+              type="button"
+              onClick={() => {
+                fileInputRef.current?.click();
+                hiveAudio.playHoneyPop();
+              }}
+              disabled={activeContact?.status === "offline"}
+              className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 transition-all active:scale-95 border border-transparent hover:border-[#9ebcd1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Verstuur een bestand naar je chatpartner!"
+            >
+              <Paperclip className="w-3.5 h-3.5 text-amber-600" />
+              <span className="font-semibold text-amber-800">Bestand versturen</span>
+            </button>
+          )}
+
+          {/* Spelletjes Duel (Gaming) */}
+          {activeType === "dm" && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowGameDuel(true);
+                setShowWebcamCall(false);
+                hiveAudio.playHoneyPop();
+              }}
+              disabled={activeContact?.status === "offline"}
+              className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 transition-all active:scale-95 border border-transparent hover:border-[#9ebcd1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Speel retro boter-kaas-en-eieren of vier-op-een-rij!"
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <span className="font-semibold text-emerald-800">Spel spelen</span>
+            </button>
+          )}
+
+          {activeType === "dm" && <div className="w-px h-4 bg-slate-300 mx-1" />}
 
           {/* Letters customization */}
           <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/60 border border-slate-300 rounded-lg shadow-sm">
@@ -599,7 +772,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         {wink.icon}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-slate-800 group-hover:text-pink-700">{wink.title}</div>
+                        <div className="text-xs font-bold text-slate-800 group-hover:text-pink-700 flex items-center gap-1">
+                          <span>{wink.title}</span>
+                          {wink.isPremium && (
+                            <span className="text-[8px] bg-amber-100 text-amber-800 border border-amber-300 rounded-sm px-1 py-0.2 select-none flex items-center gap-0.5 font-bold uppercase shrink-0">
+                              👑 VIP
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[9px] text-slate-400 truncate mt-0.5">{wink.desc}</div>
                       </div>
                     </button>
@@ -666,16 +846,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
 
                   {/* Buzzi style message content text inside window */}
-                  <div 
-                    className="text-sm pl-4 pr-1 break-words whitespace-pre-wrap selection:bg-amber-200"
-                    style={{ 
-                      color: isMe ? mmsColor : isQueen ? "#111111" : "#1a1a1a",
-                      fontFamily: isMe ? mmsFont : "sans-serif",
-                      fontWeight: isMe && isBold ? "bold" : "normal"
-                    }}
-                  >
-                    {renderMessageContent(msg.text)}
-                  </div>
+                  {msg.fileTransfer ? (
+                    <FileTransfer
+                      fileName={msg.fileTransfer.name}
+                      fileSize={msg.fileTransfer.size}
+                      isMe={isMe}
+                      senderName={msg.senderName}
+                      dataUrl={msg.fileTransfer.dataUrl}
+                      onFinished={() => {
+                        // After sending completes successfully, we can simulate an automated speech bubble!
+                        if (isMe && activeId) {
+                          setTimeout(() => {
+                            let responsePhrase = "Bedankt voor het bestand! Ontvangen op mijn pc. :-) (Y)";
+                            if (activeId === "queen") {
+                              responsePhrase = "📊 DIRECT_P2P RECEIVE: Bestand ontvangen en opgeslagen in mijn retro-AI databasesectie! Hartelijk dank! 👍";
+                            } else if (activeId === "kelly") {
+                              responsePhrase = "Aah thx!! Leuk nostalgia bestandje zeg! (H)";
+                            } else if (activeId === "wouter") {
+                              responsePhrase = "Super vet! Ik zet hem direct op mijn bureaublad! \\m/";
+                            } else if (activeId === "danny") {
+                              responsePhrase = "Hoppa, bestand binnengehaald op 45 KB/s! Werkt perfect!";
+                            } else if (activeId === "sanne") {
+                              responsePhrase = "Ooh super lief!! Dankjewel voor het doorsturen! ✨";
+                            }
+                            
+                            onSendMessage(responsePhrase, false);
+                          }, 1500);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="text-sm pl-4 pr-1 break-words whitespace-pre-wrap selection:bg-amber-200"
+                      style={{ 
+                        color: isMe ? mmsColor : isQueen ? "#111111" : "#1a1a1a",
+                        fontFamily: isMe ? mmsFont : "sans-serif",
+                        fontWeight: isMe && isBold ? "bold" : "normal"
+                      }}
+                    >
+                      {renderMessageContent(msg.text)}
+                    </div>
+                  )}
                 </motion.div>
               );
             })}
@@ -1146,12 +1357,143 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </motion.div>
               </div>
             )}
+
+            {/* Miauwend Poesje Wink */}
+            {activeWink === "cat" && (
+              <div className="absolute inset-0 bg-orange-100/20 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ y: 250, opacity: 0, scale: 0.2 }}
+                  animate={{ 
+                    y: [250, 0, -20, 0], 
+                    opacity: [0, 1, 1, 1],
+                    scale: [0.2, 1.3, 1.1, 1]
+                  }}
+                  transition={{ duration: 2, ease: "easeOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <motion.div
+                    animate={{ rotate: [-8, 8, -8] }}
+                    transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut" }}
+                    className="text-[150px] filter drop-shadow-xl"
+                  >
+                    🐱
+                  </motion.div>
+                  <div className="bg-gradient-to-r from-orange-400 to-amber-500 text-white font-extrabold border-2 border-orange-600 shadow-xl px-5 py-2.5 rounded-full text-xs uppercase tracking-widest animate-pulse mt-3">
+                    🐾 Miaaauuuuw! *Spint vrolijk* 😽
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Kwispelend Hondje Wink */}
+            {activeWink === "dog" && (
+              <div className="absolute inset-0 bg-blue-50/30 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: [0, 1.4, 1.1], rotate: [-180, 15, 0] }}
+                  transition={{ duration: 1.5 }}
+                  className="flex flex-col items-center relative"
+                >
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ repeat: Infinity, duration: 0.25 }}
+                    className="text-[140px] filter drop-shadow-2xl z-10"
+                  >
+                    🐶
+                  </motion.div>
+                  {/* Drool screen splat simulation */}
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: [0, 1.8, 1.5], opacity: [0, 0.75, 0.75] }}
+                    transition={{ delay: 1, duration: 0.8 }}
+                    className="absolute inset-x-0 -top-10 w-44 h-44 mx-auto rounded-full bg-cyan-200/40 border-4 border-cyan-100/60 blur-xs flex items-center justify-center"
+                  >
+                    <span className="text-[50px] animate-pulse">💦</span>
+                  </motion.div>
+                  <div className="bg-sky-600 text-white font-black border-2 border-sky-800 shadow-xl px-4 py-2 rounded-xl text-xs uppercase tracking-wide animate-bounce mt-4 z-20">
+                    🐾 Woef woef! *Likt je beeldscherm af!* 👅
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Draaiende Drol Wink */}
+            {activeWink === "poop" && (
+              <div className="absolute inset-0 bg-amber-900/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <motion.div
+                  initial={{ y: -300, scale: 0.1, rotate: 0 }}
+                  animate={{ 
+                    y: [-300, 30, -10, 0], 
+                    scale: [0.1, 1.3, 1],
+                    rotate: [0, 720, 1080]
+                  }}
+                  transition={{ duration: 2.2, ease: "backOut" }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="text-[150px] filter drop-shadow-xl animate-bounce">
+                    💩
+                  </div>
+                  <div className="bg-amber-800 text-amber-50 font-extrabold border-2 border-amber-950 shadow-2xl px-5 py-2.5 rounded-lg text-xs uppercase tracking-wider mt-4 flex items-center gap-1.5 animate-pulse">
+                    💨 *PFFFRRTT!* GRAVITEIT GEVERFDE SCHEET! 💨
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Euro Geldregen Wink */}
+            {activeWink === "money" && (
+              <div className="absolute inset-0 bg-emerald-950/10 flex flex-col items-center justify-between pointer-events-auto overflow-hidden select-none animate-fade-in p-10">
+                <div className="absolute inset-0 flex flex-wrap gap-8 justify-around content-start opacity-75 overflow-hidden z-10">
+                  {[...Array(24)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ y: -100, x: Math.random() * 40 - 20, rotate: Math.random() * 360, opacity: 0 }}
+                      animate={{ 
+                        y: [ -100, 600 ], 
+                        opacity: [0, 1, 1, 0],
+                        rotate: Math.random() * 720 + 180
+                      }}
+                      transition={{ 
+                        duration: 3 + Math.random() * 2, 
+                        delay: Math.random() * 1.5,
+                        repeat: Infinity 
+                      }}
+                      className="text-4xl shrink-0"
+                    >
+                      {i % 3 === 0 ? "💸" : i % 3 === 1 ? "💵" : "💶"}
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="m-auto z-20 flex flex-col items-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0, 1.4, 1] }}
+                    transition={{ duration: 1.2, ease: "easeOut" }}
+                    className="p-8 bg-emerald-600 border-4 border-white text-white rounded-full shadow-2xl flex flex-col items-center text-center justify-center shrink-0 w-44 h-44"
+                  >
+                    <span className="text-6xl animate-bounce">💰</span>
+                    <span className="text-lg font-black tracking-tighter mt-1">€ CA$H €</span>
+                  </motion.div>
+                  <div className="bg-emerald-900/90 text-emerald-300 border border-emerald-500 shadow-xl px-4 py-1.5 rounded-full text-xs font-mono font-bold uppercase mt-6 tracking-wide animate-pulse z-20">
+                    💰 MAAK BIJLAGE: BUZZI PREMIUM VERDIENSTEN! 💎
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
       </div>
 
 
+
+      {/* Blocked Contact Warning Banner */}
+      {isBlocked && (
+        <div className="bg-red-50 border-t border-b border-red-200 text-red-800 px-4 py-2.5 text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-pulse shrink-0">
+          <span>⚠️ Je hebt deze contactpersoon geblokkeerd. Deblokkeer eerst om berichten te sturen of te ontvangen.</span>
+        </div>
+      )}
 
       {/* Input Action Panel (Separated into rich area text in MSI clone) */}
       <div className="p-4 bg-white border-t border-[#bad0e3] shadow-inner-lg">
@@ -1161,10 +1503,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <button 
             type="button"
             onClick={triggerNudge}
-            className="bg-red-50 hover:bg-red-100 hover:text-red-700 text-red-500 p-3 rounded-xl border border-red-200 transition-all focus:outline-none flex-shrink-0 active:scale-90 cursor-pointer"
-            title="Geef een Duwtje!"
+            disabled={isBlocked}
+            className={`p-3 rounded-xl border transition-all focus:outline-none flex-shrink-0 active:scale-90 ${
+              isBlocked 
+                ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed" 
+                : "bg-red-50 hover:bg-red-100 hover:text-red-700 text-red-500 border border-red-200 cursor-pointer"
+            }`}
+            title={isBlocked ? "Gedeblokkeerd vereist" : "Geef een Duwtje!"}
           >
-            <Volume2 className="w-5 h-5 text-red-500 animate-pulse" />
+            <Volume2 className={`w-5 h-5 ${isBlocked ? "text-stone-300" : "text-red-500 animate-pulse"}`} />
           </button>
 
           {/* Chat input form */}
@@ -1172,6 +1519,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <input
               type="text"
               value={inputText}
+              disabled={isBlocked}
               onChange={(e) => {
                 setInputText(e.target.value);
                 if (onUserTyping) {
@@ -1180,14 +1528,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               }}
               onKeyDown={handleKeyPress}
               placeholder={
-                activeId === "queen"
-                  ? "Vraag deze retro Buzzi-bot alles over 2004..."
-                  : `Schrijf een nostalgisch bericht... (typ emoticons zoals :-D of (H))`
+                isBlocked
+                  ? "⚠️ Je hebt deze contactpersoon geblokkeerd."
+                  : activeId === "queen"
+                    ? "Vraag deze retro Buzzi-bot alles over 2004..."
+                    : `Schrijf een nostalgisch bericht... (typ emoticons zoals :-D of (H))`
               }
-              className="w-full bg-stone-50 text-stone-900 border border-slate-300 rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d5c8a]/50 focus:border-[#1d5c8a] placeholder-stone-400 font-sans shadow-inner"
+              className={`w-full border rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 placeholder-stone-400 font-sans shadow-inner ${
+                isBlocked
+                  ? "bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed"
+                  : "bg-stone-50 text-stone-900 border-slate-300 focus:ring-[#1d5c8a]/50 focus:border-[#1d5c8a]"
+              }`}
               maxLength={1000}
             />
-            {inputText.trim() && (
+            {inputText.trim() && !isBlocked && (
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-300 text-xs font-mono select-none">
                 {inputText.length}/1000
               </span>
@@ -1197,10 +1551,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Send buttons */}
           <button
             onClick={handleSend}
-            disabled={!inputText.trim()}
-            className={`p-3 rounded-xl transition-all shadow focus:outline-none flex-shrink-0 flex items-center justify-center cursor-pointer ${
-              inputText.trim()
-                ? "bg-[#2576b5] hover:bg-[#1d5c8a] active:scale-95 text-white"
+            disabled={!inputText.trim() || isBlocked}
+            className={`p-3 rounded-xl transition-all shadow focus:outline-none flex-shrink-0 flex items-center justify-center ${
+              inputText.trim() && !isBlocked
+                ? "bg-[#2576b5] hover:bg-[#1d5c8a] active:scale-95 text-white cursor-pointer"
                 : "bg-stone-100 text-stone-400 cursor-not-allowed border border-stone-200/50 shadow-none"
             }`}
           >
@@ -1208,6 +1562,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Absolute Overlays for Webcam calling and Gaming */}
+      {showWebcamCall && activeContact && (
+        <WebcamCall
+          activeContactId={activeId}
+          activeContactName={activeContact.name}
+          activeContactAvatar={activeContact.avatar}
+          onClose={() => setShowWebcamCall(false)}
+        />
+      )}
+
+      {showGameDuel && activeContact && (
+        <ChatGameDuel
+          activeContactId={activeId}
+          activeContactName={activeContact.name}
+          activeContactAvatar={activeContact.avatar}
+          onClose={() => setShowGameDuel(false)}
+          onSendGameStatusMessage={(statusText) => {
+            onSendMessage(statusText, false);
+          }}
+        />
+      )}
     </motion.div>
   );
 };

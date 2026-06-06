@@ -8,10 +8,11 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
 import { hiveAudio } from "./utils/audio";
-import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send, Smartphone, Laptop, Volume2 } from "lucide-react";
+import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send, Smartphone, Laptop, Volume2, Coins } from "lucide-react";
 import { LoginScreen } from "./components/LoginScreen";
 import { Minesweeper } from "./components/Minesweeper";
 import { LegalModal } from "./components/LegalModal";
+import { motion, AnimatePresence } from "motion/react";
 
 function simpleHash(str: string): string {
   let hash = 0;
@@ -202,6 +203,41 @@ export default function App() {
   const [userAvatar, setUserAvatar] = useState("🧑‍🚀");
   const [userListeningTo, setUserListeningTo] = useState("");
 
+  // Persistent Buzzi Premium and Blocking States
+  const [isUserPremium, setIsUserPremium] = useState<boolean>(() => {
+    return localStorage.getItem("buzzi_premium") === "true";
+  });
+  const [isSyncMusicEnabled, setIsSyncMusicEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("buzzi_sync_music") === "true";
+  });
+  const [blockedContactIds, setBlockedContactIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("buzzi_blocked_contacts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+
+  const handleToggleBlockContact = (contactId: string) => {
+    hiveAudio.playNotification();
+    setBlockedContactIds(prev => {
+      const isBlocked = prev.includes(contactId);
+      const nextList = isBlocked ? prev.filter(id => id !== contactId) : [...prev, contactId];
+      localStorage.setItem("buzzi_blocked_contacts", JSON.stringify(nextList));
+      return nextList;
+    });
+  };
+
+  const handleToggleSyncMusic = () => {
+    setIsSyncMusicEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem("buzzi_sync_music", next ? "true" : "false");
+      return next;
+    });
+  };
+
   // Account and Database states
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -214,10 +250,10 @@ export default function App() {
 
   // Utility tools collapsible/foldable states
   const [isNaamVersierderExpanded, setIsNaamVersierderExpanded] = useState(false);
-  const [isBlockCheckerExpanded, setIsBlockCheckerExpanded] = useState(false);
   const [isInviteExpanded, setIsInviteExpanded] = useState(false);
   const [isAppsExpanded, setIsAppsExpanded] = useState(false);
   const [isSoundSchemeExpanded, setIsSoundSchemeExpanded] = useState(false); // Default collapsed
+  const [isMonetizationExpanded, setIsMonetizationExpanded] = useState(false);
 
   // Retro sound scheme preference loaded/saved
   const [soundScheme, setSoundScheme] = useState<string>(() => {
@@ -258,6 +294,18 @@ export default function App() {
     message: string;
     avatar?: string;
   } | null>(null);
+
+  // MSN Messenger online/offline notification state
+  const [msnToast, setMsnToast] = useState<{
+    show: boolean;
+    name: string;
+    avatar: string;
+    event: "online" | "offline";
+    email?: string;
+  } | null>(null);
+
+  // Overridden status of contacts for the XP sign-in notification simulation
+  const [buddiesStatusOverride, setBuddiesStatusOverride] = useState<Record<string, StatusType>>({});
 
   // Copy Link State
   const [copyLinkStatus, setCopyLinkStatus] = useState(false);
@@ -561,6 +609,7 @@ exit
           status: userStatus,
           personalMessage: userPersonalMessage,
           listeningTo: userListeningTo,
+          isPremium: isUserPremium,
           ...fields
         })
       });
@@ -590,6 +639,108 @@ exit
   useEffect(() => {
     checkDbStatus();
   }, []);
+
+  // Background browser music detection syncing via HTMLMediaElement and Media Session API
+  useEffect(() => {
+    if (!isSyncMusicEnabled) return;
+
+    const triggerMusicDetection = () => {
+      try {
+        // 1. Check all playing media elements in the page
+        const mediaElements = Array.from(document.querySelectorAll("audio, video")) as HTMLMediaElement[];
+        const playingElement = mediaElements.find(el => !el.paused && !el.muted && el.volume > 0);
+
+        if (playingElement) {
+          const src = playingElement.src || "";
+          
+          // Pattern-match with common stream signatures
+          if (src.includes("RADIO538")) {
+            updateStatusIfChanged("Radio 538 (Live FM) 📻");
+            return;
+          } else if (src.includes("qmusic")) {
+            updateStatusIfChanged("Qmusic NL (Live) 📻");
+            return;
+          } else if (src.includes("RADIO10")) {
+            updateStatusIfChanged("Radio 10 (Live) 📻");
+            return;
+          } else if (src.includes("SKYRADIO")) {
+            updateStatusIfChanged("Sky Radio (Live) 📻");
+            return;
+          } else if (src.includes("VERONICA")) {
+            updateStatusIfChanged("Radio Veronica 📻");
+            return;
+          } else if (src.includes("kink")) {
+            updateStatusIfChanged("KINK (Alternative Rock) 🎸");
+            return;
+          } else if (src.includes("arrow")) {
+            updateStatusIfChanged("Arrow Classic Rock ⚡");
+            return;
+          }
+
+          if (playingElement.title) {
+            updateStatusIfChanged(playingElement.title);
+            return;
+          }
+        }
+
+        // 2. Query standard system/browser navigator.mediaSession metadata
+        if (typeof window !== "undefined" && "mediaSession" in navigator && navigator.mediaSession.metadata) {
+          const meta = navigator.mediaSession.metadata;
+          if (meta.title) {
+            const trackInfo = meta.artist ? `${meta.artist} - ${meta.title}` : meta.title;
+            updateStatusIfChanged(trackInfo);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Fout bij achtergrondmuziekdetectie:", err);
+      }
+    };
+
+    const updateStatusIfChanged = (newTrack: string) => {
+      const cleaned = newTrack.trim();
+      if (cleaned && userListeningTo !== cleaned) {
+        handleUpdateListeningTo(cleaned);
+      }
+    };
+
+    // Fast-capture any direct play event in this tab
+    const handlePlayEvent = () => {
+      setTimeout(triggerMusicDetection, 400);
+    };
+
+    document.addEventListener("play", handlePlayEvent, true);
+
+    // Intercept MediaSession metadata changes (if any external embed updates it in this tab)
+    if (typeof window !== "undefined" && "mediaSession" in navigator) {
+      try {
+        let currentMetadata = navigator.mediaSession.metadata;
+        Object.defineProperty(navigator.mediaSession, "metadata", {
+          get() {
+            return currentMetadata;
+          },
+          set(value) {
+            currentMetadata = value;
+            if (value && value.title) {
+              const info = value.artist ? `${value.artist} - ${value.title}` : value.title;
+              updateStatusIfChanged(info);
+            }
+          },
+          configurable: true
+        });
+      } catch (e) {
+        console.warn("Buzzi could not configure MediaSession interception hooks:", e);
+      }
+    }
+
+    // Set up a steady background polling layer
+    const interval = setInterval(triggerMusicDetection, 2500);
+
+    return () => {
+      document.removeEventListener("play", handlePlayEvent, true);
+      clearInterval(interval);
+    };
+  }, [isSyncMusicEnabled, userListeningTo]);
 
   // Authentication State / Local Session Restorer
   const [deletedContactIds, setDeletedContactIds] = useState<string[]>([]);
@@ -787,15 +938,21 @@ exit
           const list = await res.json();
           const filtered = list
             .filter((data: any) => data.uid !== currentUser.uid)
-            .map((data: any) => ({
-              id: data.uid,
-              name: data.name || "Buzzi Gebruiker",
-              email: data.email || "",
-              avatar: data.avatar || "🧑‍🚀",
-              status: (data.status as StatusType) || "online",
-              personalMessage: data.personalMessage || "",
-              listeningTo: data.listeningTo || "",
-            }));
+            .map((data: any) => {
+              const isStale = data.updatedAtTimestamp && (Date.now() - data.updatedAtTimestamp > 300000);
+              const effectiveStatus = isStale ? "offline" : ((data.status as StatusType) || "online");
+              return {
+                id: data.uid,
+                name: data.name || "Buzzi Gebruiker",
+                email: data.email || "",
+                avatar: data.avatar || "🧑‍🚀",
+                status: effectiveStatus,
+                personalMessage: data.personalMessage || "",
+                listeningTo: data.listeningTo || "",
+                isPremium: !!data.isPremium,
+                updatedAtTimestamp: data.updatedAtTimestamp
+              };
+            });
           setRegisteredUsers(filtered);
         }
       } catch (e) {
@@ -838,7 +995,98 @@ exit
           });
           return isFriend;
         })
-      ]).filter(c => !deletedContactIds.includes(c.id));
+      ]).map(c => ({
+        ...c,
+        isBlocked: blockedContactIds.includes(c.id)
+      })).filter(c => !deletedContactIds.includes(c.id));
+
+  // Refs to track previous buddy statuses for real-time MSN alerts
+  const lastBuddiesStatusRef = useRef<Record<string, StatusType>>({});
+  const initialSyncRef = useRef<boolean>(true);
+
+  // Monitor buddy status changes dynamically for real-time sound and toast triggers
+  useEffect(() => {
+    if (!currentUser || currentBuddies.length === 0) return;
+
+    const currentStatusMap: Record<string, StatusType> = {};
+    currentBuddies.forEach(buddy => {
+      if (buddy.id === "queen") return; // Skip Buzzi Bot
+      currentStatusMap[buddy.id] = (buddy.status as StatusType) || "offline";
+    });
+
+    if (initialSyncRef.current) {
+      lastBuddiesStatusRef.current = currentStatusMap;
+      initialSyncRef.current = false;
+      return;
+    }
+
+    Object.keys(currentStatusMap).forEach(buddyId => {
+      const prevStatus = lastBuddiesStatusRef.current[buddyId];
+      const newStatus = currentStatusMap[buddyId];
+
+      if (prevStatus !== undefined && prevStatus !== newStatus) {
+        const buddy = currentBuddies.find(b => b.id === buddyId);
+        if (buddy) {
+          const wasOffline = prevStatus === "offline";
+          const isOffline = newStatus === "offline";
+          const displayPm = buddy.personalMessage || "";
+          const subtitle = `${buddy.email}${displayPm ? ` - "${displayPm}"` : ""}`;
+
+          if (wasOffline && !isOffline) {
+            hiveAudio.playOnlineAlert();
+            setMsnToast({
+              show: true,
+              name: buddy.name,
+              avatar: buddy.avatar,
+              event: "online",
+              email: subtitle
+            });
+            setTimeout(() => {
+              setMsnToast(curr => {
+                if (curr && curr.name === buddy.name && curr.event === "online") {
+                  return { ...curr, show: false };
+                }
+                return curr;
+              });
+            }, 6000);
+          } else if (!wasOffline && isOffline) {
+            hiveAudio.playOfflineAlert();
+            setMsnToast({
+              show: true,
+              name: buddy.name,
+              avatar: buddy.avatar,
+              event: "offline",
+              email: subtitle
+            });
+            setTimeout(() => {
+              setMsnToast(curr => {
+                if (curr && curr.name === buddy.name && curr.event === "offline") {
+                  return { ...curr, show: false };
+                }
+                return curr;
+              });
+            }, 6000);
+          }
+        }
+      }
+    });
+
+    lastBuddiesStatusRef.current = currentStatusMap;
+  }, [currentBuddies, currentUser]);
+
+  // Periodic heartbeat to keep client active status fresh on the server
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Send instant update on startup or logins
+    updateProfileInDatabase({});
+
+    const interval = setInterval(() => {
+      updateProfileInDatabase({});
+    }, 8000); // 8 seconds pulse
+
+    return () => clearInterval(interval);
+  }, [currentUser, userDisplayName, userAvatar, userStatus, userPersonalMessage, userListeningTo]);
 
   const visibleChannels = channels;
 
@@ -1312,23 +1560,7 @@ exit
     }
   };
 
-  // Fun Block-Checker simulation (Dutch classic Buzzi internet virus)
-  const testBlockStatus = (contactName: string) => {
-    setChecking(true);
-    setCheckResult(null);
-    setCheckedContact(contactName);
-    hiveAudio.playHoneyPop();
 
-    setTimeout(() => {
-      setChecking(false);
-      const isBlocked = Math.random() > 0.6;
-      if (isBlocked) {
-        setCheckResult(`⚠️ JA! Het lijkt erop dat ${contactName} jou heeft GEBLOKKEERD! (grr) Wat ongezellig!`);
-      } else {
-        setCheckResult(`✅ Opluchting! ${contactName} heeft jou gewoon NIET geblokkeerd! Je bent nog vrienden. (L)`);
-      }
-    }, 1500);
-  };
 
   const saveMessageToDatabase = async (msg: Partial<Message>) => {
     if (!currentUser) return;
@@ -1343,6 +1575,7 @@ exit
       isBuzz: msg.isBuzz || false,
       isWink: msg.isWink || false,
       winkId: msg.winkId || "",
+      fileTransfer: msg.fileTransfer || undefined,
       receiverId: activeId,
       createdAt: new Date().toISOString()
     };
@@ -1380,6 +1613,7 @@ exit
       isBuzz: additional.isBuzz || false,
       isWink: additional.isWink || false,
       winkId: additional.winkId || "",
+      fileTransfer: additional.fileTransfer || undefined,
       receiverId: activeId,
       createdAt: new Date().toISOString()
     };
@@ -1478,7 +1712,13 @@ exit
   }, [currentUser]);
 
   // Sending a message
-  const handleSendMessage = async (text: string, isBuzz: boolean = false, isWink: boolean = false, winkId?: string) => {
+  const handleSendMessage = async (
+    text: string,
+    isBuzz: boolean = false,
+    isWink: boolean = false,
+    winkId?: string,
+    fileTransfer?: any
+  ) => {
     if (!currentUser) return;
 
     // Reset local typing state immediately on message send
@@ -1495,7 +1735,8 @@ exit
       text,
       isBuzz: isBuzz,
       isWink: isWink,
-      winkId: winkId
+      winkId: winkId,
+      fileTransfer: fileTransfer
     });
 
     const isConversingWithAI = activeId === "queen";
@@ -1781,6 +2022,11 @@ exit
           onUpdateListeningTo={handleUpdateListeningTo}
           activeDbMode={activeDbMode}
           dbStatus={dbStatus}
+          isUserPremium={isUserPremium}
+          onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
+          onToggleBlockContact={handleToggleBlockContact}
+          isSyncMusicEnabled={isSyncMusicEnabled}
+          onToggleSyncMusic={handleToggleSyncMusic}
         />
       </div>
 
@@ -1799,6 +2045,10 @@ exit
           myAvatar={userAvatar}
           myUserId={currentUser.uid}
           onUserTyping={handleUserTyping}
+          isBlocked={blockedContactIds.includes(activeId)}
+          onToggleBlock={() => handleToggleBlockContact(activeId)}
+          isUserPremium={isUserPremium}
+          onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
         />
       </div>
 
@@ -1896,69 +2146,6 @@ exit
                         >
                           Toepassen als Buzzi Naam! ✏️
                         </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Box 2: Wie heeft mij geblokkeerd? */}
-              <div className="bg-white border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-[#e31e24]"></div>
-                
-                {/* Collapsible Header */}
-                <div 
-                  onClick={() => {
-                    setIsBlockCheckerExpanded(!isBlockCheckerExpanded);
-                    hiveAudio.playHoneyPop();
-                  }}
-                  className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 select-none pb-3"
-                >
-                  <h3 className="font-sans font-extrabold text-[#e31e24] text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                    <span>Buzzi Block Checker (V2)</span>
-                  </h3>
-                  <span className="text-slate-400 font-mono text-xs font-bold">
-                    {isBlockCheckerExpanded ? "▲" : "▼"}
-                  </span>
-                </div>
-
-                {isBlockCheckerExpanded && (
-                  <div className="px-4 pb-4 pt-1 border-t border-slate-100 animate-fade-in space-y-3">
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Benieuwd of je klasgenoten je stiekem offline hebben geblokkeerd? Voer hier de scan uit!
-                    </p>
-
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] text-slate-400 font-bold">Selecteer contactpersoon:</div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {currentBuddies.filter(c => c.id !== "queen").map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => testBlockStatus(c.name)}
-                            disabled={checking}
-                            className="text-[10px] font-medium bg-[#f0f4f9] hover:bg-sky-100 border border-slate-200 px-2 py-1.5 rounded truncate text-slate-700 active:scale-95 cursor-pointer transition-all disabled:opacity-50 text-left"
-                          >
-                            🔍 {c.name.split(" ")[0]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {checking && (
-                      <div className="text-center space-y-1 py-1.5">
-                        <div className="text-[10px] text-slate-500 font-medium animate-pulse">
-                          Checken van block status via Buzzi servers...
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-red-500 h-1.5 rounded-full animate-[progress_1.5s_ease-out_infinite]" style={{ width: "60%" }} />
-                        </div>
-                      </div>
-                    )}
-
-                    {checkResult && (
-                      <div className="bg-red-50 p-2.5 rounded border border-red-200 text-xs text-red-950 font-bold leading-normal">
-                        {checkResult}
                       </div>
                     )}
                   </div>
@@ -2132,32 +2319,34 @@ exit
                         </p>
 
                         {/* Custom Launcher Download Block */}
-                        <button
-                          type="button"
-                          onClick={downloadWindowsLauncher}
-                          className="w-full bg-gradient-to-r from-sky-500 to-[#00aeef] hover:to-sky-600 text-white text-[11px] py-2 px-3 rounded-lg border-2 border-[#0089bd] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer"
+                        <a
+                          href="/api/download/exe"
+                          download="BuzziMessenger_Installer.bat"
+                          onClick={() => hiveAudio.playNotification()}
+                          className="w-full bg-gradient-to-r from-sky-500 to-[#00aeef] hover:to-sky-600 text-white text-[11px] py-2.5 px-3 rounded-lg border-2 border-[#0089bd] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer leading-normal text-left"
                         >
                           <div className="flex items-center gap-2">
                             <Laptop className="w-4 h-4 shrink-0 text-sky-100" />
                             <div className="text-left">
-                              <span className="block font-bold leading-none">Download Windows Standalone Launcher (.bat)</span>
-                              <span className="text-[9px] text-sky-100 font-normal">Opent direct als standalone app</span>
+                              <span className="block font-bold leading-none">Download Windows Standalone Installer (.bat)</span>
+                              <span className="text-[9px] text-sky-100 font-normal mt-0.5 block">Genereert direct 'BuzziMessenger.exe' op je pc!</span>
                             </div>
                           </div>
                           <span className="text-[9px] bg-sky-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">1 KB ⬇️</span>
-                        </button>
+                        </a>
 
                         <div className="bg-[#f0f6fc] border border-[#bcd2e8] rounded-md p-2.5 text-[10px] text-slate-600 leading-normal space-y-1.5 font-mono">
                           <div className="font-extrabold text-blue-900 border-b border-[#abc4df]/50 pb-1 uppercase tracking-wider text-[8px] flex items-center gap-1">
                             <span>💿 Eenvoudige Handleiding:</span>
                           </div>
                           <ol className="list-decimal pl-3.5 space-y-1 text-[9.5px]">
-                            <li>Klik op de blauwe knop om de launcher downloaden (<code className="bg-white px-1 rounded border">BuzziMessenger.bat</code>).</li>
-                            <li>Zet de launcher gerust op je <strong>Bureaublad</strong> voor die klassieke MSN snelkoppeling!</li>
-                            <li>Dubbelklik op de launcher. Microsoft Windows kan een SmartScreen melding geven omdat het een zelfgemaakt script is - kik op <strong>"Meer informatie"</strong> en daarna op <strong>"Toch uitvoeren"</strong>.</li>
+                            <li>Klik op de blauwe knop om de installer te downloaden (<code className="bg-white px-1 rounded border border-[#abc4df]">BuzziMessenger_Installer.bat</code>).</li>
+                            <li>Zet het bestand gerust op je <strong>Bureaublad</strong> en dubbelklik erop om het uit te voeren.</li>
+                            <li>Het script roept de ingebouwde C# compiler van Windows aan en bouwt direct een legitieme, 100% werkende en veilige <strong>BuzziMessenger.exe</strong> voor je op!</li>
+                            <li>Microsoft Windows SmartScreen kan eenmalig een waarschuwing geven omdat het bestand lokaal gecompileerd is - klik op <strong>"Meer informatie"</strong> en daarna op <strong>"Toch uitvoeren"</strong>.</li>
                           </ol>
                           <div className="text-[8.5px] text-slate-400 italic pt-1 border-t border-[#abc4df]/35">
-                            * Dit start Microsoft Edge automatisch op in veilige app-modus (zonder browseromgeving), zodat de messenger volledig onafhankelijk draait!
+                            * De geproduceerde BuzziMessenger.exe start Microsoft Edge automatisch op in de onafhankelijke app-modus, waardoor hij als losse, echte desktopprogramma draait!
                           </div>
                         </div>
                       </div>
@@ -2169,6 +2358,23 @@ exit
                         <p className="text-[11px] text-slate-600 leading-normal font-medium">
                           Zet Buzzi Messenger op je telefoon als een standalone WebView app via de officiële Progressive Web App (PWA) installatiemethode!
                         </p>
+
+                        {/* Custom Android Info Download Block */}
+                        <a
+                          href="/api/download/apk"
+                          download="BuzziMessenger_Android_Installatie.txt"
+                          onClick={() => hiveAudio.playNotification()}
+                          className="w-full bg-gradient-to-r from-emerald-500 to-[#8cc63f] hover:to-emerald-600 text-white text-[11px] py-2.5 px-3 rounded-lg border-2 border-[#76aa2f] font-black flex items-center justify-between shadow-xs active:scale-98 transition-all cursor-pointer leading-normal text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 shrink-0 text-emerald-100" />
+                            <div className="text-left">
+                              <span className="block font-bold leading-none">Download Mobiele Installatiegids (.txt)</span>
+                              <span className="text-[9px] text-emerald-100 font-normal mt-0.5 block">Legt de 2-staps PWA-installatie uit voor je GSM!</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] bg-emerald-700/50 px-1.5 py-0.5 rounded font-mono shrink-0">1 KB ⬇️</span>
+                        </a>
 
                         <div className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-2.5 text-[10px] text-slate-700 space-y-1.5 font-sans leading-normal">
                           <div className="font-extrabold text-emerald-800 uppercase tracking-wider text-[9px] flex items-center gap-1">
@@ -2312,6 +2518,87 @@ npx cap open android`}
                 )}
               </div>
 
+              {/* Box 3.7: Geld Verdienen met Buzzi Messenger */}
+              <div className="bg-gradient-to-b from-white to-[#f0fff4] border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
+                
+                {/* Collapsible Header */}
+                <div 
+                  onClick={() => {
+                    setIsMonetizationExpanded(!isMonetizationExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:brightness-95 bg-gradient-to-b from-emerald-50 to-[#e3fced] select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-[#0f5132] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Coins className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <span>Zelf Geld Verdienen met Buzzi? 💸</span>
+                  </h3>
+                  <span className="text-slate-500 font-mono text-xs font-bold">
+                    {isMonetizationExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {isMonetizationExpanded && (
+                  <div className="px-4 pb-4 pt-3 border-t border-[#abc4df]/40 bg-white/70 animate-fade-in space-y-3.5">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                      Ja absoluut! Omdat deze Buzzi Messenger-website van jou is, zijn er verschillende retro én moderne manieren om er zelf een leuk zakcentje mee te verdienen:
+                    </p>
+
+                    <div className="space-y-3 text-[10.5px] leading-relaxed text-slate-700">
+                      {/* Strategy 1: Ad Banners */}
+                      <div className="bg-sky-50 border border-sky-200 rounded-lg p-2.5 space-y-1">
+                        <span className="font-extrabold text-sky-900 flex items-center gap-1 uppercase tracking-wide text-[9px]">
+                          1. Retro Advertentie Banners 🖼️
+                        </span>
+                        <p>
+                          Zet ouderwetse banneradvertenties (AdSense of affiliate netwerken) onderaan de contactenlijst of in het chatvenster. Net zoals vroeger op MSN kun je hier banners plaatsen voor trendy merken, games of kleding!
+                        </p>
+                      </div>
+
+                      {/* Strategy 2: Premium VIP Ranks */}
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 space-y-1">
+                        <span className="font-extrabold text-amber-900 flex items-center gap-1 uppercase tracking-wide text-[9px]">
+                          2. Buzzi Premium & VIP-status 👑
+                        </span>
+                        <p>
+                          Laat gebruikers via een micro-transactie (bijvoorbeeld via PayPal of een Tikkie-link) upgraden naar <strong>Buzzi Gold Premium</strong>! Dit geeft ze:
+                        </p>
+                        <ul className="list-disc pl-3 mt-1 space-y-0.5 text-[9.5px] font-medium">
+                          <li>Een gouden glanzend kroontje achter hun naam</li>
+                          <li>Exclusieve premium winks (zoals de <em>Euro Geldregen</em> en <em>Miauwend Poesje</em>!)</li>
+                          <li>Custom neon weergavenamen in de list</li>
+                        </ul>
+                      </div>
+
+                      {/* Strategy 3: Affiliation & Invite Links */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 space-y-1">
+                        <span className="font-extrabold text-emerald-900 flex items-center gap-1 uppercase tracking-wide text-[9px]">
+                          3. Partner- & Affiliateprogramma's 🔗
+                        </span>
+                        <p>
+                          Gebruik de <strong>unieke uitnodigingslink</strong> of versierde nicks om bol.com of Amazon partnerlinks te promoten voor coole retro gadgets, MP3-spelers, skateboards of kleding. Bij elke aankoop verdien jij een percentage commissie!
+                        </p>
+                      </div>
+
+                      {/* Strategy 4: Custom Sound Packs */}
+                      <div className="bg-pink-50 border border-pink-200 rounded-lg p-2.5 space-y-1">
+                        <span className="font-extrabold text-pink-900 flex items-center gap-1 uppercase tracking-wide text-[9px]">
+                          4. Exclusieve Beltonen & Soundpacks 🎶
+                        </span>
+                        <p>
+                          Verkoop gepersonaliseerde chimes en rammelende nudges (.wav/.mp3 bestanden) om te gebruiken op computers of telefoons van je gebruikers!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#fcf8e3] border border-[#fbeed5] rounded-lg p-2.5 text-[10px] text-[#8a6d3b] leading-tight text-center font-mono font-bold animate-pulse">
+                      🤑 Tip: Begin met een simpele Tikkie of PayPal knop onder je profiel om donaties te verzamelen voor hostingskosten!
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Classic Games Box */}
               <div className="bg-stone-900 border border-stone-800 text-stone-100 rounded-xl p-4 shadow-md relative">
                 <div className="flex items-center justify-between border-b border-stone-800 pb-1.5">
@@ -2321,7 +2608,7 @@ npx cap open android`}
                 
                 <div className="mt-3 space-y-2.5">
                   <p className="text-[10.5px] italic text-slate-300 leading-normal">
-                    &ldquo;Wil je een potje Mijnenveger of Dammen spelen tegen me? Klik hieronder om me uit te dagen op Buzzi!&rdquo;
+                    &ldquo;Wil je een nostalgisch potje retro Mijnenveger of andere games spelen? Klik hieronder om direct een spel te starten!&rdquo;
                   </p>
                   <button
                     onClick={() => {
@@ -2331,7 +2618,7 @@ npx cap open android`}
                     className="w-full bg-[#8cc63f] hover:bg-[#a6d854] text-stone-950 text-xs font-black py-2 rounded-xl shadow border-2 border-[#5c8229] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
                   >
                     <Play className="w-3 h-3 fill-stone-950" />
-                    <span>Mijnenveger Spelen ! 💣</span>
+                    <span>Spel spelen ! 🎮</span>
                   </button>
                 </div>
               </div>
@@ -2669,7 +2956,260 @@ npx cap open android`}
           </div>
         </div>
       )}
+
+      {/* Authentic MSN Messenger Toaster notification */}
+      {msnToast && msnToast.show && (
+        <div 
+          className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[99999] w-[275px] sm:w-[310px] bg-[#fdfdfd] border-2 border-[#1253a4] rounded-lg shadow-2xl overflow-hidden font-sans select-none animate-slide-up"
+          style={{
+            background: "linear-gradient(to bottom, #f0f7fe 0%, #d3e5f7 15%, #ecf4fd 100%)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.6)"
+          }}
+        >
+          {/* Top header strip characteristic of MSN notifications */}
+          <div className="bg-gradient-to-r from-[#1d62b5] to-[#4c92eb] text-white text-[10px] uppercase font-extrabold px-2.5 py-1.5 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] animate-pulse">🐝</span>
+              <span>Buzzi Messenger</span>
+            </div>
+            <button 
+              onClick={() => setMsnToast(prev => prev ? { ...prev, show: false } : null)}
+              className="text-sky-100 hover:text-white font-black text-[11px] px-1 hover:bg-white/15 rounded cursor-pointer leading-none"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-3.5 flex items-start gap-3">
+            {/* MSN Messenger custom/classic blue circular bubble for avatar status */}
+            <div className="relative shrink-0 flex items-center justify-center p-1.5 bg-white border border-[#96b8e2] rounded-full shadow-inner w-12 h-12">
+              <span className="text-3xl select-none">{msnToast.avatar}</span>
+              {/* Status indicator bubble */}
+              <span className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                msnToast.event === "online" ? "bg-emerald-500" : "bg-slate-400"
+              }`} />
+            </div>
+
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[11.5px] text-[#2c5384] font-black truncate leading-tight select-all">
+                {msnToast.name}
+              </p>
+              <p className="text-[10.5px] text-slate-700 font-bold mt-1 leading-snug">
+                {msnToast.event === "online" 
+                  ? "is zojuist online gegaan!" 
+                  : "is zojuist offline gegaan."
+                }
+              </p>
+              <p className="text-[9px] text-[#4d6d9c] italic truncate mt-1 max-width-[100%] leading-none">
+                {msnToast.email}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
+
+      {/* Buzzi Premium VIP Upgrade Modal */}
+      <AnimatePresence>
+        {isPremiumModalOpen && (
+          <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-[2px] flex items-center justify-center z-[99999] p-4 select-none animate-fade-in font-sans">
+            <motion.div 
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              className="w-full max-w-lg bg-gradient-to-b from-[#fffae8] to-[#fdebd0] border-4 border-[#d4af37] shadow-3xl rounded-xl overflow-hidden flex flex-col relative"
+            >
+              {/* Glowing Animated Decorative Header */}
+              <div className="bg-gradient-to-b from-[#d4af37] to-[#aa7c11] text-stone-950 px-4 py-4 flex items-center justify-between border-b-2 border-[#8a6409]">
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-3xl animate-bounce">👑</span>
+                  <div>
+                    <h3 className="font-extrabold text-base sm:text-lg tracking-tight uppercase leading-none text-stone-950 font-sans">
+                      Buzzi Premium VIP Upgrade
+                    </h3>
+                    <span className="text-[10px] text-stone-800 font-bold block mt-1 uppercase tracking-wider font-sans">
+                      Sluit je aan bij de elite van Buzzi Messenger!
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { hiveAudio.playNotification(); setIsPremiumModalOpen(false); }}
+                  className="p-1.5 rounded bg-stone-950 text-white text-xs font-bold hover:bg-stone-800 transition-all cursor-pointer shadow-md leading-none shrink-0"
+                  title="Sluiten"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto max-h-[80vh] space-y-4">
+                
+                {/* VIP Status Summary Card */}
+                {isUserPremium ? (
+                  <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border-2 border-amber-500 p-4 rounded-xl text-center shadow-inner">
+                    <span className="text-5xl animate-spin block mb-3">👑</span>
+                    <h4 className="text-sm font-black text-amber-900 uppercase tracking-widest font-sans">Jij bent een Elite Buzzi VIP lid!</h4>
+                    <p className="text-[11px] text-amber-800 mt-1 font-bold font-sans">
+                      Gefeliciteerd! Alle premium winks (Miauwend Poesje, Euro Geldregen etc.) en de gouden kronen zijn nu geactiveerd voor jouw weergavenaam!
+                    </p>
+                    <button
+                      onClick={() => {
+                        hiveAudio.playCrazyWink();
+                        setIsUserPremium(false);
+                        localStorage.removeItem("buzzi_premium");
+                      }}
+                      className="mt-3.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-lg cursor-pointer"
+                    >
+                      🔴 Premium Deactiveren (Testmodus)
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-300 p-3 rounded-lg text-slate-800 text-xs shadow-xs text-left">
+                    <p className="font-sans font-black text-amber-900 border-b border-amber-200 pb-1.5 mb-2 flex items-center gap-1">
+                      <span>🏆 Exclusieve Premium VIP Voordelen:</span>
+                    </p>
+                    <ul className="space-y-2 text-[11px] pl-1 font-medium text-slate-700 font-sans">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-base shrink-0">👑</span>
+                        <div>
+                          <strong className="text-slate-900">Gouden Kroon & Glamour Schermnaam:</strong> Een prachtige, pulserende kroon naast je naam en een blinkend gouden neon-gloed effect bij vrienden.
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-base shrink-0">🐈</span>
+                        <div>
+                          <strong className="text-slate-900">4 Exclusieve Premium Knipogen (Winks):</strong> Directe toegang tot <strong>Miauwend Poesje</strong>, <strong>Kwispelend Hondje</strong>, <strong>Draaiende Drol</strong> en de <strong>Euro Geldregen</strong>!
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-base shrink-0">💰</span>
+                        <div>
+                          <strong className="text-slate-900">Echte Monetisatie:</strong> activeer de monetization informatie gids en leer direct hoe je centjes verdient met downloads of links!
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+
+                {/* Step 1: Real Payment Details & Link */}
+                {!isUserPremium && (
+                  <div className="space-y-3 bg-white border border-[#bad0e3] p-4 rounded-xl shadow-xs text-left">
+                    <h4 className="text-xs font-black text-[#1c5c8a] uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                      <span>💎 Hoe kan ik betalen en activeren?</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-600 font-semibold leading-normal font-sans">
+                      Steun de hostingkosten van Buzzi Messenger en ontvang levenslange VIP-status! Betalingen lopen direct via veilige en officiële betaallinks.
+                    </p>
+
+                    {/* Simulated Payment Methods */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                      {/* Bunq Option */}
+                      <div className="border border-emerald-300 hover:border-emerald-500 p-2 text-center rounded-lg bg-emerald-50/40 relative group select-none flex flex-col justify-between transition-all hover:scale-[1.01]">
+                        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-mono font-bold text-[7px] px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse shadow-sm whitespace-nowrap">
+                          Aanbevolen
+                        </div>
+                        <div className="mt-1">
+                          <span className="text-xl shrink-0 block mb-1">🌈</span>
+                          <strong className="text-xs text-emerald-800 block font-sans">Bunq Me</strong>
+                          <span className="text-[9px] text-emerald-600 block mt-0.5">Direct & Automatisch VIP</span>
+                        </div>
+                        <a 
+                          href="https://bunq.me/buzzi" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            hiveAudio.playCrazyWink();
+                            setIsUserPremium(true);
+                            localStorage.setItem("buzzi_premium", "true");
+                            updateProfileInDatabase({ isPremium: true });
+                          }}
+                          className="mt-2 block bg-gradient-to-r from-teal-500 to-emerald-600 hover:brightness-110 text-white font-black text-[9px] uppercase px-1 py-1.5 rounded shadow-xs text-center font-sans active:scale-95 transition-transform"
+                        >
+                          Bunq Donatie
+                        </a>
+                      </div>
+
+                      {/* Tikkie Option */}
+                      <div className="border border-sky-200 hover:border-sky-400 p-2 text-center rounded-lg bg-sky-50/40 relative group select-none flex flex-col justify-between transition-all hover:scale-[1.01]">
+                        <div className="mt-1">
+                          <span className="text-xl shrink-0 block mb-1">🏦</span>
+                          <strong className="text-xs text-sky-800 block font-sans">Tikkie Me</strong>
+                          <span className="text-[9px] text-sky-600 block mt-0.5">Veilig & Direct VIP</span>
+                        </div>
+                        <a 
+                          href="https://tikkie.me/buzzi" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            hiveAudio.playCrazyWink();
+                            setIsUserPremium(true);
+                            localStorage.setItem("buzzi_premium", "true");
+                            updateProfileInDatabase({ isPremium: true });
+                          }}
+                          className="mt-2 block bg-gradient-to-r from-sky-500 to-blue-600 hover:brightness-110 text-white font-black text-[9px] uppercase px-1 py-1.5 rounded shadow-xs text-center font-sans active:scale-95 transition-transform"
+                        >
+                          Tikkie €2,50
+                        </a>
+                      </div>
+
+                      {/* PayPal Option */}
+                      <div className="border border-yellow-200 hover:border-yellow-400 p-2 text-center rounded-lg bg-amber-50/20 relative group select-none flex flex-col justify-between transition-all hover:scale-[1.01]">
+                        <div className="mt-1">
+                          <span className="text-xl shrink-0 block mb-1">💳</span>
+                          <strong className="text-xs text-slate-800 block font-sans">PayPal.me</strong>
+                          <span className="text-[9px] text-slate-500 block mt-0.5">Alle valuta's & VIP</span>
+                        </div>
+                        <a 
+                          href="https://www.paypal.com/paypalme" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            hiveAudio.playCrazyWink();
+                            setIsUserPremium(true);
+                            localStorage.setItem("buzzi_premium", "true");
+                            updateProfileInDatabase({ isPremium: true });
+                          }}
+                          className="mt-2 block bg-gradient-to-r from-yellow-500 to-amber-500 hover:brightness-110 text-slate-900 font-extrabold text-[9px] uppercase px-1 py-1.5 rounded shadow-xs text-center font-sans active:scale-95 transition-transform"
+                        >
+                          PayPal Link
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="bg-sky-50 p-2.5 rounded border border-sky-200 text-center font-sans">
+                      <span className="text-[10px] text-slate-500 block">Wil je direct direct upgraden en het testen? Geen zorgen!</span>
+                      <button
+                        onClick={() => {
+                          hiveAudio.playCrazyWink();
+                          setIsUserPremium(true);
+                          localStorage.setItem("buzzi_premium", "true");
+                        }}
+                        className="mt-1.5 w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:brightness-110 border border-amber-600 text-slate-900 font-extrabold text-[11px] uppercase tracking-wider py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow animate-pulse"
+                      >
+                        ⚡ INSTANT VIP ACTIVEREN ! (PROEF)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Premium FAQ / Security notes */}
+                <div className="text-[9.5px] text-slate-400 text-center leading-normal font-sans">
+                  Buzzi Messenger is een nostalgisch community platform. Met jouw premium VIP lidmaatschap bekostigen we de database host en de servercapaciteit. Bedankt voor de support! ❤️
+                </div>
+
+              </div>
+
+              <div className="p-3.5 bg-stone-100 border-t border-slate-200 flex justify-end">
+                <button
+                  onClick={() => { hiveAudio.playNotification(); setIsPremiumModalOpen(false); }}
+                  className="bg-slate-800 hover:bg-slate-950 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer transition-all font-sans"
+                >
+                  Sluiten
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
     </div>

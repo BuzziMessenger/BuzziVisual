@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Smile, CircleAlert, ShieldCheck, Mail, User, Phone, CheckCircle2, ChevronRight, MessageSquareCode, Camera, Upload } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 import { LegalModal } from "./LegalModal";
+import { BuzziLogo } from "./BuzziLogo";
 
 const isCustomAvatar = (avatar: string) => {
   if (!avatar) return false;
@@ -316,18 +317,11 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         </div>
 
         {/* Buzzi Logo Header */}
-        <div className="px-6 pt-5 pb-3 text-center flex flex-col items-center">
-          <div className="relative group">
-            {/* Styled Colorful Retro Butterfly Avatar shape */}
-            <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 via-orange-500 to-sky-500 rounded-full flex items-center justify-center shadow-md animate-bounce border-4 border-white">
-              <Smile className="w-10 h-10 text-white fill-current animate-pulse" />
-            </div>
-            <div className="absolute top-0 right-0 w-5.5 h-5.5 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center text-[10px] shadow-sm font-bold text-white">✓</div>
-          </div>
-          <h1 className="mt-3 text-[#1C427F] font-black text-lg tracking-tighter uppercase drop-shadow-sm flex items-center gap-1.5 justify-center">
-            <span>Buzzi Messenger</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white font-mono lowercase tracking-normal">v7.6.6</span>
-          </h1>
+        <div className="px-6 pt-4 pb-2 text-center flex flex-col items-center relative">
+          <BuzziLogo size={145} textColor="#1C427F" className="transition-all hover:scale-105 duration-300 drop-shadow-md cursor-pointer" />
+          <span className="absolute bottom-2 right-8 text-[9px] px-1 py-0.5 rounded bg-red-500 text-white font-mono lowercase tracking-normal shadow-sm">
+            v7.6.6
+          </span>
         </div>
 
         {/* Invitation Banner Alert if invited */}

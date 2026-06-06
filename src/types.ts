@@ -15,6 +15,13 @@ export interface Message {
   winkId?: string; // e.g. "pig", "crazy", "water", "guitar", "heart"
   customFontColor?: string; // Buzzi custom text color
   customFontFamily?: string; // Buzzi custom font
+  fileTransfer?: {
+    name: string;
+    size: string;
+    progress: number; // 0-100
+    status: "sending" | "completed" | "failed";
+    dataUrl?: string;
+  };
 }
 
 export type StatusType = "online" | "bezet" | "afwezig" | "offline";
@@ -27,6 +34,7 @@ export interface Contact {
   status: StatusType;
   personalMessage: string;
   listeningTo?: string; // Buzzi Music feature: "Luistert nu naar: ..."
+  isPremium?: boolean;
 }
 
 export interface Channel {

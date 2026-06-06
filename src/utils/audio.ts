@@ -754,6 +754,165 @@ class BuzziAudioSynthesizer {
       console.warn("Banana sound failed:", e);
     }
   }
+
+  public playCatWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(1400, now + 0.45);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 0.7);
+    } catch (e) {
+      console.warn("Cat sound failed:", e);
+    }
+  }
+
+  public playDogWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      [0, 0.22].forEach((delay) => {
+        const t = now + delay;
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(380, t + 0.15);
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.19);
+      });
+    } catch (e) {
+      console.warn("Dog sound failed:", e);
+    }
+  }
+
+  public playPoopWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(120, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.55);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 0.65);
+    } catch (e) {
+      console.warn("Poop sound failed:", e);
+    }
+  }
+
+  public playMoneyWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      const notes = [587.33, 659.25, 783.99, 880.00, 1046.50, 1318.51, 1567.98];
+      notes.forEach((freq, idx) => {
+        const t = now + (idx * 0.05);
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.06, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.16);
+      });
+    } catch (e) {
+      console.warn("Money sound failed:", e);
+    }
+  }
+
+  public playOnlineAlert() {
+    this.playLogin();
+  }
+
+  public playOfflineAlert() {
+    const scheme = this.getActiveScheme();
+    if (scheme === "mute") return;
+
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+
+      if (scheme === "classic_messenger") {
+        // Beautiful descending chime arpeggio - classic offline MSN sound!
+        const notes = [1975.53, 1567.98, 1318.51, 987.77, 783.99, 659.25];
+        notes.forEach((freq, idx) => {
+          const t = now + (idx * 0.038);
+          const osc = actx.createOscillator();
+          const gain = actx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t);
+          
+          gain.gain.setValueAtTime(0.001, t);
+          gain.gain.linearRampToValueAtTime(0.09, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+          osc.connect(gain);
+          gain.connect(actx.destination);
+          
+          osc.start(t);
+          osc.stop(t + 0.38);
+        });
+      } else {
+        // Standard Buzzi offline sound - cheerful double descending chime
+        const osc1 = actx.createOscillator();
+        const gain1 = actx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(783.99, now); // G5
+        gain1.gain.setValueAtTime(0.1, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc1.connect(gain1);
+        gain1.connect(actx.destination);
+
+        const osc2 = actx.createOscillator();
+        const gain2 = actx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(523.25, now + 0.1); // C5
+        gain2.gain.setValueAtTime(0.12, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc2.connect(gain2);
+        gain2.connect(actx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.21);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.5);
+      }
+    } catch (e) {
+      console.warn("Buzzi offline sound failed:", e);
+    }
+  }
 }
 
 export const hiveAudio = new BuzziAudioSynthesizer();

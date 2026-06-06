@@ -143,35 +143,136 @@ app.get("/api/db/status", async (req, res) => {
 
   // DOWNLOAD API: Download simulate retro APK for Android
   app.get("/api/download/apk", (req, res) => {
+    const host = req.get("host") || "buzzimessenger.nl";
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const targetUrl = `${protocol}://${host}`;
+    
     const fileContent = "BUZZIMESSENGER_MOBILE_CLIENT v1.2.0-Buzzi\n\n" +
-      "Hallo retro chatter! Dit is de officiële mobiele Buzzi Messenger APK voor Android!\n\n" +
-      "Schakel 'Onbekende bronnen' in bij de beveiligingsinstellingen van je GSM om deze retro-ervaring direct op je telefoon te installeren!\n\n" +
-      "💬 Veel plezier met inbellen, nudges sturen en Buzzi-geluiden!\n\n" +
-      "www.buzzimessenger.nl";
+      "Hallo retro chatter! We maken nu gebruik van de PWA (Progressive Web App) specificatie voor mobiele installaties!\n\n" +
+      "Hierdoor draait de messenger als standalone applicatie volledig op zichzelf, met een eigen app-icoon en zonder Chrome-adresbalken op je startscherm!\n\n" +
+      "====================================================\n" +
+      "📱 HOE TE INSTALLEREN (In 5 seconden):\n" +
+      "====================================================\n" +
+      `1. Open deze link in Chrome op je Android telefoon: ${targetUrl}\n` +
+      "2. Druk op de 3 puntjes rechtsbovenin Chrome.\n" +
+      "3. Tik op 'App installeren' of 'Toevoegen aan startscherm'!\n" +
+      "4. Start de app op via je startscherm - alles werkt live, standalone en up-to-date!\n\n" +
+      "Veel plezier met inbellen!";
     
     const buffer = Buffer.from(fileContent, "utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger.apk");
-    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger_Android_Installatie.txt");
+    res.setHeader("Content-Type", "text/plain");
     res.setHeader("Content-Length", buffer.length);
     res.status(200).send(buffer);
   });
 
-  // DOWNLOAD API: Download simulate retro EXE for Windows
+  // DOWNLOAD API: Download helper installer script to compile real EXE locally
   app.get("/api/download/exe", (req, res) => {
-    const fileContent = "BUZZIMESSENGER_DESKTOP_CLIENT v1.2.0-XP\n\n" +
-      "Hallo retro chatter! Dit is de Windows Desktop-versie van Buzzi Messenger!\n\n" +
-      "Systeemvereisten:\n" +
-      "- Windows 98, ME, 2000, XP, Vista, of Windows 11 met inbelverbinding (56k modem recommended).\n" +
-      "- DirectX 9.0c en minimaal 64MB RAM.\n" +
-      "- Optioneel: Creative Labs SoundBlaster Live! geluidskaart voor kristalheldere Nudge-trillingen!\n\n" +
-      "💬 Veel plezier met inbellen en chatten!\n\n" +
-      "www.buzzimessenger.nl";
+    const host = req.get("host") || "buzzimessenger.nl";
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const targetUrl = `${protocol}://${host}`;
 
-    const buffer = Buffer.from(fileContent, "utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger.exe");
+    const batContent = `@echo off
+title Buzzi Messenger Installer
+cls
+echo ====================================================
+echo   BUZZI MESSENGER - WINDOWS DESKTOP CONVERTER v1.2
+echo ====================================================
+echo.
+echo Bezig met het genereren van uw standalone Buzzi Messenger...
+echo Web-adres: ${targetUrl}
+echo.
+
+set "CSC_PATH=%windir%\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe"
+
+if not exist "%CSC_PATH%" (
+    echo [INFO] C# Compiler niet direct gevonden, we starten edge app-mode op...
+    start msedge --app=${targetUrl}
+    exit /b
+)
+
+echo Bezig met compileren van een echte BuzziMessenger.exe op uw computer...
+
+:: Schrijf de C# Code voor de standalone launcher
+echo using System; > temp_launcher.cs
+echo using System.Diagnostics; >> temp_launcher.cs
+echo public class Program { >> temp_launcher.cs
+echo     public static void Main() { >> temp_launcher.cs
+echo         ProcessStartInfo psi = new ProcessStartInfo(); >> temp_launcher.cs
+echo         psi.FileName = "msedge.exe"; >> temp_launcher.cs
+echo         psi.Arguments = "--app=${targetUrl}"; >> temp_launcher.cs
+echo         psi.WindowStyle = ProcessWindowStyle.Hidden; >> temp_launcher.cs
+echo         Process.Start(psi); >> temp_launcher.cs
+echo     } >> temp_launcher.cs
+echo } >> temp_launcher.cs
+
+:: Compileer C# broncode naar een echte windows executable (.exe)
+"%CSC_PATH%" /target:winexe /out:BuzziMessenger.exe temp_launcher.cs >nul 2>nul
+
+:: Ruim de tijdelijke broncode op
+del temp_launcher.cs >nul 2>nul
+
+if exist "BuzziMessenger.exe" (
+    echo.
+    echo [SUCCES!] BuzziMessenger.exe is succesvol opgebouwd op uw computer!
+    echo.
+    echo U kunt dit installatiescript nu sluiten of verwijderen.
+    echo Start voortaan direct de nieuw aangemaakte 'BuzziMessenger.exe' op!
+    echo.
+    echo Buzzi Messenger start nu op...
+    start BuzziMessenger.exe
+    timeout /t 3 >nul
+) else (
+    echo [INFO] Compileren mislukt, we starten direct op via Microsoft Edge...
+    start msedge --app=${targetUrl}
+)
+exit
+`;
+
+    const buffer = Buffer.from(batContent, "utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=BuzziMessenger_Installer.bat");
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Length", buffer.length);
     res.status(200).send(buffer);
+  });
+
+  // PWA Support: Web App Manifest
+  app.get("/manifest.json", (req, res) => {
+    const manifest = {
+      name: "Buzzi Messenger",
+      short_name: "Buzzi",
+      description: "De ultieme retro chat-buddy uit 2004",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#abd4ff",
+      theme_color: "#0a2d54",
+      icons: [
+        {
+          src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20,50 a30,25 0 1,1 60,0 a30,25 0 1,1 -60,0' fill='%23ffd700'/%3E%3Cpath d='M35,35 a10,15 0 1,1 10,0' fill='%2338bdf8' opacity='0.8'/%3E%3Cpath d='M55,35 a10,15 0 1,1 10,0' fill='%2338bdf8' opacity='0.8'/%3E%3Ccircle cx='40' cy='50' r='4' fill='%23000'/%3E%3Ccircle cx='60' cy='50' r='4' fill='%23000'/%3E%3Cpath d='M45,62 q5,5 10,0' stroke='%23000' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E",
+          sizes: "192x192 512x512",
+          type: "image/svg+xml"
+        }
+      ]
+    };
+    res.setHeader("Content-Type", "application/json");
+    res.json(manifest);
+  });
+
+  // PWA Support: Minimal active Service Worker
+  app.get("/sw.js", (req, res) => {
+    const swCode = `
+      self.addEventListener('install', (e) => {
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', (e) => {
+        e.waitUntil(clients.claim());
+      });
+      self.addEventListener('fetch', (e) => {
+        e.respondWith(fetch(e.request));
+      });
+    `;
+    res.setHeader("Content-Type", "application/javascript");
+    res.send(swCode);
   });
 
   // DB API: Get Messages (MongoDB or Local File backup)

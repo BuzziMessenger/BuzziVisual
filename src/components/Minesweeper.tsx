@@ -16,7 +16,7 @@ type Cell = {
 };
 
 export function Minesweeper({ onClose }: MinesweeperProps) {
-  const [activeTab, setActiveTab] = useState<"minesweeper" | "tictactoe" | "snake">("minesweeper");
+  const [activeTab, setActiveTab] = useState<"minesweeper" | "tictactoe" | "snake" | "memory">("minesweeper");
 
   // ==========================================
   // 💣 MINESWEEPER STATE & LOGIC
@@ -530,6 +530,82 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
     return () => window.removeEventListener("keydown", handleKeys);
   }, [direction, activeTab]);
 
+  // ==========================================
+  // 🧠 MEMORY GAME STATE & LOGIC
+  // ==========================================
+  const MEMORY_EMOJIS = ["🐶", "🐱", "🍕", "🚀", "👑", "🎮", "👾", "💎"];
+  const [memoryGrid, setMemoryGrid] = useState<{ id: number; char: string; isFlipped: boolean; isMatched: boolean }[]>([]);
+  const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
+  const [memoryMoves, setMemoryMoves] = useState(0);
+  const [memoryWin, setMemoryWin] = useState(false);
+
+  const initMemoryGame = () => {
+    const doubled = [...MEMORY_EMOJIS, ...MEMORY_EMOJIS];
+    const shuffled = doubled
+      .map((char, idx) => ({ id: idx, char, isFlipped: false, isMatched: false }))
+      .sort(() => Math.random() - 0.5);
+    setMemoryGrid(shuffled);
+    setFlippedIndices([]);
+    setMemoryMoves(0);
+    setMemoryWin(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === "memory") {
+      initMemoryGame();
+    }
+  }, [activeTab]);
+
+  const handleCardClick = (index: number) => {
+    if (memoryWin || flippedIndices.length >= 2 || memoryGrid[index].isFlipped || memoryGrid[index].isMatched) return;
+
+    hiveAudio.playNotification();
+    const nextGrid = [...memoryGrid];
+    nextGrid[index].isFlipped = true;
+    setMemoryGrid(nextGrid);
+
+    const nextFlipped = [...flippedIndices, index];
+    setFlippedIndices(nextFlipped);
+
+    if (nextFlipped.length === 2) {
+      setMemoryMoves(prev => prev + 1);
+      const [firstIdx, secondIdx] = nextFlipped;
+      if (nextGrid[firstIdx].char === nextGrid[secondIdx].char) {
+        // Match!
+        setTimeout(() => {
+          const matchedGrid = nextGrid.map((card, idx) => {
+            if (idx === firstIdx || idx === secondIdx) {
+              return { ...card, isMatched: true };
+            }
+            return card;
+          });
+          setMemoryGrid(matchedGrid);
+          setFlippedIndices([]);
+          
+          const isGameOver = matchedGrid.every(card => card.isMatched);
+          if (isGameOver) {
+            setMemoryWin(true);
+            hiveAudio.playCrazyWink();
+          } else {
+            hiveAudio.playNotification();
+          }
+        }, 500);
+      } else {
+        // No match
+        setTimeout(() => {
+          const resetGrid = nextGrid.map((card, idx) => {
+            if (idx === firstIdx || idx === secondIdx) {
+              return { ...card, isFlipped: false };
+            }
+            return card;
+          });
+          setMemoryGrid(resetGrid);
+          setFlippedIndices([]);
+        }, 1000);
+      }
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
       <div className="w-full max-w-sm bg-[#eedcc0] border-4 border-[#1c5c8a] shadow-2xl rounded-md flex flex-col overflow-hidden animate-scale-up">
@@ -573,13 +649,23 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
           </button>
           <button
             onClick={() => { hiveAudio.playNotification(); setActiveTab("snake"); }}
-            className={`px-3 py-1 rounded-t-md font-sans border-t border-x transition-all ${
+            className={`px-3 py-1 mr-1 rounded-t-md font-sans border-t border-x transition-all ${
               activeTab === "snake"
                 ? "bg-[#eedcc0] border-[#1c5c8a] font-bold text-[#1c5c8a]"
                 : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
             }`}
           >
             🐍 Nokia Snake
+          </button>
+          <button
+            onClick={() => { hiveAudio.playNotification(); setActiveTab("memory"); }}
+            className={`px-3 py-1 rounded-t-md font-sans border-t border-x transition-all ${
+              activeTab === "memory"
+                ? "bg-[#eedcc0] border-[#1c5c8a] font-bold text-[#1c5c8a]"
+                : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
+            }`}
+          >
+            🧠 Memory
           </button>
         </div>
 
@@ -851,6 +937,54 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
                 </button>
               </div>
 
+            </div>
+          )}
+
+          {/* TAB 4: RETRO MEMORY */}
+          {activeTab === "memory" && (
+            <div className="w-full flex flex-col items-center">
+              <div className="w-full flex justify-between items-center text-xs font-bold text-slate-700 mb-3 px-1">
+                <span className="bg-sky-100 text-[#1c5c8a] border border-sky-300 rounded px-2 py-0.5 font-mono">Zetten: {memoryMoves}</span>
+                {memoryWin ? (
+                  <span className="bg-green-100 text-green-800 border border-green-300 rounded px-2 py-0.5 animate-bounce font-black">🥇 Gewonnen! 🎉</span>
+                ) : (
+                  <button
+                    onClick={initMemoryGame}
+                    className="bg-sky-600 hover:bg-sky-700 text-white font-bold rounded px-2 py-0.5 shadow-sm cursor-pointer text-[10px] uppercase font-sans shrink-0"
+                  >
+                    Herstart
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 w-full max-w-[280px]">
+                {memoryGrid.map((card, idx) => (
+                  <button
+                    key={card.id}
+                    onClick={() => handleCardClick(idx)}
+                    className={`h-14 rounded-lg flex items-center justify-center text-2xl font-bold transition-all shadow-sm select-none border-2 active:scale-95 cursor-pointer ${
+                      card.isFlipped || card.isMatched
+                        ? "bg-amber-100 border-amber-400 rotate-y-180"
+                        : "bg-gradient-to-br from-[#1c5c8a] to-[#2178b8] border-[#124264] hover:brightness-110"
+                    }`}
+                  >
+                    {(card.isFlipped || card.isMatched) ? card.char : "❓"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-[10px] text-slate-500 italic text-center mt-3 max-w-[240px] font-sans">
+                Vind alle 8 paren vintage symbolen met zo min mogelijk zetten!
+              </div>
+
+              {memoryWin && (
+                <button
+                  onClick={initMemoryGame}
+                  className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded px-4 py-2 text-xs uppercase animate-pulse shadow duration-200 cursor-pointer w-full text-center"
+                >
+                  Nog een keer Spelen! 🔄
+                </button>
+              )}
             </div>
           )}
 
