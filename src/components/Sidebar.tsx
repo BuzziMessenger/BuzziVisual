@@ -170,6 +170,8 @@ interface SidebarProps {
   onDeclineFriendRequest?: (id: string) => void;
   activeDbMode?: "mongodb" | "local";
   dbStatus?: any;
+  isReconnectingDb?: boolean;
+  onReconnectDb?: () => void;
 
   isUserPremium?: boolean;
   onOpenPremiumModal?: () => void;
@@ -206,6 +208,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeclineFriendRequest,
   activeDbMode = "local",
   dbStatus = null,
+  isReconnectingDb = false,
+  onReconnectDb,
   isUserPremium = false,
   onOpenPremiumModal,
   onToggleBlockContact,
@@ -1243,17 +1247,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         {/* Sleek, space-saving Database connection status pill */}
-        <div 
-          title={activeDbMode === "mongodb" ? "MongoDB Atlas DB Gekoppeld! Gegevens worden veilig gesynchroniseerd in de cloud." : "Lokaal bestandssysteem backup actief (server-side)."}
-          className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black cursor-help hover:brightness-105 transition-all shadow-xs ${
-            activeDbMode === "mongodb" 
-              ? "bg-emerald-600/10 text-emerald-800 border-emerald-400" 
-              : "bg-amber-600/10 text-amber-800 border-amber-400"
+        <button 
+          type="button"
+          onClick={() => {
+            if (!isReconnectingDb && onReconnectDb) {
+              hiveAudio.playHoneyPop();
+              onReconnectDb();
+            }
+          }}
+          disabled={isReconnectingDb}
+          title={
+            isReconnectingDb 
+              ? "Bezig met herverbinden naar MongoDB Atlas database..." 
+              : activeDbMode === "mongodb" 
+                ? "MongoDB Atlas gekoppeld! Klik hier om verbinding opnieuw te testen." 
+                : "Lokaal bestandssysteem backup actief (server-side). Klik nu om MongoDB Atlas handmatig opnieuw te verbinden!"
+          }
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-black transition-all shadow-xs active:scale-95 cursor-pointer shrink-0 select-none ${
+            isReconnectingDb
+              ? "bg-sky-600/10 text-sky-800 border-sky-400 animate-pulse"
+              : activeDbMode === "mongodb" 
+                ? "bg-emerald-600/10 text-emerald-800 border-emerald-400 hover:bg-emerald-600/20" 
+                : "bg-amber-600/10 text-amber-800 border-amber-400 hover:bg-amber-600/20"
           }`}
         >
-          <span className={`w-1 h-1 rounded-full ${activeDbMode === "mongodb" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-          <span>{activeDbMode === "mongodb" ? "MongoDB Atlas" : "Lokaal Backup"}</span>
-        </div>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            isReconnectingDb 
+              ? "bg-sky-500 animate-spin border border-sky-700" 
+              : activeDbMode === "mongodb" 
+                ? "bg-emerald-500 animate-pulse" 
+                : "bg-amber-500"
+          }`} />
+          <span>
+            {isReconnectingDb 
+              ? "Verbinden..." 
+              : activeDbMode === "mongodb" 
+                ? "MongoDB Atlas" 
+                : "Lokaal Backup 🔁 (klik!)"
+            }
+          </span>
+        </button>
       </div>
 
       {/* Avatar Picker Modal */}

@@ -120,6 +120,10 @@ app.use(express.json());
 // Database Connection Status API
 app.get("/api/db/status", async (req, res) => {
     try {
+      if (req.query.reconnect === "true") {
+        mongoDb = null;
+        lastConnectAttempt = 0;
+      }
       const dbInstance = await getMongoDb();
       const rawUri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
       res.json({
@@ -307,7 +311,7 @@ exit
       
       const docToInsert = {
         ...message,
-        createdAtTimestamp: Date.now()
+        createdAtTimestamp: message.createdAtTimestamp || Date.now()
       };
 
       let savedOk = false;

@@ -246,6 +246,7 @@ export default function App() {
   const [acceptedFriendships, setAcceptedFriendships] = useState<any[]>([]);
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
+  const [isReconnectingDb, setIsReconnectingDb] = useState(false);
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
 
   // Utility tools collapsible/foldable states
@@ -526,15 +527,22 @@ exit
       }
 
       if (!currentProfile) {
-        // Only if user profile does not exist do we create and write the initial default profile!
+        // Fetch values from local storage back-up or fallback to defaults
+        const localSavedName = localStorage.getItem("buzzi_remembered_name") || defaultName;
+        const localSavedAvatar = localStorage.getItem("buzzi_remembered_avatar") || "🧑‍🚀";
+        const localSavedStatus = localStorage.getItem("buzzi_remembered_status") || "online";
+        const localSavedPM = localStorage.getItem("buzzi_remembered_pm") || "Lekker chatten op Buzzi met Buzzi Bot! B-)";
+        const localSavedListening = localStorage.getItem("buzzi_remembered_listening") || "";
+
+        // Only if user profile does not exist do we create and write the initial default or recovered profile!
         const initialProfile = {
           uid: user.uid,
-          name: defaultName,
+          name: localSavedName,
           email: user.email || "",
-          avatar: "🧑‍🚀",
-          status: "online",
-          personalMessage: "Lekker chatten op Buzzi met Buzzi Bot! B-)",
-          listeningTo: ""
+          avatar: localSavedAvatar,
+          status: localSavedStatus,
+          personalMessage: localSavedPM,
+          listeningTo: localSavedListening
         };
         await fetch("/api/db/users", {
           method: "POST",
@@ -542,24 +550,41 @@ exit
           body: JSON.stringify(initialProfile)
         });
         
-        setUserDisplayName(defaultName);
-        setUserPersonalMessage("Lekker chatten op Buzzi met Buzzi Bot! B-)");
-        setUserAvatar("🧑‍🚀");
-        setUserStatus("online");
-        setUserListeningTo("");
+        setUserDisplayName(localSavedName);
+        setUserPersonalMessage(localSavedPM);
+        setUserAvatar(localSavedAvatar);
+        setUserStatus(localSavedStatus as StatusType);
+        setUserListeningTo(localSavedListening);
+
+        // Keep local storage synchronized for persistent seamless log-ins
+        localStorage.setItem("buzzi_remembered_name", localSavedName);
+        localStorage.setItem("buzzi_remembered_avatar", localSavedAvatar);
+        localStorage.setItem("buzzi_remembered_status", localSavedStatus);
+        localStorage.setItem("buzzi_remembered_pm", localSavedPM);
+        localStorage.setItem("buzzi_remembered_listening", localSavedListening);
       } else {
         // Load existing saved profile details securely, preferring local changes to prevent stale server overrides!
         const localSavedName = localStorage.getItem("buzzi_remembered_name") || user.displayName || user.name || "";
         const finalName = localSavedName || currentProfile.name || defaultName;
         setUserDisplayName(finalName);
 
-        setUserPersonalMessage(currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)");
-        setUserAvatar(currentProfile.avatar || "🧑‍🚀");
-        setUserStatus((currentProfile.status as StatusType) || "online");
-        setUserListeningTo(currentProfile.listeningTo || "");
+        const pm = currentProfile.personalMessage || "Lekker chatten op Buzzi met Buzzi Bot! B-)";
+        const av = currentProfile.avatar || "🧑‍🚀";
+        const st = (currentProfile.status as StatusType) || "online";
+        const lt = currentProfile.listeningTo || "";
+
+        setUserPersonalMessage(pm);
+        setUserAvatar(av);
+        setUserStatus(st);
+        setUserListeningTo(lt);
 
         // Keep local storage synchronized for persistent seamless log-ins
         localStorage.setItem("buzzi_remembered_name", finalName);
+        localStorage.setItem("buzzi_remembered_avatar", av);
+        localStorage.setItem("buzzi_remembered_status", st);
+        localStorage.setItem("buzzi_remembered_pm", pm);
+        localStorage.setItem("buzzi_remembered_listening", lt);
+
         const savedUser = localStorage.getItem("buzzi_user");
         if (savedUser) {
           try {
@@ -579,10 +604,10 @@ exit
               uid: user.uid,
               name: finalName,
               email: user.email || "",
-              avatar: currentProfile.avatar || "🧑‍🚀",
-              status: currentProfile.status || "online",
-              personalMessage: currentProfile.personalMessage || "",
-              listeningTo: currentProfile.listeningTo || ""
+              avatar: av,
+              status: st,
+              personalMessage: pm,
+              listeningTo: lt
             })
           }).catch(err => console.warn("Failed self-healing update:", err));
         }
@@ -597,18 +622,25 @@ exit
   const updateProfileInDatabase = async (fields: Partial<any>) => {
     if (!currentUser) return;
 
+    // Cache updated fields to localStorage as local backup
+    if (fields.name !== undefined) localStorage.setItem("buzzi_remembered_name", fields.name);
+    if (fields.avatar !== undefined) localStorage.setItem("buzzi_remembered_avatar", fields.avatar);
+    if (fields.status !== undefined) localStorage.setItem("buzzi_remembered_status", fields.status);
+    if (fields.personalMessage !== undefined) localStorage.setItem("buzzi_remembered_pm", fields.personalMessage);
+    if (fields.listeningTo !== undefined) localStorage.setItem("buzzi_remembered_listening", fields.listeningTo);
+
     try {
       await fetch("/api/db/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uid: currentUser.uid,
-          name: userDisplayName,
+          name: fields.name !== undefined ? fields.name : userDisplayName,
           email: currentUser.email || "",
-          avatar: userAvatar,
-          status: userStatus,
-          personalMessage: userPersonalMessage,
-          listeningTo: userListeningTo,
+          avatar: fields.avatar !== undefined ? fields.avatar : userAvatar,
+          status: fields.status !== undefined ? fields.status : userStatus,
+          personalMessage: fields.personalMessage !== undefined ? fields.personalMessage : userPersonalMessage,
+          listeningTo: fields.listeningTo !== undefined ? fields.listeningTo : userListeningTo,
           isPremium: isUserPremium,
           ...fields
         })
@@ -619,9 +651,13 @@ exit
   };
 
   // Dynamic database connection checker
-  const checkDbStatus = async () => {
+  const checkDbStatus = async (forceReconnect = false) => {
+    if (forceReconnect) {
+      setIsReconnectingDb(true);
+    }
     try {
-      const res = await fetch("/api/db/status");
+      const url = forceReconnect ? "/api/db/status?reconnect=true" : "/api/db/status";
+      const res = await fetch(url);
       if (res.status === 200) {
         const data = await res.json();
         setDbStatus(data);
@@ -633,6 +669,10 @@ exit
       }
     } catch (err) {
       console.warn("Could not load database status dynamically:", err);
+    } finally {
+      if (forceReconnect) {
+        setIsReconnectingDb(false);
+      }
     }
   };
 
@@ -936,7 +976,38 @@ exit
         const res = await fetch("/api/db/users?t=" + Date.now());
         if (res.status === 200) {
           const list = await res.json();
-          const filtered = list
+          
+          let finalUsersList = list;
+          if (list.length <= 1) { // server reset/cleanup happened
+            const savedBackup = localStorage.getItem("buzzi_backup_users");
+            if (savedBackup) {
+              try {
+                const parsedBackup = JSON.parse(savedBackup);
+                if (parsedBackup && parsedBackup.length > 1) {
+                  console.log("[Restore] Restoring other registered users from browser cache back to server...", parsedBackup.length);
+                  parsedBackup.forEach((userDoc: any) => {
+                    if (userDoc.uid !== currentUser.uid) {
+                      fetch("/api/db/users", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(userDoc)
+                      }).catch(e => console.warn("Background restore user failed:", e));
+                    }
+                  });
+                  // Merge so we display them immediately
+                  finalUsersList = parsedBackup;
+                }
+              } catch (err3) {
+                console.warn("Failed to restore users backup:", err3);
+              }
+            }
+          } else {
+            try {
+              localStorage.setItem("buzzi_backup_users", JSON.stringify(list));
+            } catch (errs) {}
+          }
+
+          const filtered = finalUsersList
             .filter((data: any) => data.uid !== currentUser.uid)
             .map((data: any) => {
               const isStale = data.updatedAtTimestamp && (Date.now() - data.updatedAtTimestamp > 300000);
@@ -1356,6 +1427,33 @@ exit
         if (res.status === 200) {
           const list = await res.json();
           
+          let finalMessagesList = list;
+          if (list.length === 0) {
+            const savedBackup = localStorage.getItem("buzzi_backup_messages");
+            if (savedBackup) {
+              try {
+                const parsedBackup = JSON.parse(savedBackup);
+                if (parsedBackup && parsedBackup.length > 0) {
+                  console.log("[Restore] Restoring messages from local browser cache back to server...", parsedBackup.length);
+                  parsedBackup.forEach((msgDoc: any) => {
+                    fetch("/api/db/messages", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(msgDoc)
+                    }).catch(e => console.warn("Background restore message failed:", e));
+                  });
+                  finalMessagesList = parsedBackup;
+                }
+              } catch (err2) {
+                console.warn("Failed to restore messages backup:", err2);
+              }
+            }
+          } else {
+            try {
+              localStorage.setItem("buzzi_backup_messages", JSON.stringify(list));
+            } catch (errs) {}
+          }
+          
           const freshMessages: Record<string, Message[]> = {
             "mensen-van-toen": [],
             "breezer-groep": [],
@@ -1366,7 +1464,7 @@ exit
             "sanne": []
           };
 
-          list.forEach((data: any) => {
+          finalMessagesList.forEach((data: any) => {
             const recId = data.receiverId;
             let conversationKey = recId;
 
@@ -1385,7 +1483,12 @@ exit
             // Check for mobile push / browser notifications on new incoming messages
             if (data.senderId !== currentUser.uid) {
               if (processedMessageIds.current.size > 0 && !processedMessageIds.current.has(data.id)) {
-                if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                // To avoid sending double notifications for restored backup/historic messages,
+                // we ONLY trigger alerts if the message is genuinely new (created within the last 60 seconds).
+                const createdAtTime = data.createdAt ? new Date(data.createdAt).getTime() : data.createdAtTimestamp;
+                const isVeryRecent = createdAtTime ? (Math.abs(Date.now() - createdAtTime) < 60000) : false;
+
+                if (isVeryRecent && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
                   try {
                     let notificationBody = data.text;
                     if (data.isBuzz) {
@@ -2027,6 +2130,8 @@ exit
           onToggleBlockContact={handleToggleBlockContact}
           isSyncMusicEnabled={isSyncMusicEnabled}
           onToggleSyncMusic={handleToggleSyncMusic}
+          isReconnectingDb={isReconnectingDb}
+          onReconnectDb={() => checkDbStatus(true)}
         />
       </div>
 
