@@ -610,10 +610,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {(cleanAdminEmail === "prinsrobbin@gmail.com" || userDisplayName?.toLowerCase().includes("robbin") || userDisplayName?.toLowerCase().includes("admin")) && (
                   <span className="text-amber-500 animate-pulse text-xs" title="Buzzi Systeem Administrator 👑">👑</span>
                 )}
-                {isUserPremium && (
-                  <span className="text-amber-500 drop-shadow font-bold text-xs animate-bounce" title="Buzzi Premium VIP 👑">👑</span>
-                )}
-                <span className={isUserPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse drop-shadow-xs" : ""}>{userDisplayName}</span>
+                <span>{userDisplayName}</span>
               </span>
             )}
 
@@ -717,28 +714,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[8.5px] text-emerald-600 animate-pulse font-normal italic shrink-0">
                 (luistert...)
               </span>
-            )}
-          </div>
-
-          {/* Buzzi Premium Badge/Button */}
-          <div className="mt-1 flex items-center shrink-0">
-            {isUserPremium ? (
-              <div 
-                onClick={onOpenPremiumModal}
-                className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-300 rounded px-2 py-0.5 text-[9px] text-amber-800 font-extrabold shadow-sm select-none animate-pulse cursor-pointer hover:scale-105 transition-transform"
-                title="Buzzi Premium VIP is actief! Klik om voordelen te bekijken 👑"
-              >
-                <span>👑 Premium VIP Actief</span>
-              </div>
-            ) : (
-              <button 
-                type="button"
-                onClick={onOpenPremiumModal}
-                className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-600 text-slate-900 font-black border border-amber-600 rounded px-2 py-0.5 text-[9px] uppercase tracking-wider shadow-sm hover:brightness-110 cursor-pointer active:scale-95 transition-all"
-                title="Word Premium VIP! Klik om te upgraden 👑"
-              >
-                <span>👑 Word Premium VIP</span>
-              </button>
             )}
           </div>
 
@@ -1087,12 +1062,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
                             <span className="text-amber-500 animate-pulse text-[10px]" title="Buzzi Systeem Administrator 👑">👑</span>
                           )}
-                          {contact.isPremium && (
-                            <span className="text-amber-500 drop-shadow font-bold text-[10px] animate-bounce shrink-0" title="Buzzi Premium VIP 👑">👑</span>
-                          )}
-                          <span className={contact.isPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse drop-shadow-xs" : ""}>
-                            {contact.name}
-                          </span>
+                          <span>{contact.name}</span>
                           {isBlocked && (
                             <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded-sm border border-red-200 font-extrabold shrink-0 uppercase tracking-wide">Geblokkeerd</span>
                           )}

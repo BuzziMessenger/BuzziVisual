@@ -117,10 +117,10 @@ const WINKS_LIST = [
   { id: "laser", title: "Neon Laser Ogen", icon: "👁️", desc: "Zet je laserblik op scherp en splits het scherm in tweeën!" },
   { id: "alien", title: "Spaceship UFO", icon: "🛸", desc: "Laat een buitenaards ruimteschip de boel ontvoeren met felle lichten!" },
   { id: "banana", title: "Dansende Banaan", icon: "🍌", desc: "De legendarische dansende banaan swingt over je scherm!" },
-  { id: "cat", title: "Miauwend Poesje", icon: "🐱", desc: "Een schattig oranje katje dat spint en over je scherm huppelt!", isPremium: true },
-  { id: "dog", title: "Kwispelend Hondje", icon: "🐶", desc: "Een dolenthousiaste puppy die je beeldscherm aflikt!", isPremium: true },
-  { id: "poop", title: "Draaiende Drol", icon: "💩", desc: "Een maffe lachende drol met retro-synthesizer scheetgeluiden!", isPremium: true },
-  { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!", isPremium: true }
+  { id: "cat", title: "Miauwend Poesje", icon: "🐱", desc: "Een schattig oranje katje dat spint en over je scherm huppelt!" },
+  { id: "dog", title: "Kwispelend Hondje", icon: "🐶", desc: "Een dolenthousiaste puppy die je beeldscherm aflikt!" },
+  { id: "poop", title: "Draaiende Drol", icon: "💩", desc: "Een maffe lachende drol met retro-synthesizer scheetgeluiden!" },
+  { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -437,15 +437,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleSendWink = (winkId: string, title: string) => {
-    const wink = WINKS_LIST.find(w => w.id === winkId);
-    if (wink?.isPremium && !isUserPremium) {
-      if (onOpenPremiumModal) {
-        onOpenPremiumModal();
-      } else {
-        alert("Upgrade naar Buzzi Premium om deze wink te sturen! 👑");
-      }
-      return;
-    }
     onSendMessage(`*Stuurt knipoog: ${title}*`, false, true, winkId);
     setShowWinksPicker(false);
   };
@@ -523,10 +514,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 ? `👥 Groep: #${activeChannel?.name}` 
                 : <>
                     💬 
-                    {activeContact?.isPremium && (
-                      <span className="text-amber-500 animate-bounce text-xs" title="Buzzi Premium VIP 👑">👑</span>
-                    )}
-                    <span className={activeContact?.isPremium ? "bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-600 bg-clip-text text-transparent font-black animate-pulse" : ""}>
+                    <span>
                       {activeContact?.name}
                     </span>
                     <span className="text-xs text-slate-500 font-normal truncate">&lt;{activeContact?.email}&gt;</span>
@@ -774,11 +762,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold text-slate-800 group-hover:text-pink-700 flex items-center gap-1">
                           <span>{wink.title}</span>
-                          {wink.isPremium && (
-                            <span className="text-[8px] bg-amber-100 text-amber-800 border border-amber-300 rounded-sm px-1 py-0.2 select-none flex items-center gap-0.5 font-bold uppercase shrink-0">
-                              👑 VIP
-                            </span>
-                          )}
                         </div>
                         <div className="text-[9px] text-slate-400 truncate mt-0.5">{wink.desc}</div>
                       </div>
