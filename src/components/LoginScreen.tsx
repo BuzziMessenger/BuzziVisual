@@ -105,11 +105,15 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     try {
       const rememberedEmail = localStorage.getItem("buzzi_remembered_email");
       const rememberedName = localStorage.getItem("buzzi_remembered_name");
+      const rememberedAvatar = localStorage.getItem("buzzi_remembered_avatar");
       if (rememberedEmail) {
         setTypedEmail(rememberedEmail);
       }
       if (rememberedName) {
         setTypedName(rememberedName);
+      }
+      if (rememberedAvatar) {
+        setSelectedAvatar(rememberedAvatar);
       }
     } catch (e) {
       console.warn("Could not read remembered Buzzi login credentials:", e);
@@ -123,8 +127,9 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       setErrorMsg("Voer je e-mailadres in!");
       return;
     }
-    if (!typedEmail.includes("@")) {
-      setErrorMsg("Voer een geldig e-mailadres in (bijvoorbeeld: robin@live.nl)!");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(typedEmail.trim())) {
+      setErrorMsg("Voer een geldig e-mailadres in (bijvoorbeeld: buzzi@buzzimessenger.nl)!");
       return;
     }
     if (emailFlow === "register" && !typedName.trim()) {
@@ -229,6 +234,9 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         try {
           localStorage.setItem("buzzi_remembered_email", targetCleanEmail);
           localStorage.setItem("buzzi_remembered_name", existingUserDoc.name || "");
+          if (existingUserDoc.avatar) {
+            localStorage.setItem("buzzi_remembered_avatar", existingUserDoc.avatar);
+          }
         } catch (e) {
           console.error(e);
         }
@@ -432,7 +440,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               </button>
             </div>
 
-            <form onSubmit={handleCustomEmailLogin} className="px-6 pb-5 flex-1 flex flex-col justify-between">
+            <form onSubmit={handleCustomEmailLogin} noValidate className="px-6 pb-5 flex-1 flex flex-col justify-between">
               <div className="space-y-3">
                 {/* E-mail Input */}
                 <div className="flex flex-col gap-1 text-left">
@@ -443,7 +451,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <input
                     type="email"
                     required
-                    placeholder="bijvoorbeeld: robbin@hotmail.com"
+                    placeholder="bijvoorbeeld: buzzi@buzzimessenger.nl"
                     value={typedEmail}
                     onChange={(e) => setTypedEmail(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"

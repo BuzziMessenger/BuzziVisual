@@ -260,6 +260,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Avatar Selection & Create Group Modals state
   const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    if (isStatusDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isStatusDropdownOpen]);
+
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDesc, setNewGroupDesc] = useState("");
@@ -619,33 +635,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* Custom Status Bullet Selector inside Profile block */}
-            <div className="relative group">
+            <div className="relative" ref={statusMenuRef}>
               <button 
                 type="button"
-                className="hover:scale-110 active:scale-95 transition-transform translate-y-0.5 cursor-pointer flex items-center"
-                title={`Status: ${getStatusLabelText(userStatus)}`}
+                onClick={() => {
+                  hiveAudio.playHoneyPop();
+                  setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                }}
+                className="hover:bg-[#cfe1f5] px-1.5 py-0.5 rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                title={`Status: ${getStatusLabelText(userStatus)} (Klik om te wijzigen)`}
               >
                 {getStatusIcon(userStatus)}
-                <DropdownIcon className="w-3 h-3 text-slate-500 -ml-0.5" />
+                <span className="text-[10px] font-bold text-slate-600 tracking-tight">{getStatusLabelText(userStatus)}</span>
+                <DropdownIcon className="w-3 h-3 text-slate-500" />
               </button>
               
-              {/* Dropdown Menu block (Hover-active on Desktop, clean & compact) */}
-              <div className="hidden group-hover:block absolute left-0 top-full bg-white border border-[#8da7c1] rounded bg-white shadow-lg py-1 w-40 z-50 text-xs text-slate-700 animate-fade-in">
-                {(["online", "bezet", "afwezig", "offline"] as StatusType[]).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => {
-                      onUpdateStatus(st);
-                      hiveAudio.playHoneyPop();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-[#e4ecf7] flex items-center gap-2"
-                  >
-                    {getStatusIcon(st)}
-                    <span>{getStatusLabelText(st)}</span>
-                  </button>
-                ))}
-              </div>
+              {/* Dropdown Menu block (Click-activated, works flawlessly everywhere!) */}
+              {isStatusDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1 bg-white border border-[#8da7c1] rounded shadow-lg py-1.5 w-44 z-50 text-xs text-slate-700 animate-fade-in">
+                  {(["online", "bezet", "afwezig", "offline"] as StatusType[]).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        onUpdateStatus(st);
+                        setIsStatusDropdownOpen(false);
+                        hiveAudio.playHoneyPop();
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-[#e4ecf7] flex items-center gap-2.5 transition-colors"
+                    >
+                      {getStatusIcon(st)}
+                      <span className={userStatus === st ? "font-bold text-[#1E56A0]" : ""}>{getStatusLabelText(st)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

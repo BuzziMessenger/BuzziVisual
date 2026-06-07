@@ -197,6 +197,7 @@ export default function App() {
   const [isBuzzingFlash, setIsBuzzingFlash] = useState(false);
 
   // Custom User Profile configuration for Buzzi Clone
+  const [profileInitialized, setProfileInitialized] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState("Robbin (H)");
   const [userPersonalMessage, setUserPersonalMessage] = useState("Lekker chatten op Buzzi met Buzzi Bot! B-)");
   const [userStatus, setUserStatus] = useState<StatusType>("online");
@@ -615,6 +616,8 @@ exit
     } catch (err) {
       console.warn("User profile init failed, falling back to state:", err);
       setUserDisplayName(defaultName);
+    } finally {
+      setProfileInitialized(true);
     }
   };
 
@@ -1160,7 +1163,7 @@ exit
 
   // Periodic heartbeat to keep client active status fresh on the server
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !profileInitialized) return;
 
     // Send instant update on startup or logins
     updateProfileInDatabase({});
@@ -1170,7 +1173,7 @@ exit
     }, 8000); // 8 seconds pulse
 
     return () => clearInterval(interval);
-  }, [currentUser, userDisplayName, userAvatar, userStatus, userPersonalMessage, userListeningTo]);
+  }, [currentUser, profileInitialized, userDisplayName, userAvatar, userStatus, userPersonalMessage, userListeningTo]);
 
   const visibleChannels = channels;
 
@@ -1630,6 +1633,7 @@ exit
     hiveAudio.playHoneyPop();
     localStorage.removeItem("buzzi_user");
     setCurrentUser(null);
+    setProfileInitialized(false);
   };
 
   const handleLoginSuccess = async (name: string, email: string) => {

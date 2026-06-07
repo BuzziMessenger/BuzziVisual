@@ -96,6 +96,18 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
   const actualGameId = initialGameId || `g_duel_${sortedUids.join("_")}`;
   const amIPlayer1 = myUid === sortedUids[0];
 
+  const isUploadingRef = useRef(false);
+  const tttBoardRef = useRef(tttBoard);
+  const c4BoardRef = useRef(c4Board);
+
+  useEffect(() => {
+    tttBoardRef.current = tttBoard;
+  }, [tttBoard]);
+
+  useEffect(() => {
+    c4BoardRef.current = c4Board;
+  }, [c4Board]);
+
   // Sound Synth Helper
   const playRetroTone = (freqs: number[], duration: number, type: OscillatorType = "sine") => {
     try {
@@ -182,6 +194,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
   // Upload Game State helper (for Multiplayer mode)
   const uploadGameState = async (updates: any) => {
     if (!isMultiplayer) return;
+    isUploadingRef.current = true;
     try {
       const response = await fetch(`/api/db/games?id=${actualGameId}`);
       let existing: any = {};
@@ -210,6 +223,10 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
       });
     } catch (err) {
       console.warn("Failed to upload game state:", err);
+    } finally {
+      setTimeout(() => {
+        isUploadingRef.current = false;
+      }, 700);
     }
   };
 
@@ -233,6 +250,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
     if (!isMultiplayer) return;
 
     const fetchGameStatus = async () => {
+      if (isUploadingRef.current) return;
       try {
         const response = await fetch(`/api/db/games?id=${actualGameId}`);
         if (!response.ok) return;
@@ -264,7 +282,8 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
               }
             });
 
-            const boardChanged = JSON.stringify(mappedBoard) !== JSON.stringify(tttBoard);
+            const currentLocalBoard = tttBoardRef.current;
+            const boardChanged = JSON.stringify(mappedBoard) !== JSON.stringify(currentLocalBoard);
             if (boardChanged) {
               setTttBoard(mappedBoard);
               const isMyTurnNow = game.turn === (amIPlayer1 ? "player1" : "player2");
@@ -301,7 +320,8 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
               })
             );
 
-            const boardChanged = JSON.stringify(mappedC4Board) !== JSON.stringify(c4Board);
+            const currentLocalC4Board = c4BoardRef.current;
+            const boardChanged = JSON.stringify(mappedC4Board) !== JSON.stringify(currentLocalC4Board);
             if (boardChanged) {
               setC4Board(mappedC4Board);
               const isMyTurnNow = game.turn === (amIPlayer1 ? "player1" : "player2");
@@ -358,9 +378,9 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
     };
 
     fetchGameStatus();
-    const interval = setInterval(fetchGameStatus, 2000);
+    const interval = setInterval(fetchGameStatus, 800);
     return () => clearInterval(interval);
-  }, [isMultiplayer, actualGameId, amIPlayer1, tttBoard, c4Board]);
+  }, [isMultiplayer, actualGameId, amIPlayer1]);
 
   // Snake game loop effect
   useEffect(() => {
