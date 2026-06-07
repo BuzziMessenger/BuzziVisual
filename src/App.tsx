@@ -680,6 +680,19 @@ exit
     checkDbStatus();
   }, []);
 
+  // Automatic background reconnect loop for MongoDB database
+  useEffect(() => {
+    if (activeDbMode !== "local") return;
+
+    // Periodically check if we can establish connection to MongoDB automatically in the background
+    const interval = setInterval(() => {
+      console.log("[Auto-Reconnect] Checking database status & auto-reconnecting to MongoDB Atlas...");
+      checkDbStatus(false); 
+    }, 12000); // Check every 12 seconds
+
+    return () => clearInterval(interval);
+  }, [activeDbMode]);
+
   // Background browser music detection syncing via HTMLMediaElement and Media Session API
   useEffect(() => {
     if (!isSyncMusicEnabled) return;
@@ -1488,14 +1501,20 @@ exit
                 const createdAtTime = data.createdAt ? new Date(data.createdAt).getTime() : data.createdAtTimestamp;
                 const isVeryRecent = createdAtTime ? (Math.abs(Date.now() - createdAtTime) < 60000) : false;
 
-                if (isVeryRecent && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-                  try {
-                    let notificationBody = data.text;
-                    if (data.isBuzz) {
-                      notificationBody = "🚨 NUDGE! Stuurde je een nudge duwtje!";
-                    } else if (data.isWink) {
-                      notificationBody = "😉 KNIPOOG! Stuurde een knipoog!";
-                    }
+                if (isVeryRecent) {
+                  if (data.isBuzz) {
+                    handleBuzzIncoming();
+                    hiveAudio.playNudge();
+                  }
+
+                  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                    try {
+                      let notificationBody = data.text;
+                      if (data.isBuzz) {
+                        notificationBody = "🚨 NUDGE! Stuurde je een nudge duwtje!";
+                      } else if (data.isWink) {
+                        notificationBody = "😉 KNIPOOG! Stuurde een knipoog!";
+                      }
                     new Notification(`${data.senderName || "Buzzi Vriend"} 💬`, {
                       body: notificationBody,
                       icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20,50 a30,25 0 1,1 60,0 ' fill='%23ffd700'/%3E%3C/svg%3E",
@@ -1511,7 +1530,8 @@ exit
                   }
                 }
               }
-              processedMessageIds.current.add(data.id);
+            }
+            processedMessageIds.current.add(data.id);
             } else {
               processedMessageIds.current.add(data.id);
             }
@@ -1678,6 +1698,10 @@ exit
       isBuzz: msg.isBuzz || false,
       isWink: msg.isWink || false,
       winkId: msg.winkId || "",
+      isGameDuel: msg.isGameDuel || false,
+      gameType: msg.gameType || undefined,
+      gameId: msg.gameId || "",
+      gameStatus: msg.gameStatus || undefined,
       fileTransfer: msg.fileTransfer || undefined,
       receiverId: activeId,
       createdAt: new Date().toISOString()
@@ -1820,7 +1844,10 @@ exit
     isBuzz: boolean = false,
     isWink: boolean = false,
     winkId?: string,
-    fileTransfer?: any
+    fileTransfer?: any,
+    isGameDuel?: boolean,
+    gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory",
+    gameId?: string
   ) => {
     if (!currentUser) return;
 
@@ -1839,7 +1866,11 @@ exit
       isBuzz: isBuzz,
       isWink: isWink,
       winkId: winkId,
-      fileTransfer: fileTransfer
+      fileTransfer: fileTransfer,
+      isGameDuel: isGameDuel,
+      gameType: gameType,
+      gameId: gameId,
+      gameStatus: isGameDuel ? "inviting" : undefined
     });
 
     const isConversingWithAI = activeId === "queen";

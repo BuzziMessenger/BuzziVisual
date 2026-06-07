@@ -13,6 +13,10 @@ export interface Message {
   isBuzz?: boolean; // True if it is a Nudge/Duwtje
   isWink?: boolean; // True if a fullscreen Wink
   winkId?: string; // e.g. "pig", "crazy", "water", "guitar", "heart"
+  isGameDuel?: boolean; // Game invite
+  gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory";
+  gameId?: string;
+  gameStatus?: "inviting" | "ended" | "active";
   customFontColor?: string; // Buzzi custom text color
   customFontFamily?: string; // Buzzi custom font
   fileTransfer?: {

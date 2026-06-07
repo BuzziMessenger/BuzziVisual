@@ -210,7 +210,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             setLoading(false);
             return;
           } else {
-            setErrorMsg("Dit Buzzi account bestaat nog niet of is niet gevonden. Klik hierboven op 'Registreren' om een account aan te maken!");
+            setErrorMsg("Dit Buzzi account bestaat nog niet of is niet gevonden. Klik hieronder op 'Registreren' om een account aan te maken!");
             setLoading(false);
             return;
           }
@@ -237,7 +237,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       } else {
         // REGISTRATION FLOW
         if (existingUserDoc) {
-          setErrorMsg("Dit e-mailadres is al geregistreerd! Klik hierboven op 'Inloggen' om direct in te loggen.");
+          setErrorMsg("Dit e-mailadres is al geregistreerd! Klik hieronder op 'Inloggen' om direct in te loggen.");
           setLoading(false);
           return;
         }

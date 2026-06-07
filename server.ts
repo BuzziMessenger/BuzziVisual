@@ -13,6 +13,7 @@ const MESSAGES_FILE = path.join(process.cwd(), "data_messages.json");
 const CHANNELS_FILE = path.join(process.cwd(), "data_channels.json");
 const BUGS_FILE = path.join(process.cwd(), "data_bugs.json");
 const FRIEND_REQUESTS_FILE = path.join(process.cwd(), "data_friend_requests.json");
+const GAMES_FILE = path.join(process.cwd(), "data_games.json");
 
 const isVercel = !!process.env.VERCEL;
 const inMemoryCache: Record<string, any> = {};
@@ -64,7 +65,7 @@ function writeJsonFile<T>(filePath: string, data: T): void {
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
 let lastConnectAttempt = 0;
-const CONNECT_COOLDOWN_MS = 25000; // Wait 25 seconds before retrying to avoid spamming timeouts
+const CONNECT_COOLDOWN_MS = 10000; // Overcooldown reduced to 10 seconds for faster automatic background recovery
 
 async function getMongoDb(): Promise<Db | null> {
   const uri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
@@ -644,6 +645,80 @@ exit
     }
   });
 
+  // Multiplayer Games Sync API: GET or POST game states
+  app.get("/api/db/games", async (req, res) => {
+    try {
+      const { id } = req.query;
+      const dbInstance = await getMongoDb();
+      if (dbInstance) {
+        try {
+          if (id) {
+            const game = await dbInstance.collection("games").findOne({ id: id as string });
+            res.json(game ? [game] : []);
+            return;
+          }
+          const games = await dbInstance.collection("games").find({}).toArray();
+          res.json(games);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB games query failed, falling back to local files:", mongoErr);
+        }
+      }
+
+      const fileGames = readJsonFile<any[]>(GAMES_FILE, []);
+      if (id) {
+        const game = fileGames.find((g) => g.id === id);
+        res.json(game ? [game] : []);
+        return;
+      }
+      res.json(fileGames);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/db/games", async (req, res) => {
+    try {
+      const dbInstance = await getMongoDb();
+      const gamePayload = req.body;
+      if (!gamePayload || !gamePayload.id) {
+        res.status(400).json({ error: "Invalid game payload" });
+        return;
+      }
+
+      const docToInsert = {
+        ...gamePayload,
+        updatedAtTimestamp: Date.now()
+      };
+
+      if (dbInstance) {
+        try {
+          await dbInstance.collection("games").replaceOne(
+            { id: gamePayload.id },
+            docToInsert,
+            { upsert: true }
+          );
+          res.json(docToInsert);
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB games save failed, falling back to JSON:", mongoErr);
+        }
+      }
+
+      const fileGames = readJsonFile<any[]>(GAMES_FILE, []);
+      const index = fileGames.findIndex((g) => g.id === gamePayload.id);
+      if (index > -1) {
+        fileGames[index] = docToInsert;
+      } else {
+        fileGames.push(docToInsert);
+      }
+      writeJsonFile(GAMES_FILE, fileGames);
+      res.json(docToInsert);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 6. FRIEND REQUESTS API: GET pending or accepted friend requests/relations
   app.get("/api/friend-requests", async (req, res) => {
     try {
@@ -971,6 +1046,9 @@ exit
       });
     }
   });
+
+  // Serve promotional design and mockup kit images
+  app.use("/promo-images", express.static(path.join(process.cwd(), "src/assets/images")));
 
 async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

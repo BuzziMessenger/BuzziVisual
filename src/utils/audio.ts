@@ -850,6 +850,146 @@ class BuzziAudioSynthesizer {
     }
   }
 
+  public playPinguinWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      // High-pitched penguins tango tap arpeggio
+      const notes = [440, 554.37, 659.25, 880, 659.25, 554.37, 440];
+      notes.forEach((freq, idx) => {
+        const t = now + (idx * 0.1);
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.linearRampToValueAtTime(freq + (idx % 2 === 0 ? 20 : -20), t + 0.08);
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.1);
+      });
+    } catch (e) {
+      console.warn("Pinguin sound failed:", e);
+    }
+  }
+
+  public playHeartbreakerWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      // Cracking glass dissonant chord followed by sliding teardrop frequency
+      const chord = [293.66, 311.13, 349.23, 415.30]; // Dissonant flat
+      chord.forEach((freq) => {
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      });
+
+      // Teardrop slide sliding down
+      const tear = actx.createOscillator();
+      const tearGain = actx.createGain();
+      tear.type = "sine";
+      tear.frequency.setValueAtTime(880, now + 0.35);
+      tear.frequency.linearRampToValueAtTime(220, now + 1.1);
+      tearGain.gain.setValueAtTime(0.001, now + 0.35);
+      tearGain.gain.linearRampToValueAtTime(0.06, now + 0.45);
+      tearGain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+      tear.connect(tearGain);
+      tearGain.connect(actx.destination);
+      tear.start(now + 0.35);
+      tear.stop(now + 1.1);
+    } catch (e) {
+      console.warn("Heartbreaker sound failed:", e);
+    }
+  }
+
+  public playMatrixWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      // Synthesized retro high-speed computing data chimes
+      for (let i = 0; i < 15; i++) {
+        const t = now + (i * 0.05);
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = "sine";
+        // Alternating rising sci-fi scale
+        const freq = 600 + (i * 80) % 900;
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.04, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start(t);
+        osc.stop(t + 0.05);
+      }
+    } catch (e) {
+      console.warn("Matrix sound failed:", e);
+    }
+  }
+
+  public playBeeWink() {
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const actx = this.ctx;
+      const now = actx.currentTime;
+      // Vibrating high buzz frequency
+      const osc = actx.createOscillator();
+      const gainNode = actx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(140, now);
+      // Fast pitch vibrato
+      const lfo = actx.createOscillator();
+      const lfoGain = actx.createGain();
+      lfo.frequency.setValueAtTime(45, now);
+      lfoGain.gain.setValueAtTime(10, now);
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+
+      gainNode.gain.setValueAtTime(0.08, now);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + 1.0);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.25);
+
+      osc.connect(gainNode);
+      gainNode.connect(actx.destination);
+
+      osc.start(now);
+      lfo.start(now);
+      osc.stop(now + 1.25);
+      lfo.stop(now + 1.25);
+
+      // Sweet honey splat chime
+      const chime = actx.createOscillator();
+      const chimeGain = actx.createGain();
+      chime.type = "triangle";
+      chime.frequency.setValueAtTime(523.25, now + 0.8); // C5 splat
+      chimeGain.gain.setValueAtTime(0.12, now + 0.8);
+      chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      chime.connect(chimeGain);
+      chimeGain.connect(actx.destination);
+      chime.start(now + 0.8);
+      chime.stop(now + 1.25);
+    } catch (e) {
+      console.warn("Bee sound failed:", e);
+    }
+  }
+
   public playOnlineAlert() {
     this.playLogin();
   }

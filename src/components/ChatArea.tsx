@@ -45,7 +45,16 @@ interface ChatAreaProps {
   activeContact?: Contact;
   messages: Message[];
   isTyping: boolean;
-  onSendMessage: (text: string, isBuzz?: boolean, isWink?: boolean, winkId?: string) => void;
+  onSendMessage: (
+    text: string,
+    isBuzz?: boolean,
+    isWink?: boolean,
+    winkId?: string,
+    fileTransfer?: any,
+    isGameDuel?: boolean,
+    gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory",
+    gameId?: string
+  ) => void;
   onBuzzIncoming: () => void;
   myDisplayName: string;
   myAvatar: string;
@@ -102,7 +111,19 @@ const BUZZI_EMOTICONS = [
   { code: "(heart_eyes)", char: "😍", name: "Verliefd" },
   { code: "(yawn)", char: "🥱", name: "Gapen" },
   { code: "(alien)", char: "👽", name: "Alien" },
-  { code: "(devil)", char: "😈", name: "Duiveltje" }
+  { code: "(devil)", char: "😈", name: "Duiveltje" },
+  { code: "(fire)", char: "🔥", name: "Vuur" },
+  { code: "(bomb)", char: "💣", name: "Bom" },
+  { code: "(lol)", char: "😂", name: "Lachen" },
+  { code: "(sick)", char: "🤢", name: "Ziek" },
+  { code: "(sleep)", char: "😴", name: "Slapen" },
+  { code: "(wave)", char: "👋", name: "Zwaaien" },
+  { code: "(party)", char: "🎉", name: "Feest" },
+  { code: "(clown)", char: "🤡", name: "Clown" },
+  { code: "(poop)", char: "💩", name: "Maffe Poep" },
+  { code: "(game)", char: "🎮", name: "Spel" },
+  { code: "(yes)", char: "✅", name: "Compleet" },
+  { code: "(no)", char: "❌", name: "Fout" }
 ];
 
 const WINKS_LIST = [
@@ -120,7 +141,11 @@ const WINKS_LIST = [
   { id: "cat", title: "Miauwend Poesje", icon: "🐱", desc: "Een schattig oranje katje dat spint en over je scherm huppelt!" },
   { id: "dog", title: "Kwispelend Hondje", icon: "🐶", desc: "Een dolenthousiaste puppy die je beeldscherm aflikt!" },
   { id: "poop", title: "Draaiende Drol", icon: "💩", desc: "Een maffe lachende drol met retro-synthesizer scheetgeluiden!" },
-  { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!" }
+  { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!" },
+  { id: "pinguin", title: "Dansende MSN Pinguïn", icon: "🐧", desc: "De legendarische retro dansende Linux pinguïn swingt zijn heupen!" },
+  { id: "heartbreaker", title: "MSN Heartbreaker", icon: "💔", desc: "Een pijnlijk gebroken hart dat over je scherm barst!" },
+  { id: "matrix", title: "Retro Matrix Rain", icon: "👾", desc: "Hack het chatvenster met vallende groene cryptische MSN matrixcodes!" },
+  { id: "bee", title: "Buzzi Honingbij", icon: "🐝", desc: "Een maffe bij die zoemend het scherm vult met zoete glinsterhoning!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -146,18 +171,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [showWinksPicker, setShowWinksPicker] = useState(false);
   const [activeWink, setActiveWink] = useState<string | null>(null);
+  const [showWinkClose, setShowWinkClose] = useState(true);
   const lastActiveId = useRef<string | null>(null);
   const processedWinkIds = useRef<Set<string>>(new Set());
 
   // Webcam, spellen en bestand overdracht
   const [showWebcamCall, setShowWebcamCall] = useState(false);
   const [showGameDuel, setShowGameDuel] = useState(false);
+  const [currentGameId, setCurrentGameId] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Reset webcam call en game duel bij gespreks-wisseling
     setShowWebcamCall(false);
     setShowGameDuel(false);
+    setCurrentGameId(undefined);
   }, [activeId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,6 +225,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [mmsColor, setMmsColor] = useState<string>("#1d5fb0"); // Buzzi classic blue text
   const [mmsFont, setMmsFont] = useState<string>("Comic Sans MS"); // Comic Sans default lol
   const [isBold, setIsBold] = useState(true);
+  const [showColorPanel, setShowColorPanel] = useState(true);
 
   // Music Ticker Playlists & Dynamic States
   const CONTACT_PLAYLISTS: Record<string, string[]> = {
@@ -416,12 +445,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         hiveAudio.playPoopWink();
       } else if (lastMsg.winkId === "money") {
         hiveAudio.playMoneyWink();
+      } else if (lastMsg.winkId === "pinguin") {
+        hiveAudio.playPinguinWink();
+      } else if (lastMsg.winkId === "heartbreaker") {
+        hiveAudio.playHeartbreakerWink();
+      } else if (lastMsg.winkId === "matrix") {
+        hiveAudio.playMatrixWink();
+      } else if (lastMsg.winkId === "bee") {
+        hiveAudio.playBeeWink();
       }
+
+      setShowWinkClose(true);
 
       const timer = setTimeout(() => {
         setActiveWink(null);
       }, 5000);
-      return () => clearTimeout(timer);
+
+      const closeTimer = setTimeout(() => {
+        setShowWinkClose(false);
+      }, 2500);
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(closeTimer);
+      };
     }
   }, [messages, activeId]);
 
@@ -551,10 +598,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               {isBlocked ? "🔓 Deblokkeer contact" : "🚫 Blokkeer contact"}
             </button>
           )}
-          <div className="bg-white/80 border border-emerald-200 rounded px-2.5 py-1 flex items-center gap-1 text-[10px] text-emerald-700 font-bold font-mono">
-            <Wifi className="w-3 h-3 text-emerald-600" />
-            <span>BUZZI SECURE DIRECT</span>
-          </div>
         </div>
       </div>
 
@@ -638,39 +681,60 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Letters customization */}
           <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/60 border border-slate-300 rounded-lg shadow-sm">
-            <Palette className="w-3.5 h-3.5 text-slate-500 mr-1" />
-            <div className="flex items-center gap-1">
-              {[
-                { hex: "#121212", name: "Zwart" },
-                { hex: "#1d5fb0", name: "Blauw" },
-                { hex: "#00a8e8", name: "Lichtblauw" },
-                { hex: "#d11f25", name: "Rood" },
-                { hex: "#e5097f", name: "Roze" },
-                { hex: "#15a13c", name: "Groen" },
-                { hex: "#ef7c00", name: "Oranje" },
-                { hex: "#fbc531", name: "Geel" },
-                { hex: "#7d1b8c", name: "Paars" },
-              ].map((c) => (
-                <button
-                  key={c.hex}
-                  onClick={() => {
-                    setMmsColor(c.hex);
-                    hiveAudio.playHoneyPop();
-                  }}
-                  className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer active:scale-90 border flex items-center justify-center ${
-                    mmsColor === c.hex 
-                      ? "border-slate-800 scale-110 shadow-sm ring-1 ring-slate-400" 
-                      : "border-slate-200 hover:scale-105"
-                  }`}
-                  title={c.name}
-                  style={{ backgroundColor: c.hex }}
-                >
-                  {mmsColor === c.hex && (
-                    <span className="w-1 h-1 rounded-full bg-white shadow-xs" />
-                  )}
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={() => {
+                setShowColorPanel(!showColorPanel);
+                hiveAudio.playHoneyPop();
+              }}
+              className="flex items-center gap-1 cursor-pointer hover:bg-slate-200/50 px-1 py-0.5 rounded text-[10px] font-bold text-slate-600 focus:outline-none transition-all"
+              title="Klap kleurenpaneel in of uit"
+            >
+              <Palette className="w-3.5 h-3.5 text-slate-500" />
+              <span>Kleur {showColorPanel ? "▲" : "▼"}</span>
+            </button>
+            
+            {showColorPanel && (
+              <div className="flex items-center gap-1 overflow-x-auto max-w-[140px] sm:max-w-[220px] scrollbar-thin pl-1 border-l border-slate-300 ml-1 py-0.5 animate-fade-in">
+                {[
+                  { hex: "#121212", name: "Zwart" },
+                  { hex: "#1d5fb0", name: "Blauw" },
+                  { hex: "#00a8e8", name: "Lichtblauw" },
+                  { hex: "#d11f25", name: "Rood" },
+                  { hex: "#e5097f", name: "Roze" },
+                  { hex: "#15a13c", name: "Groen" },
+                  { hex: "#ef7c00", name: "Oranje" },
+                  { hex: "#fbc531", name: "Geel" },
+                  { hex: "#7d1b8c", name: "Paars" },
+                  { hex: "#8c52ff", name: "Lavendel" },
+                  { hex: "#ff5757", name: "Warm Koraal" },
+                  { hex: "#00c49f", name: "Jade Mint" },
+                  { hex: "#a4b0be", name: "Retro Grijs" },
+                  { hex: "#b8860b", name: "Messing Goud" },
+                  { hex: "#ff4757", name: "Liefde Rood" },
+                  { hex: "#2ed573", name: "Neon Groen" },
+                  { hex: "#1e90ff", name: "Neon Blauw" },
+                ].map((c) => (
+                  <button
+                    key={c.hex}
+                    onClick={() => {
+                      setMmsColor(c.hex);
+                      hiveAudio.playHoneyPop();
+                    }}
+                    className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer active:scale-90 border flex items-center justify-center shrink-0 ${
+                      mmsColor === c.hex 
+                        ? "border-slate-800 scale-110 shadow-sm ring-1 ring-slate-400" 
+                        : "border-slate-200 hover:scale-105"
+                    }`}
+                    title={c.name}
+                    style={{ backgroundColor: c.hex }}
+                  >
+                    {mmsColor === c.hex && (
+                      <span className="w-1 h-1 rounded-full bg-white shadow-xs" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <button
@@ -809,6 +873,52 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 );
               }
 
+              // Custom Retro Buzzi MSN Game Invitation Card
+              if (msg.isGameDuel) {
+                const DutchGameName = msg.gameType === "tictactoe" 
+                  ? "Boter-Kaas-en-Eieren" 
+                  : msg.gameType === "connect4"
+                  ? "Vier-op-een-rij"
+                  : msg.gameType === "snake"
+                  ? "Buzzi Slang (Snake)"
+                  : msg.gameType === "memory"
+                  ? "Geheugen Trainer"
+                  : "Steen, Papier, Schaar";
+                return (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="mx-auto max-w-sm bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-400 p-4 rounded-xl text-xs font-sans shadow-md my-4 border-b-emerald-600 border-r-emerald-600"
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="bg-emerald-100 p-1 rounded-full text-emerald-700">
+                        <Gamepad2 className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <span className="font-extrabold text-emerald-950 text-[11px] uppercase tracking-wider">
+                        🎮 Buzzi Duel Zone
+                      </span>
+                    </div>
+                    <p className="text-slate-700 mb-3.5 leading-relaxed text-[11px]">
+                      <strong>{msg.senderName}</strong> nodigt je uit voor een legendarische match <strong>{DutchGameName}</strong>! Durf jij de strijd aan?
+                    </p>
+                    <div className="flex justify-between items-center bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
+                      <span className="text-[10px] text-slate-500 font-mono">Status: Uitgenodigd...</span>
+                      <button
+                        onClick={() => {
+                          setCurrentGameId(msg.gameId);
+                          setShowGameDuel(true);
+                          hiveAudio.playHoneyPop();
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded border-b-2 border-emerald-800 text-[10px] active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        ⚔️ SPEEL NU!
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              }
+
               return (
                 <motion.div
                   key={msg.id}
@@ -937,15 +1047,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Full-screen retro Buzzi Winks Overlays */}
         {activeWink && (
-          <div className="absolute inset-0 z-50 pointer-events-none">
+          <div 
+            onClick={() => setActiveWink(null)}
+            className="absolute inset-0 z-50 pointer-events-auto cursor-pointer"
+            title="Klik ergens om te sluiten"
+          >
             {/* Authentic Buzzi Close Button for Winks */}
-            <button
-              onClick={() => setActiveWink(null)}
-              className="absolute top-4 right-4 bg-white/95 hover:bg-white text-slate-800 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center font-bold font-sans text-sm border border-slate-300 shadow-md z-50 pointer-events-auto cursor-pointer transition-all active:scale-90"
-              title="Sluit knipoog"
-            >
-              ✕
-            </button>
+            {showWinkClose && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveWink(null);
+                }}
+                className="absolute top-4 right-4 bg-white/95 hover:bg-white text-slate-800 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center font-bold font-sans text-sm border border-slate-300 shadow-md z-50 pointer-events-auto cursor-pointer transition-all active:scale-90"
+                title="Sluit knipoog"
+              >
+                ✕
+              </button>
+            )}
 
             {/* Pink Pig Wink */}
             {activeWink === "pig" && (
@@ -1464,6 +1583,173 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Dansende MSN Pinguïn Wink */}
+            {activeWink === "pinguin" && (
+              <div className="absolute inset-0 bg-blue-900/15 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
+                <div className="absolute inset-x-0 bottom-12 flex justify-between px-12 opacity-30 pointer-events-none">
+                  <span className="text-8xl animate-bounce">❄️</span>
+                  <span className="text-8xl animate-bounce delay-300">❄️</span>
+                </div>
+                <motion.div
+                  initial={{ x: -250, y: 100, rotate: -20, scale: 0.5 }}
+                  animate={{
+                    x: [-250, 0, 50, -50, 0],
+                    y: [100, -20, 10, -10, 0],
+                    rotate: [-20, 15, -15, 12, 0],
+                    scale: [0.5, 1.4, 1]
+                  }}
+                  transition={{ duration: 2.8, ease: "easeInOut" }}
+                  className="flex flex-col items-center z-20"
+                >
+                  <div className="text-[140px] filter drop-shadow-2xl animate-pulse relative">
+                    🐧
+                    <span className="absolute -top-3 -right-3 text-4xl animate-bounce">🎵</span>
+                  </div>
+                  
+                  <div className="bg-blue-600 text-white font-extrabold border-2 border-white shadow-2xl px-5 py-2.5 rounded-full text-xs uppercase tracking-wider mt-4 animate-bounce border-b-4 border-r-4">
+                    🐧 WADDLE WADDLE! De legendarische tango-pinguïn is er! 🐧
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* MSN Heartbreaker Wink */}
+            {activeWink === "heartbreaker" && (
+              <div className="absolute inset-0 bg-red-900/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in p-6">
+                <div className="absolute inset-0 opacity-40 z-10 pointer-events-none flex flex-wrap gap-12 justify-around">
+                  {[...Array(12)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ y: 300, scale: 0.2 }}
+                      animate={{ y: -400, scale: [0.2, 1.2, 0.5] }}
+                      transition={{ duration: 3, delay: i * 0.15, repeat: Infinity }}
+                      className="text-3xl"
+                    >
+                      💔
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div
+                  initial={{ scale: 0.1, y: -100 }}
+                  animate={{
+                    scale: [0.1, 1.5, 1.1, 1],
+                    y: [-100, 20, 0]
+                  }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="z-20 text-center flex flex-col items-center"
+                >
+                  <div className="text-[160px] filter drop-shadow-2xl relative">
+                    <motion.span
+                      animate={{
+                        rotate: [0, -5, 5, -15, 15],
+                        scale: [1, 1.05, 0.95, 1],
+                      }}
+                      transition={{ duration: 1.8, repeat: Infinity }}
+                      className="inline-block"
+                    >
+                      💔
+                    </motion.span>
+                  </div>
+
+                  <div className="bg-red-700 text-red-50 font-black border-2 border-red-900 shadow-2xl px-6 py-3 rounded-lg text-xs uppercase tracking-wide mt-4 animate-pulse">
+                    💔 MSN HEARTBREAKER... WIJ ZIJN DOOR HET DOLLE HEEN! 💔
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Retro Matrix Rain Wink */}
+            {activeWink === "matrix" && (
+              <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in p-10 font-mono">
+                <div className="absolute inset-0 grid grid-cols-12 opacity-30 select-none overflow-hidden text-[10px] text-green-500 font-mono leading-none z-10">
+                  {[...Array(12)].map((_, col) => (
+                    <motion.div
+                      key={col}
+                      initial={{ y: -500 }}
+                      animate={{ y: 500 }}
+                      transition={{
+                        duration: 2 + Math.random() * 3,
+                        repeat: Infinity,
+                        ease: "linear",
+                        delay: Math.random() * 2
+                      }}
+                      className="flex flex-col gap-0.5"
+                    >
+                      {"010101110011011001010101BUZZIMSNMSNREGELN".split("").map((char, index) => (
+                        <span key={index} className="text-emerald-400 font-bold opacity-80">{char}</span>
+                      ))}
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.8 }}
+                  className="z-20 border border-green-500 bg-black/80 p-6 rounded-md text-center max-w-sm shadow-emerald-500/20 shadow-2xl"
+                >
+                  <div className="text-5xl mb-4 animate-pulse">👾</div>
+                  <h3 className="text-emerald-400 font-bold tracking-widest text-[13px] uppercase mb-2">Hacking Chat Terminal</h3>
+                  <div className="text-emerald-500 text-[10px] tracking-wide mb-4 leading-relaxed bg-black/50 p-2.5 rounded border border-emerald-900/40 text-left">
+                    CD .. <br />
+                    LOADING DIRECT CHAT PROTOCOL v1.0.4... <br />
+                    SECURE CONSOLE ACCESSED SUCCESFULLY ✅ <br />
+                    BUZZI SYSTEMS IN CONTROL...
+                  </div>
+                  <div className="text-xs text-black bg-emerald-500 font-bold px-3 py-1 rounded inline-block animate-pulse">
+                    📟 MATRIX OVERRIDE
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Buzzi Honingbij Wink */}
+            {activeWink === "bee" && (
+              <div className="absolute inset-0 bg-amber-500/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in p-6 font-sans">
+                <div className="absolute inset-0 z-10 pointer-events-none flex flex-wrap gap-20">
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0, opacity: 0, rotate: 0 }}
+                      animate={{
+                        scale: [0, 1.2, 1],
+                        opacity: [0, 0.9, 0.9, 0],
+                        y: [50, -100]
+                      }}
+                      transition={{ duration: 2.2, delay: i * 0.3 }}
+                      className="text-4xl absolute"
+                      style={{
+                        top: `${20 + Math.random() * 60}%`,
+                        left: `${15 + Math.random() * 70}%`
+                      }}
+                    >
+                      🍯
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div
+                  initial={{ x: 150, y: -200, scale: 0.2 }}
+                  animate={{
+                    x: [150, -50, 50, 0],
+                    y: [-200, 50, -20, 0],
+                    scale: [0.2, 1.5, 1.1, 1]
+                  }}
+                  transition={{ duration: 2.4, ease: "backOut" }}
+                  className="z-20 text-center flex flex-col items-center"
+                >
+                  <div className="text-[150px] animate-bounce filter drop-shadow-2xl">
+                    🐝
+                  </div>
+
+                  <div className="bg-amber-655 text-amber-50 bg-amber-600 border-2 border-amber-950 px-5 py-2.5 rounded-xl shadow-2xl text-[11px] uppercase tracking-wider mt-4 animate-pulse border-b-4 border-r-4">
+                    🍯 ZOEM ZOEM! Zoete Honing Direct op je Scherm! 🍯
+                  </div>
+                </motion.div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1561,9 +1847,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           activeContactId={activeId}
           activeContactName={activeContact.name}
           activeContactAvatar={activeContact.avatar}
-          onClose={() => setShowGameDuel(false)}
-          onSendGameStatusMessage={(statusText) => {
-            onSendMessage(statusText, false);
+          myUserId={myUserId}
+          myDisplayName={myDisplayName}
+          initialGameId={currentGameId}
+          onClose={() => {
+            setShowGameDuel(false);
+            setCurrentGameId(undefined);
+          }}
+          onSendGameStatusMessage={(statusText, isGameDuel, gameType, gId) => {
+            onSendMessage(
+              statusText,
+              false,
+              false,
+              undefined,
+              undefined,
+              isGameDuel,
+              gameType,
+              gId
+            );
           }}
         />
       )}
