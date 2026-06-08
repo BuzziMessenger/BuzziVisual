@@ -3,6 +3,7 @@ import { Smile, CircleAlert, ShieldCheck, Mail, User, Phone, CheckCircle2, Chevr
 import { hiveAudio } from "../utils/audio";
 import { LegalModal } from "./LegalModal";
 import { BuzziLogo } from "./BuzziLogo";
+import { translateUI } from "../translations";
 
 const isCustomAvatar = (avatar: string) => {
   if (!avatar) return false;
@@ -11,6 +12,7 @@ const isCustomAvatar = (avatar: string) => {
 
 interface LoginScreenProps {
   onLoginSuccess: (name: string, email: string) => void;
+  siteLanguage?: string;
 }
 
 // Client-side simple string hashing function to prevent plaintext password lookup in users list
@@ -24,7 +26,11 @@ function simpleHash(str: string): string {
   return "h_" + Math.abs(hash).toString(36);
 }
 
-export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, siteLanguage = "NL" }: LoginScreenProps) {
+  const t = (key: string) => {
+    return translateUI(siteLanguage, key);
+  };
+
   const [activeTab, setActiveTab ] = useState<"custom" | "guest">("custom");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -316,7 +322,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         {/* Buzzi Top Window Bar */}
         <div className="bg-gradient-to-r from-[#2154B6] via-[#327EE3] to-[#2154B6] px-4 py-2 flex items-center justify-between text-white border-b border-[#0C3B90]">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold font-mono tracking-wider">GEBRUIKERS INLOGGEN</span>
+            <span className="text-xs font-bold font-mono tracking-wider">{t("GEBRUIKERS INLOGGEN")}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3.5 h-3.5 rounded-sm bg-[#5C94E5] hover:bg-sky-400 border border-[#0F3987] flex items-center justify-center text-[8px] font-bold cursor-pointer">&#9644;</div>
@@ -337,9 +343,9 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div className="mx-6 mb-3 bg-indigo-50 border-2 border-indigo-300 rounded-xl p-3 text-left animate-pulse shadow-sm flex items-start gap-2.5">
             <span className="text-xl">💌</span>
             <div>
-              <div className="text-indigo-950 text-[10px] font-black uppercase tracking-wider">Uitnodiging Ontvangen!</div>
+              <div className="text-indigo-950 text-[10px] font-black uppercase tracking-wider">{t("Uitnodiging Ontvangen!")}</div>
               <p className="text-[10.5px] text-indigo-900 leading-normal font-bold">
-                Je bent uitgenodigd door <strong className="text-[#1C427F]">{invitedBy}</strong>! Meld je hieronder direct aan en chat meteen samen live op Buzzi!
+                {t("Je bent uitgenodigd door")} <strong className="text-[#1C427F]">{invitedBy}</strong>! {t("Meld je hieronder direct aan en chat meteen samen live op Buzzi!")}
               </p>
             </div>
           </div>
@@ -359,7 +365,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 : "text-slate-600 hover:text-[#1C427F]"
             }`}
           >
-            📧 E-mail & Wachtwoord
+            {t("📧 E-mail & Wachtwoord")}
           </button>
           <button
             type="button"
@@ -373,7 +379,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 : "text-slate-600 hover:text-[#1C427F]"
             }`}
           >
-            ⚡ Gast Snelstart
+            {t("⚡ Gast Snelstart")}
           </button>
         </div>
 
@@ -382,12 +388,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <div className="text-emerald-950 text-[10px] font-black uppercase tracking-wider">
-              {activeTab === "guest" ? "Gast Toegang Snelstart:" : "Veilige Logingegevens:"}
+              {activeTab === "guest" ? t("Gast Toegang Snelstart:") : t("Veilige Logingegevens:")}
             </div>
             <p className="text-[10px] text-emerald-900 leading-normal font-medium font-sans">
               {activeTab === "guest"
-                ? "Meld je direct en anoniem aan als Buzzi Gast om de chat meteen uit te proberen, zonder wachtwoord."
-                : "Registreer de eerste keer gratis je e-mail met een wachtwoord naar keuze. Dit zorgt ervoor dat jouw profiel perfect beveiligd is en je chatgesprekken privé blijven!"}
+                ? t("Meld je direct en anoniem aan als Buzzi Gast om de chat meteen uit te proberen, zonder wachtwoord.")
+                : t("Registreer de eerste keer gratis je e-mail met een wachtwoord naar keuze. Dit zorgt ervoor dat jouw profiel perfect beveiligd is en je chatgesprekken privé blijven!")}
             </p>
           </div>
         </div>
@@ -398,7 +404,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <div className="flex items-start gap-2">
               <CircleAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <div className="text-red-950 text-xs font-black">Aanmeldingsfout!</div>
+                <div className="text-red-950 text-xs font-black">{t("Aanmeldingsfout!")}</div>
                 <p className="text-[10px] text-red-900 leading-normal font-semibold font-sans">{errorMsg}</p>
               </div>
             </div>
@@ -422,7 +428,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     : "text-slate-600 hover:text-slate-900 font-bold"
                 }`}
               >
-                Inloggen 🔓
+                {t("Inloggen 🔓")}
               </button>
               <button
                 type="button"
@@ -433,10 +439,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 className={`flex-1 text-xs font-extrabold py-2 rounded-md transition-all cursor-pointer text-center ${
                   emailFlow === "register"
                     ? "bg-emerald-700 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900 font-bold"
+                    : "text-slate-600 hover:text-[#1C427F] font-bold"
                 }`}
               >
-                Registreren ✨
+                {t("Registreren ✨")}
               </button>
             </div>
 
@@ -446,7 +452,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 <div className="flex flex-col gap-1 text-left">
                   <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5" />
-                    <span>E-mailadres</span>
+                    <span>{t("E-mailadres")}</span>
                   </label>
                   <input
                     type="email"
@@ -464,7 +470,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     <div className="flex flex-col gap-1 text-left animate-fade-in">
                       <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
-                        <span>Buzzi Schermnaam</span>
+                        <span>{t("Buzzi Schermnaam")}</span>
                       </label>
                       <input
                         type="text"
@@ -481,7 +487,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                       <div className="flex items-center justify-between">
                         <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                           <span>🧩</span>
-                          <span>Buzzi Avatar of Eigen Foto uploaden</span>
+                          <span>{t("Buzzi Avatar of Eigen Foto uploaden")}</span>
                         </label>
                         <button
                           type="button"
@@ -497,7 +503,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                           }}
                           className="text-[9.5px] font-black text-[#1C427F] hover:text-[#4A86E8] bg-white border border-[#B9CEDF] rounded px-1.5 py-0.5 shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-0.5"
                         >
-                          <span>🎲 Dobbelen!</span>
+                          <span>{t("🎲 Dobbelen!")}</span>
                         </button>
                       </div>
 
@@ -513,7 +519,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                         <div className="flex-1 space-y-1">
                           <label className="cursor-pointer bg-[#1C427F] hover:bg-sky-800 text-white font-black text-[9px] uppercase tracking-wider px-2.5 py-1.5 rounded-md text-center max-w-fit flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow">
                             <Camera className="w-3 h-3" />
-                            <span>📷 Upload Eigen Foto</span>
+                            <span>{t("📷 Upload Eigen Foto")}</span>
                             <input 
                               type="file" 
                               accept="image/*" 
@@ -521,7 +527,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                               className="hidden" 
                             />
                           </label>
-                          <p className="text-[9px] text-[#1C427F] font-bold leading-none">Of klik hieronder op een retro Buzzi avatar:</p>
+                          <p className="text-[9px] text-[#1C427F] font-bold leading-none">{t("Of klik hieronder op een retro Buzzi avatar:")}</p>
                         </div>
                       </div>
 
@@ -550,7 +556,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                       {/* Show current selection if it is a rolled custom one from the deep list of 48 */}
                       {!isCustomAvatar(selectedAvatar) && !["🧑‍🚀", "🦋", "🐝", "🐱", "🐶", "🦊", "🤖", "👽", "🤠", "🧙", "😎", "👾", "🐻", "🦄", "🎮", "🍕", "🎸", "🎧", "🛹", "⚽", "⚡", "🔥", "🌈", "👑"].includes(selectedAvatar) && (
                         <div className="mt-1 flex items-center gap-1.5 bg-[#CFE1F5] p-1 rounded border border-[#16427E] text-[10px] text-slate-800 font-bold self-start animate-fade-in">
-                          <span>Gedobbeld:</span>
+                          <span>{t("Gedobbeld:")}</span>
                           <span className="text-sm bg-white aspect-square h-5 rounded flex items-center justify-center border">{selectedAvatar}</span>
                         </div>
                       )}
@@ -560,12 +566,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     <div className="flex flex-col gap-1 text-left animate-fade-in">
                       <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                         <span>💬</span>
-                        <span>Kies of typ je statusbericht</span>
+                        <span>{t("Kies of typ je statusbericht")}</span>
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="Typ je eigen status..."
+                        placeholder={t("Typ je eigen status...")}
                         value={personalMessage}
                         onChange={(e) => setPersonalMessage(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"
@@ -575,22 +581,25 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                           "Lekker chatten op Buzzi! 😎",
                           "Aan het rocken op Veronica 🎸",
                           "Offline vibe, online chat B-)",
-                          "Zoemend de dag door! 🐝",
+                          "Zoemend de day door! 🐝",
                           "Druk bezig met gamen 🎮"
-                        ].map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => setPersonalMessage(preset)}
-                            className={`text-[8.5px] px-1.5 py-0.5 rounded border text-slate-700 font-medium cursor-pointer transition-all ${
-                              personalMessage === preset
-                                ? "bg-[#1C427F] text-white border-[#1C427F]"
-                                : "bg-[#EAEEF4] hover:bg-[#D9E4EF] border-[#B9CEDF]"
-                            }`}
-                          >
-                            {preset}
-                          </button>
-                        ))}
+                        ].map((preset) => {
+                          const originalPreset = preset.replace("day", "dag"); // normalize key
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setPersonalMessage(t(originalPreset))}
+                              className={`text-[8.5px] px-1.5 py-0.5 rounded border text-slate-700 font-medium cursor-pointer transition-all ${
+                                personalMessage === t(originalPreset)
+                                  ? "bg-[#1C427F] text-white border-[#1C427F]"
+                                  : "bg-[#EAEEF4] hover:bg-[#D9E4EF] border-[#B9CEDF]"
+                              }`}
+                            >
+                              {t(originalPreset)}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
@@ -600,12 +609,12 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 <div className="flex flex-col gap-1 text-left">
                   <label className="text-[10px] font-black text-[#1C427F] uppercase tracking-wider flex items-center gap-1">
                     <span>🔑</span>
-                    <span>Buzzi Wachtwoord</span>
+                    <span>{t("Wachtwoord")}</span>
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder={emailFlow === "register" ? "Kies een nieuw wachtwoord..." : "Voer je wachtwoord in..."}
+                    placeholder={t("Typ je wachtwoord...")}
                     value={typedPassword}
                     onChange={(e) => setTypedPassword(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-lg border-2 border-[#B9CEDF] bg-white text-slate-800 focus:outline-none focus:border-[#4A86E8] select-text font-semibold shadow-inner"
@@ -624,10 +633,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <span className="text-base">{emailFlow === "register" ? "✨" : "🔓"}</span>
                   <span>
                     {loading
-                      ? "Inloggen beveiligen..."
-                      : emailFlow === "register"
-                      ? "Maak account & Inloggen"
-                      : "Direct Veilig Inloggen"}
+                      ? "Buzzi..."
+                      : t("Aanmelden / Registreren")}
                   </span>
                 </button>
               </div>
@@ -640,7 +647,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div className="px-6 pb-6 pt-2 flex-1 flex flex-col justify-between animate-fade-in">
             <div className="space-y-4 text-center">
               <div className="text-[11px] font-bold text-slate-500 leading-relaxed py-1">
-                Wil je liever anoniem rondkijken? Met onze Gast inlogfunctie ben je direct startklaar zonder e-mail of wachtwoord op te hoeven geven.
+                {t("Wil je liever anoniem rondkijken? Met onze Gast inlogfunctie ben je direct startklaar zonder e-mail of wachtwoord op te hoeven geven.")}
               </div>
 
               <button
@@ -657,11 +664,11 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-3 rounded-xl shadow-md border-2 border-amber-700 flex items-center justify-center gap-3 cursor-pointer active:scale-98 transition-all duration-100 uppercase tracking-wider"
               >
                 <span className="text-lg">⚡</span>
-                <span>Als Gast Binnengaan (Direct Chatten)</span>
+                <span>{t("Als Gast Binnengaan (Direct Chatten)")}</span>
               </button>
 
               <div className="text-[9.5px] italic text-slate-400">
-                (Let op: Gast-accounts bewaren geen chatgeschiedenis bij het wissen van browsergegevens)
+                {t("(Let op: Gast-accounts bewaren geen chatgeschiedenis bij het wissen van browsergegevens)")}
               </div>
             </div>
           </div>
@@ -678,7 +685,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               }}
               className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
             >
-              📄 Gebruikersvoorwaarden & Privacy
+              {t("📄 Gebruikersvoorwaarden & Privacy")}
             </button>
             <span className="text-slate-300">•</span>
             <button
@@ -689,7 +696,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               }}
               className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
             >
-              🍪 Cookiebeleid
+              {t("🍪 Cookiebeleid")}
             </button>
             <span className="text-slate-300">•</span>
             <button
@@ -700,7 +707,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               }}
               className="hover:underline font-extrabold uppercase tracking-wide cursor-pointer text-[9px]"
             >
-              ⚖️ Juridische Disclaimer
+              {t("⚖️ Juridische Disclaimer")}
             </button>
           </div>
           <div className="text-[8.5px] font-mono text-slate-400 uppercase tracking-widest mt-0.5">
@@ -711,10 +718,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       {/* Instructional helper with setup guidelines */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center text-white/50 text-[9px] uppercase tracking-wider font-bold">
-        Beveiligd door 128-bit SSL & Buzzi Gateways Ltd™
+        {t("Beveiligd door 128-bit SSL & Buzzi Gateways Ltd™")}
       </div>
 
-      <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
+      <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} siteLanguage={siteLanguage} />
     </div>
   );
 }

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { Channel, Contact, StatusType } from "../types";
 import { hiveAudio } from "../utils/audio";
+import { translateUI } from "../translations";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -179,6 +180,7 @@ interface SidebarProps {
 
   isSyncMusicEnabled?: boolean;
   onToggleSyncMusic?: () => void;
+  siteLanguage?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -214,8 +216,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenPremiumModal,
   onToggleBlockContact,
   isSyncMusicEnabled = false,
-  onToggleSyncMusic
+  onToggleSyncMusic,
+  siteLanguage = "NL"
 }) => {
+  const t = (key: string) => {
+    return translateUI(siteLanguage, key);
+  };
+
   // Collapsible groups states
   const [onlineExpanded, setOnlineExpanded] = useState(true);
   const [offlineExpanded, setOfflineExpanded] = useState(true);
@@ -750,7 +757,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onSignOut}
               className="mt-1.5 self-start text-[10px] text-[#2c659e] hover:text-red-700 font-bold hover:underline cursor-pointer uppercase tracking-wider flex items-center gap-1"
             >
-              <span>🚪 Afmelden</span>
+              <span>🚪 {t("Uitloggen")}</span>
             </button>
           )}
         </div>
@@ -762,7 +769,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input 
             type="text"
-            placeholder="Zoeken..."
+            placeholder={t("Zoeken...")}
             className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-slate-400 select-text text-left"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -778,9 +785,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             hiveAudio.playHoneyPop();
           }}
           className="bg-[#1d5c8a] hover:bg-sky-700 text-white font-extrabold text-[10px] px-2 py-1.5 rounded flex items-center gap-0.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0 uppercase tracking-wide"
-          title="Voeg een nieuwe vriend toe"
+          title={t("Vriend toevoegen")}
         >
-          <span>👤+ Vriend</span>
+          <span>👤+ {t("Toevoegen")}</span>
         </button>
       </div>
 
@@ -1000,7 +1007,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-1">
               {chatbotsExpanded ? <ChevronDown className="w-3 h-3 text-slate-600" /> : <ChevronRight className="w-3 h-3 text-slate-600" />}
-              <span>Buzzi Chat Robots ({chatbots.length}/{chatbots.length})</span>
+              <span>{t("Buzzi Bot & Vrienden")} ({chatbots.length}/{chatbots.length})</span>
             </div>
           </button>
 
@@ -1057,7 +1064,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-1">
               {onlineExpanded ? <ChevronDown className="w-3 h-3 text-slate-600" /> : <ChevronRight className="w-3 h-3 text-slate-600" />}
-              <span>Vrienden online ({onlineContacts.length}/{contacts.length - 1})</span>
+              <span>{t("Favoriete Vrienden")} ({onlineContacts.length}/{contacts.length - 1})</span>
             </div>
           </button>
 
@@ -1155,7 +1162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <div className="flex items-center gap-1">
               {offlineExpanded ? <ChevronDown className="w-3 h-3 text-slate-600" /> : <ChevronRight className="w-3 h-3 text-slate-600" />}
-              <span>Vrienden offline ({offlineContacts.length})</span>
+              <span>{t("Andere contacten")} ({offlineContacts.length})</span>
             </div>
           </button>
 

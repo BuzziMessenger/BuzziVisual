@@ -13,6 +13,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { Minesweeper } from "./components/Minesweeper";
 import { LegalModal } from "./components/LegalModal";
 import { motion, AnimatePresence } from "motion/react";
+import { translateUI } from "./translations";
 
 function simpleHash(str: string): string {
   let hash = 0;
@@ -195,6 +196,16 @@ export default function App() {
     setSimulatedTyping(prev => ({ ...prev, [activeId]: typing }));
   };
   const [isBuzzingFlash, setIsBuzzingFlash] = useState(false);
+
+  // Site language setting for global UI translation (NL by default)
+  const [siteLanguage, setSiteLanguage] = useState<string>(() => {
+    return localStorage.getItem("buzzi_language") || "NL";
+  });
+
+  // Short translation helper for App.tsx
+  const t = (key: string) => {
+    return translateUI(siteLanguage, key);
+  };
 
   // Custom User Profile configuration for Buzzi Clone
   const [profileInitialized, setProfileInitialized] = useState(false);
@@ -833,8 +844,9 @@ exit
 
   useEffect(() => {
     // Clean out old local browser message cache to ensure a 100% fresh start across database wipes!
-    if (!localStorage.getItem("buzzi_backup_messages_cleared_v2")) {
+    if (!localStorage.getItem("buzzi_backup_messages_cleared_v3")) {
       localStorage.removeItem("buzzi_backup_messages");
+      localStorage.setItem("buzzi_backup_messages_cleared_v3", "true");
       localStorage.setItem("buzzi_backup_messages_cleared_v2", "true");
       localStorage.setItem("buzzi_backup_messages_cleared_v1", "true");
       console.log("[Clear] Local messages backup has been cleared on app mount to start with a clean slate.");
@@ -1716,13 +1728,25 @@ exit
   const saveMessageToDatabase = async (msg: Partial<Message>) => {
     if (!currentUser) return;
     const msgId = `m-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    let amsterdamTime = "";
+    let amsterdamDateTime = "";
+    try {
+      amsterdamTime = new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false });
+      amsterdamDateTime = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    } catch (e) {
+      amsterdamTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      amsterdamDateTime = new Date().toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    }
+
     const msgDoc = {
       id: msgId,
       senderId: msg.senderId || currentUser.uid,
       senderName: msg.senderName || userDisplayName,
       senderAvatar: msg.senderAvatar || userAvatar,
       text: msg.text || "",
-      timestamp: msg.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: msg.timestamp || amsterdamTime,
+      createdAtLocal: amsterdamDateTime,
       isBuzz: msg.isBuzz || false,
       isWink: msg.isWink || false,
       winkId: msg.winkId || "",
@@ -1761,13 +1785,25 @@ exit
   const writeSimulatedReply = async (simText: string, simName: string, simAvatar: string, simId: string, additional: Partial<Message> = {}) => {
     if (!currentUser) return;
     const msgId = `m-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    let amsterdamTime = "";
+    let amsterdamDateTime = "";
+    try {
+      amsterdamTime = new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false });
+      amsterdamDateTime = new Date().toLocaleString('nl-NL', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    } catch (e) {
+      amsterdamTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      amsterdamDateTime = new Date().toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    }
+
     const msgDoc = {
       id: msgId,
       senderId: simId, // Use simId so local UI styling formats it correctly
       senderName: simName,
       senderAvatar: simAvatar,
       text: simText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: amsterdamTime,
+      createdAtLocal: amsterdamDateTime,
       isBuzz: additional.isBuzz || false,
       isWink: additional.isWink || false,
       winkId: additional.winkId || "",
@@ -2093,7 +2129,7 @@ exit
   }
 
   if (!currentUser) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} siteLanguage={siteLanguage} />;
   }
 
   return (
@@ -2158,6 +2194,7 @@ exit
           contacts={currentBuddies}
           activeId={activeId}
           activeType={activeType}
+          siteLanguage={siteLanguage}
           onSelectChannel={(cid) => {
             setActiveId(cid);
             setActiveType("channel");
@@ -2221,6 +2258,7 @@ exit
           onToggleBlock={() => handleToggleBlockContact(activeId)}
           isUserPremium={isUserPremium}
           onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
+          siteLanguage={siteLanguage}
         />
       </div>
 
@@ -2539,6 +2577,75 @@ exit
                   </button>
                 </div>
               </div>
+
+              {/* Universal Language Translation Panel */}
+              <div className="bg-white border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-teal-500"></div>
+                
+                <div className="p-3 bg-gradient-to-b from-teal-50 to-[#e9f7f5] pb-2 border-b border-teal-100 flex items-center justify-between">
+                  <h3 className="font-sans font-extrabold text-[#115b51] text-[11px] flex items-center gap-1.5 uppercase tracking-wide">
+                    <span>🌍 {t("Taal selecteren")}</span>
+                  </h3>
+                  <span className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded font-bold font-mono">
+                    {siteLanguage}
+                  </span>
+                </div>
+
+                <div className="p-3 space-y-2">
+                  <p className="text-[10px] text-slate-500 leading-normal font-bold">
+                    {siteLanguage === "NL" 
+                      ? "Verander de taal van de hele Buzzi Messenger website:" 
+                      : siteLanguage === "DE"
+                      ? "Ändere die Sprache der gesamten Buzzi Messenger-Website:"
+                      : siteLanguage === "FR"
+                      ? "Changer la langue de l'ensemble du site Web de Buzzi Messenger :"
+                      : siteLanguage === "ES"
+                      ? "Cambia el idioma de todo el sitio web de Buzzi Messenger:"
+                      : siteLanguage === "IT"
+                      ? "Cambia la lingua di tutto il sito web di Buzzi Messenger:"
+                      : "Change the language of the entire Buzzi Messenger website:"}
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { code: "NL", label: "Nederlands 🇳🇱" },
+                      { code: "EN", label: "English 🇬🇧" },
+                      { code: "DE", label: "Deutsch 🇩🇪" },
+                      { code: "FR", label: "Français 🇫🇷" },
+                      { code: "ES", label: "Español 🇪🇸" },
+                      { code: "IT", label: "Italiano 🇮🇹" }
+                    ].map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setSiteLanguage(lang.code);
+                          localStorage.setItem("buzzi_language", lang.code);
+                          hiveAudio.playHoneyPop();
+                          
+                          setBuzziToast({
+                            show: true,
+                            title: lang.code === "NL" ? "Taal Gewijzigd!" : "Language Changed!",
+                            message: lang.code === "NL" 
+                              ? `De hele website is nu ingesteld op het Nederlands!` 
+                              : `The entire website is now translated to ${lang.label}!`,
+                            avatar: "🌍"
+                          });
+                        }}
+                        className={`px-1.5 py-1 rounded-lg border text-[10px] font-bold text-left transition-all flex items-center justify-between cursor-pointer active:scale-98 ${
+                          siteLanguage === lang.code
+                            ? "bg-teal-500/10 border-teal-500 text-teal-950 font-black"
+                            : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        <span className="truncate">{lang.label}</span>
+                        {siteLanguage === lang.code && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-teal-600 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             /* Bug Reporting panel */
@@ -2850,7 +2957,7 @@ exit
       </div>
 
       {isMinesweeperOpen && (
-        <Minesweeper onClose={() => setIsMinesweeperOpen(false)} />
+        <Minesweeper onClose={() => setIsMinesweeperOpen(false)} siteLanguage={siteLanguage} />
       )}
 
       {/* Classic Windows XP Style Bubble Notice Toast */}

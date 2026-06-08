@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Message, Contact, Channel } from "../types";
 import { motion, AnimatePresence } from "motion/react";
+import { translateUI } from "../translations";
 import { 
   Send, 
   Volume2, 
@@ -66,6 +67,7 @@ interface ChatAreaProps {
   onToggleBlock?: () => void;
   isUserPremium?: boolean;
   onOpenPremiumModal?: () => void;
+  siteLanguage?: string;
 }
 
 const BUZZI_EMOTICONS = [
@@ -166,8 +168,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isBlocked = false,
   onToggleBlock,
   isUserPremium = false,
-  onOpenPremiumModal
+  onOpenPremiumModal,
+  siteLanguage = "NL"
 }) => {
+  const t = (key: string) => {
+    return translateUI(siteLanguage, key);
+  };
+
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
@@ -229,7 +236,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isBold, setIsBold] = useState(true);
   const [showColorPanel, setShowColorPanel] = useState(true);
 
-  // Music Ticker Playlists & Dynamic States
+// Music Ticker Playlists & Dynamic States
   const CONTACT_PLAYLISTS: Record<string, string[]> = {
     queen: [
       "Linkin Park - In The End",
@@ -653,7 +660,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               title="Start een retro videocall / webcam-gesprek!"
             >
               <Video className="w-3.5 h-3.5 text-sky-600" />
-              <span className="font-semibold text-sky-800">Videobellen</span>
+              <span className="font-semibold text-sky-800">{t("Video")}</span>
             </button>
           )}
 
@@ -667,10 +674,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               }}
               disabled={activeContact?.status === "offline"}
               className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 transition-all active:scale-95 border border-transparent hover:border-[#9ebcd1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              title="Verstuur een bestand naar je chatpartner!"
+              title={t("Bestand verzenden")}
             >
               <Paperclip className="w-3.5 h-3.5 text-amber-600" />
-              <span className="font-semibold text-amber-800">Bestand versturen</span>
+              <span className="font-semibold text-amber-800">{t("Bestand verzenden")}</span>
             </button>
           )}
 
@@ -685,10 +692,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               }}
               disabled={activeContact?.status === "offline"}
               className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 transition-all active:scale-95 border border-transparent hover:border-[#9ebcd1] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              title="Speel retro boter-kaas-en-eieren of vier-op-een-rij!"
+              title={t("Spel spelen ! 🎮")}
             >
               <Gamepad2 className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-              <span className="font-semibold text-emerald-800">Spel spelen</span>
+              <span className="font-semibold text-emerald-800">{t("Spellen")}</span>
             </button>
           )}
 
@@ -816,10 +823,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 hiveAudio.playHoneyPop();
               }}
               className="hover:bg-[#cfe1f5] text-[#1d5c8a] px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer border border-[#bad0e3]/40 bg-gradient-to-r from-pink-50 to-white"
-              title="Kies een geanimeerde Wink (Knipoog) over het hele scherm!"
+              title={t("Wink versturen")}
             >
               <Sparkles className="w-3.5 h-3.5 text-pink-500 animate-pulse" />
-              <span className="text-pink-700">Knipogen 😉</span>
+              <span className="text-pink-700">{t("Winks")} 😉</span>
             </button>
 
             {showWinksPicker && (
@@ -1853,10 +1860,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onKeyDown={handleKeyPress}
               placeholder={
                 isBlocked
-                  ? "⚠️ Je hebt deze contactpersoon geblokkeerd."
+                  ? "⚠️ " + t("Deblokkeer")
                   : activeId === "queen"
-                    ? "Vraag deze retro Buzzi-bot alles over 2004..."
-                    : `Schrijf een nostalgisch bericht... (typ emoticons zoals :-D of (H))`
+                    ? "🤖 Buzzi Bot (H) - 2004..."
+                    : t("Typ een bericht...")
               }
               className={`w-full border rounded-xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 placeholder-stone-400 font-sans shadow-inner ${
                 isBlocked

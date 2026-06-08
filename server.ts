@@ -1122,6 +1122,113 @@ exit
     }
   });
 
+  // API Route: Real-Time Translation for global multi-language support (English, German, French, etc.)
+  app.post("/api/translate", async (req, res) => {
+    try {
+      const { text, targetLanguage } = req.body;
+
+      if (!text) {
+        res.status(400).json({ error: "Text is verplicht." });
+        return;
+      }
+
+      // Default back to Dutch if not specified
+      const targetLang = targetLanguage || "Dutch";
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+        // High quality offline translation simulation for typical 2004 words
+        const textLower = text.trim().toLowerCase();
+        let fallback = text;
+
+        if (targetLang.toLowerCase().includes("eng") || targetLang.toLowerCase().includes("en")) {
+          if (textLower.includes("hallo") || textLower.includes("hey")) {
+            fallback = "Hello! Nice to meet you! :-D";
+          } else if (textLower.includes("duwtje") || textLower.includes("nudge")) {
+            fallback = "🚨 NUDGE! Immediate attention required!";
+          } else {
+            fallback = `[Translated to English] ${text}`;
+          }
+        } else if (targetLang.toLowerCase().includes("deu") || targetLang.toLowerCase().includes("dt") || targetLang.toLowerCase().includes("de")) {
+          if (textLower.includes("hallo") || textLower.includes("hey")) {
+            fallback = "Hallo! Schön dich kennenzulernen! :-D";
+          } else if (textLower.includes("duwtje") || textLower.includes("nudge")) {
+            fallback = "🚨 ANSTOSS! Sofortige Aufmerksamkeit erforderlich!";
+          } else {
+            fallback = `[Translated to German] ${text}`;
+          }
+        } else if (targetLang.toLowerCase().includes("fra") || targetLang.toLowerCase().includes("fr")) {
+          if (textLower.includes("hallo") || textLower.includes("hey")) {
+            fallback = "Salut ! Ravi de te rencontrer ! :-D";
+          } else if (textLower.includes("duwtje") || textLower.includes("nudge")) {
+            fallback = "🚨 SIGNAL! Attention immédiate requise !";
+          } else {
+            fallback = `[Translated to French] ${text}`;
+          }
+        }
+        res.json({ translation: fallback });
+        return;
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      const prompt = `Je bent een professionele vertaler geïntegreerd in Buzzi Messenger, een nostalgische MSN Messenger-kloon uit 2004.
+Vertaal het onderstaande bericht zorgvuldig naar de taal: ${targetLang}.
+
+Strikte regels:
+1. Behoud de nostalgische 2004 MSN-sfeer en MSN-jargon (bijvoorbeeld 'w00t', 'lmao', 'omg', 'brb', 'ff', 'mss') op een passende manier in de doeltaal.
+2. Laat emoticons (bijv. :-D, (H), :P, (A), (L), (W), (K), (S), 😉, 👑, 🤖) en nudges (🚨 DUWTJE! ...) EXACT onaangeroerd! Vertaal ze niet en verander de symbolen niet!
+3. Geef ENKEL de vertaalde tekst terug. Voeg geen aanhalingstekens, inleiding, uitleg of extra bron/doel-vermeldingen toe.
+
+Bericht om te vertalen:
+"${text}"`;
+
+      // Fallback model sequence
+      const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+      let response: any = null;
+      let lastError: any = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              temperature: 0.3,
+            },
+          });
+          if (response) {
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`Translation API: model ${modelName} selected. Trying fallback...`, err);
+          lastError = err;
+        }
+      }
+
+      if (!response && lastError) {
+        throw lastError;
+      }
+
+      let translatedResult = response?.text?.trim() || text;
+      // Strip wrapping quotes if any
+      if (translatedResult.startsWith('"') && translatedResult.endsWith('"')) {
+        translatedResult = translatedResult.slice(1, -1);
+      }
+      res.json({ translation: translatedResult });
+    } catch (error: any) {
+      console.error("Express /api/translate Error:", error);
+      res.json({ translation: `[Fout bij vertalen] ${req.body?.text || ""}` });
+    }
+  });
+
   // Serve promotional design and mockup kit images
   app.use("/promo-images", express.static(path.join(process.cwd(), "src/assets/images")));
 

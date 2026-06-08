@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { Smile, RefreshCw, X, Play, RotateCcw } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 
+import { translateUI } from "../translations";
+
 interface MinesweeperProps {
   onClose: () => void;
+  siteLanguage?: string;
 }
 
 type Cell = {
@@ -15,8 +18,12 @@ type Cell = {
   neighborMines: number;
 };
 
-export function Minesweeper({ onClose }: MinesweeperProps) {
-  const [activeTab, setActiveTab] = useState<"minesweeper" | "tictactoe" | "snake" | "memory">("minesweeper");
+export function Minesweeper({ onClose, siteLanguage = "NL" }: MinesweeperProps) {
+  const t = (key: string) => {
+    return translateUI(siteLanguage, key);
+  };
+
+  const [activeTab, setActiveTab ] = useState<"minesweeper" | "tictactoe" | "snake" | "memory">("minesweeper");
 
   // ==========================================
   // 💣 MINESWEEPER STATE & LOGIC
@@ -635,7 +642,7 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
                 : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
             }`}
           >
-            💣 Mijnenveger
+            💣 {t("Mijnenveger")}
           </button>
           <button
             onClick={() => { hiveAudio.playNotification(); setActiveTab("tictactoe"); }}
@@ -665,7 +672,7 @@ export function Minesweeper({ onClose }: MinesweeperProps) {
                 : "bg-stone-200 border-transparent text-slate-600 hover:bg-stone-300"
             }`}
           >
-            🧠 Memory
+            🧠 {t("Memory")}
           </button>
         </div>
 
