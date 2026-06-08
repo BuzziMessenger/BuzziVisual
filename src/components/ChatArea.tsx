@@ -53,7 +53,9 @@ interface ChatAreaProps {
     fileTransfer?: any,
     isGameDuel?: boolean,
     gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory",
-    gameId?: string
+    gameId?: string,
+    isCallInvite?: boolean,
+    callId?: string
   ) => void;
   onBuzzIncoming: () => void;
   myDisplayName: string;
@@ -142,9 +144,9 @@ const WINKS_LIST = [
   { id: "dog", title: "Kwispelend Hondje", icon: "🐶", desc: "Een dolenthousiaste puppy die je beeldscherm aflikt!" },
   { id: "poop", title: "Draaiende Drol", icon: "💩", desc: "Een maffe lachende drol met retro-synthesizer scheetgeluiden!" },
   { id: "money", title: "Euro Geldregen", icon: "💸", desc: "Laat het dikke eurobiljetten regenen over je chatvenster!" },
-  { id: "pinguin", title: "Dansende MSN Pinguïn", icon: "🐧", desc: "De legendarische retro dansende Linux pinguïn swingt zijn heupen!" },
-  { id: "heartbreaker", title: "MSN Heartbreaker", icon: "💔", desc: "Een pijnlijk gebroken hart dat over je scherm barst!" },
-  { id: "matrix", title: "Retro Matrix Rain", icon: "👾", desc: "Hack het chatvenster met vallende groene cryptische MSN matrixcodes!" },
+  { id: "pinguin", title: "Dansende Buzzi Pinguïn", icon: "🐧", desc: "De legendarische retro dansende Linux pinguïn swingt zijn heupen!" },
+  { id: "heartbreaker", title: "Buzzi Heartbreaker", icon: "💔", desc: "Een pijnlijk gebroken hart dat over je scherm barst!" },
+  { id: "matrix", title: "Retro Matrix Rain", icon: "👾", desc: "Hack het chatvenster met vallende groene cryptische Buzzi matrixcodes!" },
   { id: "bee", title: "Buzzi Honingbij", icon: "🐝", desc: "Een maffe bij die zoemend het scherm vult met zoete glinsterhoning!" }
 ];
 
@@ -629,6 +631,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               type="button"
               onClick={() => {
+                const callId = `call-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                onSendMessage(
+                  "📹 Wil een videoverbinding met je starten!",
+                  false,
+                  false,
+                  undefined,
+                  undefined,
+                  false,
+                  undefined,
+                  undefined,
+                  true,
+                  callId
+                );
                 setShowWebcamCall(true);
                 setShowGameDuel(false);
                 hiveAudio.playHoneyPop();
@@ -914,6 +929,46 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       >
                         ⚔️ SPEEL NU!
                       </button>
+                    </div>
+                  </motion.div>
+                );
+              }
+
+              // Custom Retro Buzzi Webcampopp calling Invitation Card
+              if (msg.isCallInvite) {
+                return (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="mx-auto max-w-sm bg-gradient-to-br from-sky-50 to-blue-50 border-2 border-sky-400 p-4 rounded-xl text-xs font-sans shadow-md my-4 border-b-sky-600 border-r-sky-600"
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="bg-sky-100 p-1 rounded-full text-sky-700">
+                        <Video className="w-4 h-4 animate-pulse text-sky-600" />
+                      </div>
+                      <span className="font-extrabold text-sky-950 text-[11px] uppercase tracking-wider">
+                        📹 Buzzi Videoverbinding
+                      </span>
+                    </div>
+                    <p className="text-slate-700 mb-3.5 leading-relaxed text-[11px]">
+                      <strong>{msg.senderName}</strong> nodigt je uit voor een <strong>videogesprek</strong> op de live webcam! Neem je op?
+                    </p>
+                    <div className="flex justify-between items-center bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
+                      <span className="text-[10px] text-slate-500 font-mono">Status: Oproep...</span>
+                      {isMe ? (
+                        <span className="text-[10px] text-slate-400 italic font-medium">Bellen...</span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setShowWebcamCall(true);
+                            hiveAudio.playHoneyPop();
+                          }}
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold px-3 py-1.5 rounded border-b-2 border-sky-800 text-[10px] active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          📞 OPNEMEN
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -1584,7 +1639,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
-            {/* Dansende MSN Pinguïn Wink */}
+            {/* Dansende Buzzi Pinguïn Wink */}
             {activeWink === "pinguin" && (
               <div className="absolute inset-0 bg-blue-900/15 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in">
                 <div className="absolute inset-x-0 bottom-12 flex justify-between px-12 opacity-30 pointer-events-none">
@@ -1614,7 +1669,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
-            {/* MSN Heartbreaker Wink */}
+            {/* Buzzi Heartbreaker Wink */}
             {activeWink === "heartbreaker" && (
               <div className="absolute inset-0 bg-red-900/10 flex flex-col items-center justify-center pointer-events-auto overflow-hidden select-none animate-fade-in p-6">
                 <div className="absolute inset-0 opacity-40 z-10 pointer-events-none flex flex-wrap gap-12 justify-around">
@@ -1654,7 +1709,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
 
                   <div className="bg-red-700 text-red-50 font-black border-2 border-red-900 shadow-2xl px-6 py-3 rounded-lg text-xs uppercase tracking-wide mt-4 animate-pulse">
-                    💔 MSN HEARTBREAKER... WIJ ZIJN DOOR HET DOLLE HEEN! 💔
+                    💔 BUZZI HEARTBREAKER... WIJ ZIJN DOOR HET DOLLE HEEN! 💔
                   </div>
                 </motion.div>
               </div>
@@ -1677,7 +1732,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       }}
                       className="flex flex-col gap-0.5"
                     >
-                      {"010101110011011001010101BUZZIMSNMSNREGELN".split("").map((char, index) => (
+                      {"010101110011011001010101BUZZIPROFIELREGELN".split("").map((char, index) => (
                         <span key={index} className="text-emerald-400 font-bold opacity-80">{char}</span>
                       ))}
                     </motion.div>
@@ -1838,6 +1893,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           activeContactId={activeId}
           activeContactName={activeContact.name}
           activeContactAvatar={activeContact.avatar}
+          myUserId={myUserId}
           onClose={() => setShowWebcamCall(false)}
         />
       )}

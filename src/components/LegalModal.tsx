@@ -83,7 +83,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose }) => {
             </p>
             <ul className="list-disc list-inside pl-1 text-[10px] text-slate-600 space-y-0.5 font-medium">
               <li>Je inlogstatus en retro-identiteit (schermnaam, avatar) te onthouden.</li>
-              <li>Je gekozen MSN-geluidsschema en voorkeuren op te slaan.</li>
+              <li>Je gekozen Buzzi-geluidsschema en voorkeuren op te slaan.</li>
               <li>De acceptatie van deze voorwaarden te onthouden zodat je niet telkens opnieuw akkoord hoeft te gaan.</li>
             </ul>
             <p className="text-[10px] text-slate-500 italic">

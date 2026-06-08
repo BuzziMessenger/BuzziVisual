@@ -571,13 +571,13 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
       }
 
       onSendGameStatusMessage(
-        `🎮 Heeft je uitgenodigd voor een spelletje Retro MSN ${DutchName}! Speel live mee door op de knop te klikken!`,
+        `🎮 Heeft je uitgenodigd voor een spelletje Retro Buzzi ${DutchName}! Speel live mee door op de knop te klikken!`,
         true,
         type,
         actualGameId
       );
     } else {
-      onSendGameStatusMessage(`🎮 Heeft je uitgenodigd voor een spelletje MSN ${DutchName}! Verbinding gestart.`);
+      onSendGameStatusMessage(`🎮 Heeft je uitgenodigd voor een spelletje Buzzi ${DutchName}! Verbinding gestart.`);
       setTimeout(() => {
         triggerBotChatter("start");
       }, 1200);
@@ -1153,7 +1153,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
                 🎮
               </div>
               <h3 className="text-sm font-black text-slate-800 px-2 leading-snug">
-                Speel MSN Retro Spelletjes met {activeContactName}!
+                Speel Buzzi Retro Spelletjes met {activeContactName}!
               </h3>
               <p className="text-[10.5px] text-slate-500 max-w-xs leading-normal px-2">
                 Kies een nostalgisch turn-based mini-game. Je vriend kan direct live meedoen over de chat status-koppeling!
@@ -1206,7 +1206,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
                 >
                   <span className="text-xl filter drop-shadow">🪨 📄 ✂️</span>
                   <span className="text-[11px] font-extrabold text-emerald-800 leading-none">Steen, Papier, Schaar</span>
-                  <span className="text-[9px] text-slate-500 font-mono font-medium">MSN Retro Classic Rock-Paper-Scissors</span>
+                  <span className="text-[9px] text-slate-500 font-mono font-medium">Buzzi Retro Classic Rock-Paper-Scissors</span>
                 </button>
               </div>
             </div>

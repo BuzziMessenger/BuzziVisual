@@ -387,7 +387,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <p className="text-[10px] text-emerald-900 leading-normal font-medium font-sans">
               {activeTab === "guest"
                 ? "Meld je direct en anoniem aan als Buzzi Gast om de chat meteen uit te proberen, zonder wachtwoord."
-                : "Registreer de eerste keer gratis je e-mail met een wachtwoord naar keuze. Dit beveiligt jouw profiel en chatgesprekken!"}
+                : "Registreer de eerste keer gratis je e-mail met een wachtwoord naar keuze. Dit zorgt ervoor dat jouw profiel perfect beveiligd is en je chatgesprekken privé blijven!"}
             </p>
           </div>
         </div>

@@ -167,7 +167,7 @@ export const FileTransfer: React.FC<FileTransferProps> = ({
         {status === "pending" && (
           <div className="space-y-2">
             <p className="text-slate-500 italic leading-snug">
-              🚨 <strong>{senderName}</strong> wil het bestand verzenden via een directe MSN verbinding.
+              🚨 <strong>{senderName}</strong> wil het bestand verzenden via een directe Buzzi verbinding.
             </p>
             <div className="flex items-center gap-2.5 pt-1">
               <button

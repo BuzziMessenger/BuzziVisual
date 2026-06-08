@@ -832,10 +832,34 @@ exit
   };
 
   useEffect(() => {
+    // Clean out old local browser message cache to ensure a 100% fresh start across database wipes!
+    if (!localStorage.getItem("buzzi_backup_messages_cleared_v2")) {
+      localStorage.removeItem("buzzi_backup_messages");
+      localStorage.setItem("buzzi_backup_messages_cleared_v2", "true");
+      localStorage.setItem("buzzi_backup_messages_cleared_v1", "true");
+      console.log("[Clear] Local messages backup has been cleared on app mount to start with a clean slate.");
+    }
+
     const savedUser = localStorage.getItem("buzzi_user");
     if (savedUser) {
       try {
-        const parsed = JSON.parse(savedUser);
+        let parsed = JSON.parse(savedUser);
+        let updatedLocally = false;
+        if (parsed) {
+          if (parsed.name && typeof parsed.name === "string" && /Robbin/i.test(parsed.name)) {
+            parsed.name = parsed.name.replace(/Robbin/gi, "Test");
+            updatedLocally = true;
+          }
+          if (parsed.displayName && typeof parsed.displayName === "string" && /Robbin/i.test(parsed.displayName)) {
+            parsed.displayName = parsed.displayName.replace(/Robbin/gi, "Test");
+            updatedLocally = true;
+          }
+          if (updatedLocally) {
+            localStorage.setItem("buzzi_user", JSON.stringify(parsed));
+            localStorage.setItem("buzzi_remembered_name", parsed.name || parsed.displayName || "Test");
+            console.log("[Migration] Automatically migrated local session 'Robbin' keywords to 'Test'");
+          }
+        }
         setCurrentUser(parsed);
         initUserProfile(parsed);
       } catch (e) {
@@ -1707,6 +1731,9 @@ exit
       gameId: msg.gameId || "",
       gameStatus: msg.gameStatus || undefined,
       fileTransfer: msg.fileTransfer || undefined,
+      isCallInvite: msg.isCallInvite || false,
+      callId: msg.callId || "",
+      callStatus: msg.callStatus || undefined,
       receiverId: activeId,
       createdAt: new Date().toISOString()
     };
@@ -1851,7 +1878,9 @@ exit
     fileTransfer?: any,
     isGameDuel?: boolean,
     gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory",
-    gameId?: string
+    gameId?: string,
+    isCallInvite?: boolean,
+    callId?: string
   ) => {
     if (!currentUser) return;
 
@@ -1874,7 +1903,10 @@ exit
       isGameDuel: isGameDuel,
       gameType: gameType,
       gameId: gameId,
-      gameStatus: isGameDuel ? "inviting" : undefined
+      gameStatus: isGameDuel ? "inviting" : undefined,
+      isCallInvite: isCallInvite || false,
+      callId: callId || "",
+      callStatus: isCallInvite ? "dialing" : undefined
     });
 
     const isConversingWithAI = activeId === "queen";

@@ -12,6 +12,7 @@ interface WebcamCallProps {
   activeContactId: string;
   activeContactName: string;
   activeContactAvatar: string;
+  myUserId?: string;
   onClose: () => void;
 }
 
@@ -19,9 +20,11 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
   activeContactId,
   activeContactName,
   activeContactAvatar,
+  myUserId,
   onClose
 }) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [callStatus, setCallStatus] = useState<"dialing" | "connecting" | "active" | "ended">("dialing");
   const [isMuted, setIsMuted] = useState(false);
@@ -29,9 +32,13 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isFpsDrop, setIsFpsDrop] = useState(false);
   const [remoteCaption, setRemoteCaption] = useState("");
+  const [roomId, setRoomId] = useState<string>("");
   
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+
+  const isAIBot = ["queen", "kelly", "wouter", "danny", "sanne"].includes(activeContactId);
 
   // Synthesize dialing or calling sounds retro style
   const playBeep = (freq: number, duration: number, type: OscillatorType = "sine") => {
@@ -80,7 +87,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
     }
 
     if (callStatus === "active") {
-      // Happy MSN connecting chime
+      // Happy Buzzi connecting chime
       playBeep(880, 0.15);
       setTimeout(() => playBeep(1109, 0.15), 100);
       setTimeout(() => playBeep(1318, 0.25), 200);
@@ -122,7 +129,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
         "Wacht, mijn zus roept dat ze op de inbelverbinding wil!"
       ],
       wouter: [
-        "Vet cool dit man! \m/",
+        "Vet cool dit man! \\m/",
         "Ik neem dit op via een echte VHS-band!",
         "Numb van Linkin Park staat op herhaling!",
         "Mijn SoundBlaster audio kraakt een beetje..."
@@ -137,7 +144,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
         "Heeeeeey! Wat leuk dit! ✨",
         "Mijn webcam was super goedkoop (10 euro)!",
         "Er zit stof op mijn webcam lens geloof ik.",
-        "Kopje thee erbij en MSN'en maar!"
+        "Kopje thee erbij en Buzzi'en maar!"
       ]
     };
 
@@ -159,16 +166,21 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
 
   // Connect local camera stream
   useEffect(() => {
-    // Phase 1: Dialing for 3 seconds, then Connecting for 2 seconds, then Active!
-    const dialTimer = setTimeout(() => {
-      setCallStatus("connecting");
-      
-      const connectTimer = setTimeout(() => {
-        setCallStatus("active");
-      }, 1800);
+    let active = true;
 
-      return () => clearTimeout(connectTimer);
-    }, 3200);
+    // Phase 1 fallback (only for bot mode. For WebTC, we transition on connection!)
+    let dialTimer: NodeJS.Timeout;
+    if (isAIBot) {
+      dialTimer = setTimeout(() => {
+        setCallStatus("connecting");
+        
+        const connectTimer = setTimeout(() => {
+          setCallStatus("active");
+        }, 1800);
+
+        return () => clearTimeout(connectTimer);
+      }, 3200);
+    }
 
     // Initialize media capture
     const startCamera = async () => {
@@ -178,18 +190,22 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
             video: { width: 320, height: 240, facingMode: "user" },
             audio: true
           });
-          setLocalStream(stream);
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
+          if (active) {
+            setLocalStream(stream);
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = stream;
+            }
           }
         } else {
-          setCameraError("Browser ondersteunt geen webcam media APIs.");
+          if (active) setCameraError("Browser ondersteunt geen webcam media APIs.");
         }
       } catch (err: any) {
         console.warn("Could not start local camera", err);
-        setCameraError(
-          "Webcam niet gevonden of toegang geweigerd. We tonen een vintage webcam-simulatie!"
-        );
+        if (active) {
+          setCameraError(
+            "Webcam niet gevonden of toegang geweigerd. We tonen een vintage webcam-simulatie!"
+          );
+        }
       }
     };
 
@@ -197,12 +213,155 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
 
     // Cleanup on unmount
     return () => {
-      clearTimeout(dialTimer);
+      active = false;
+      if (dialTimer) clearTimeout(dialTimer);
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
+
+  // WebRTC Real-Time Signaling Handshake Hook
+  useEffect(() => {
+    if (isAIBot || !myUserId || !localStream) {
+      return;
+    }
+
+    const calculatedRoomId = [myUserId, activeContactId].sort().join("-");
+    setRoomId(calculatedRoomId);
+
+    let active = true;
+    let pc: RTCPeerConnection | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let localCandidatesUploaded: string[] = [];
+    let remoteCandidatesAdded: string[] = [];
+
+    const initializeWebRTC = async () => {
+      pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" }
+        ]
+      });
+      pcRef.current = pc;
+
+      // Add local audio and video tracks to WebRTC
+      localStream.getTracks().forEach(track => {
+        if (pc) pc.addTrack(track, localStream);
+      });
+
+      // Handle receiving remote media stream
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0] && active) {
+          setRemoteStream(event.streams[0]);
+          setCallStatus("active");
+        }
+      };
+
+      let isCaller = false;
+      try {
+        setCallStatus("connecting");
+        const res = await fetch(`/api/db/calls/signal?roomId=${calculatedRoomId}`);
+        const signalData = await res.json();
+        
+        if (signalData && signalData.offer) {
+          // Callee Mode: Set offer and create answer
+          isCaller = false;
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData.offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          await fetch("/api/db/calls/signal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roomId: calculatedRoomId, type: "answer", data: answer })
+          });
+        } else {
+          // Caller Mode: Reset room and create initial offer
+          isCaller = true;
+          await fetch("/api/db/calls/signal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roomId: calculatedRoomId, type: "reset" })
+          });
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          await fetch("/api/db/calls/signal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roomId: calculatedRoomId, type: "offer", data: offer })
+          });
+        }
+      } catch (err) {
+        console.warn("WebRTC Initial handshake failed:", err);
+      }
+
+      // Candidate handling
+      pc.onicecandidate = (event) => {
+        if (event.candidate && active) {
+          const candStr = JSON.stringify(event.candidate);
+          if (!localCandidatesUploaded.includes(candStr)) {
+            localCandidatesUploaded.push(candStr);
+            fetch("/api/db/calls/signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId: calculatedRoomId,
+                type: isCaller ? "caller_candidate" : "callee_candidate",
+                data: event.candidate
+              })
+            }).catch(err => console.warn("ICE upload skipped:", err));
+          }
+        }
+      };
+
+      // Periodic poller for answer and remote ICE candidates
+      pollInterval = setInterval(async () => {
+        if (!active || !pc) return;
+        try {
+          const res = await fetch(`/api/db/calls/signal?roomId=${calculatedRoomId}`);
+          const signalInfo = await res.json();
+          if (!signalInfo) return;
+
+          // If caller, get callee's answer
+          if (isCaller && signalInfo.answer && pc.signalingState === "have-local-offer") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signalInfo.answer));
+            setCallStatus("active");
+          }
+
+          // Gather ICE candidates from peer
+          const foreignCandidates = isCaller ? signalInfo.calleeCandidates : signalInfo.callerCandidates;
+          if (foreignCandidates && foreignCandidates.length > 0) {
+            for (const item of foreignCandidates) {
+              const itemStr = JSON.stringify(item);
+              if (!remoteCandidatesAdded.includes(itemStr)) {
+                remoteCandidatesAdded.push(itemStr);
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(item));
+                } catch (candidateErr) {
+                  console.warn("ICE remote input problem", candidateErr);
+                }
+              }
+            }
+          }
+        } catch (pollErr) {
+          console.warn("Signal poller error:", pollErr);
+        }
+      }, 1250);
+    };
+
+    initializeWebRTC();
+
+    return () => {
+      active = false;
+      if (pollInterval) clearInterval(pollInterval);
+      if (pc) {
+        pc.close();
+      }
+    };
+  }, [localStream, myUserId, activeContactId, isAIBot]);
 
   // Update local video element when stream is active
   useEffect(() => {
@@ -322,21 +481,34 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
                   ) : (
                     // Regular contacts retro webcam display
                     <div className="w-full h-full relative flex flex-col items-center justify-center overflow-hidden bg-slate-900">
-                      {/* Character image with retro filters */}
-                      <div className="w-24 h-24 rounded border-2 border-slate-500/40 p-0.5 bg-white shadow-md relative group-hover:scale-105 transition-transform">
-                        {activeContactAvatar.length > 5 ? (
-                          <img src={activeContactAvatar} alt="Webcam Simulatie" className="w-full h-full object-cover filter brightness-95 contrast-105 saturate-90" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-full h-full bg-[#1e4675] flex items-center justify-center text-4xl">
-                            {activeContactAvatar}
+                      {remoteStream && !isAIBot ? (
+                        <video
+                          ref={(el) => {
+                            if (el && el.srcObject !== remoteStream) {
+                              el.srcObject = remoteStream;
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          className="w-full h-full object-cover filter brightness-95 contrast-105 saturate-100"
+                        />
+                      ) : (
+                        /* Character image with retro filters */
+                        <div className="w-24 h-24 rounded border-2 border-slate-500/40 p-0.5 bg-white shadow-md relative group-hover:scale-105 transition-transform">
+                          {activeContactAvatar.length > 5 ? (
+                            <img src={activeContactAvatar} alt="Webcam Simulatie" className="w-full h-full object-cover filter brightness-95 contrast-105 saturate-90" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-full h-full bg-[#1e4675] flex items-center justify-center text-4xl">
+                              {activeContactAvatar}
+                            </div>
+                          )}
+                          {/* Fake red dot recording indicator */}
+                          <div className="absolute -top-1 -left-1 px-1 py-0.2 bg-red-600 rounded text-[7px] text-white font-extrabold flex items-center gap-0.5 shadow">
+                            <span className="w-1 h-1 rounded-full bg-white animate-ping" />
+                            <span>OPNAME</span>
                           </div>
-                        )}
-                        {/* Fake red dot recording indicator */}
-                        <div className="absolute -top-1 -left-1 px-1 py-0.2 bg-red-600 rounded text-[7px] text-white font-extrabold flex items-center gap-0.5 shadow">
-                          <span className="w-1 h-1 rounded-full bg-white animate-ping" />
-                          <span>OPNAME</span>
                         </div>
-                      </div>
+                      )}
 
                       {/* Animated retro graphics loops */}
                       <div className="absolute bottom-1 right-2 text-[10px] font-mono text-amber-500/70 select-none flex items-center gap-1">

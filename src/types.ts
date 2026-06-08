@@ -17,6 +17,9 @@ export interface Message {
   gameType?: "tictactoe" | "connect4" | "rps" | "snake" | "memory";
   gameId?: string;
   gameStatus?: "inviting" | "ended" | "active";
+  isCallInvite?: boolean; // Real WebRTC calling invite
+  callId?: string;
+  callStatus?: "dialing" | "connecting" | "active" | "ended";
   customFontColor?: string; // Buzzi custom text color
   customFontFamily?: string; // Buzzi custom font
   fileTransfer?: {
