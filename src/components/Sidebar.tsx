@@ -181,6 +181,7 @@ interface SidebarProps {
   isSyncMusicEnabled?: boolean;
   onToggleSyncMusic?: () => void;
   siteLanguage?: string;
+  unreadCounts?: Record<string, number>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -217,7 +218,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleBlockContact,
   isSyncMusicEnabled = false,
   onToggleSyncMusic,
-  siteLanguage = "NL"
+  siteLanguage = "NL",
+  unreadCounts = {}
 }) => {
   const t = (key: string) => {
     return translateUI(siteLanguage, key);
@@ -1035,10 +1037,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-1 w-full">
                           <span className="text-xs font-bold text-slate-800 truncate block">
                             {contact.name} <span className="text-sky-600 text-[10px] font-normal font-mono">({contact.email.split("#pwd_")[0]})</span>
                           </span>
+                          {unreadCounts[contact.id] > 0 && (
+                            <span className="bg-[#FF5A00] text-white font-mono rounded-full text-[9px] px-1.5 py-0.5 leading-none shrink-0 font-extrabold animate-pulse shadow-sm min-w-[16px] text-center" title={`${unreadCounts[contact.id]} ongelezen berichten`}>
+                              {unreadCounts[contact.id]}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10.5px] text-slate-400 italic truncate leading-none mt-0.5">
                           &ldquo;{contact.personalMessage}&rdquo;
@@ -1093,15 +1100,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                       
                       <div className="flex-1 min-w-0 pr-1">
-                        <span className={`text-xs font-bold truncate block flex items-center gap-1 ${isBlocked ? "line-through text-slate-400" : "text-slate-800"}`}>
-                          {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
-                            <span className="text-amber-500 animate-pulse text-[10px]" title="Buzzi Systeem Administrator 👑">👑</span>
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className={`text-xs font-bold truncate block flex items-center gap-1 ${isBlocked ? "line-through text-slate-400" : "text-slate-800"}`}>
+                            {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
+                              <span className="text-amber-500 animate-pulse text-[10px]" title="Buzzi Systeem Administrator 👑">👑</span>
+                            )}
+                            <span>{contact.name}</span>
+                            {isBlocked && (
+                              <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded-sm border border-red-200 font-extrabold shrink-0 uppercase tracking-wide">Geblokkeerd</span>
+                            )}
+                          </span>
+                          {unreadCounts[contact.id] > 0 && (
+                            <span className="bg-[#FF5A00] text-white font-mono rounded-full text-[9px] px-1.5 py-0.5 leading-none shrink-0 font-extrabold animate-pulse shadow-sm min-w-[16px] text-center" title={`${unreadCounts[contact.id]} ongelezen berichten`}>
+                              {unreadCounts[contact.id]}
+                            </span>
                           )}
-                          <span>{contact.name}</span>
-                          {isBlocked && (
-                            <span className="text-[8px] bg-red-100 text-red-700 px-1 rounded-sm border border-red-200 font-extrabold shrink-0 uppercase tracking-wide">Geblokkeerd</span>
-                          )}
-                        </span>
+                        </div>
                         
                         <p className={`text-[10.5px] italic truncate leading-none mt-0.5 ${isBlocked ? "text-slate-300" : "text-slate-400"}`}>
                           &ldquo;{contact.personalMessage}&rdquo;
@@ -1185,12 +1199,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="absolute -bottom-1 -right-1 leading-none">{getStatusIcon("offline")}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs text-slate-600 font-medium truncate block flex items-center gap-1">
-                          {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
-                            <span className="text-amber-500 text-[10px]" title="Buzzi Systeem Administrator 👑 font-bold">👑</span>
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className="text-xs text-slate-600 font-medium truncate block flex items-center gap-1">
+                            {(contact.name?.toLowerCase().includes("robbin") || contact.email?.toLowerCase().includes("robbin") || contact.name?.toLowerCase().includes("admin")) && (
+                              <span className="text-amber-500 text-[10px]" title="Buzzi Systeem Administrator 👑 font-bold">👑</span>
+                            )}
+                            <span>{contact.name}</span>
+                          </span>
+                          {unreadCounts[contact.id] > 0 && (
+                            <span className="bg-[#FF5A00] text-white font-mono rounded-full text-[9px] px-1.5 py-0.5 leading-none shrink-0 font-extrabold animate-pulse shadow-sm min-w-[16px] text-center opacity-80 group-hover:opacity-100" title={`${unreadCounts[contact.id]} ongelezen berichten`}>
+                              {unreadCounts[contact.id]}
+                            </span>
                           )}
-                          <span>{contact.name}</span>
-                        </span>
+                        </div>
                         <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>
                       </div>
                     </button>
@@ -1254,9 +1275,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <span className="text-lg leading-none">👥</span>
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-[#1d5c8a] truncate block">
-                        #{channel.name}
-                      </span>
+                      <div className="flex items-center justify-between gap-1 w-full">
+                        <span className="text-xs font-bold text-[#1d5c8a] truncate block">
+                          #{channel.name}
+                        </span>
+                        {unreadCounts[channel.id] > 0 && (
+                          <span className="bg-[#FF5A00] text-white font-mono rounded-full text-[9px] px-1.5 py-0.5 leading-none shrink-0 font-extrabold animate-pulse shadow-sm min-w-[16px] text-center" title={`${unreadCounts[channel.id]} ongelezen berichten`}>
+                            {unreadCounts[channel.id]}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">
                         {channel.description}
                       </p>

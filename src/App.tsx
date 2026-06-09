@@ -8,10 +8,11 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { Message, Channel, Contact, StatusType } from "./types";
 import { hiveAudio } from "./utils/audio";
-import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send, Smartphone, Laptop, Volume2, Coins } from "lucide-react";
+import { Sparkles, Trophy, Users, RefreshCw, Smile, Compass, AlertTriangle, Play, Database, Wifi, CheckCircle2, Share2, Link, Send, Smartphone, Laptop, Volume2, Coins, Gamepad2, Video } from "lucide-react";
 import { LoginScreen } from "./components/LoginScreen";
 import { Minesweeper } from "./components/Minesweeper";
 import { LegalModal } from "./components/LegalModal";
+import { AndroidInstallModal } from "./components/AndroidInstallModal";
 import { motion, AnimatePresence } from "motion/react";
 import { translateUI } from "./translations";
 
@@ -186,6 +187,7 @@ export default function App() {
   
   // Keeps track of processed messages to only notify on new incoming ones during live polling
   const processedMessageIds = useRef<Set<string>>(new Set());
+  const isInitialSyncCompletedRef = useRef(false);
   
   // App-status
   const [messages, setMessages] = useState<Record<string, Message[]>>(INITIAL_MESSAGES);
@@ -250,6 +252,15 @@ export default function App() {
     });
   };
 
+  useEffect(() => {
+    if (activeId) {
+      setUnreadCounts(prev => {
+        if (!prev[activeId]) return prev;
+        return { ...prev, [activeId]: 0 };
+      });
+    }
+  }, [activeId]);
+
   // Account and Database states
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -260,6 +271,13 @@ export default function App() {
   const [activeDbMode, setActiveDbMode] = useState<"mongodb" | "local">("local");
   const [isReconnectingDb, setIsReconnectingDb] = useState(false);
   const [isMinesweeperOpen, setIsMinesweeperOpen] = useState(false);
+
+  const isUserAnAdmin = !!(
+    (currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase() === "prinsrobbin@gmail.com" || 
+    userDisplayName?.toLowerCase().includes("robbin") ||
+    userDisplayName?.toLowerCase().includes("admin") ||
+    userDisplayName?.toLowerCase().includes("operator")
+  );
 
   // Utility tools collapsible/foldable states
   const [isNaamVersierderExpanded, setIsNaamVersierderExpanded] = useState(false);
@@ -284,6 +302,28 @@ export default function App() {
     return false;
   });
   const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
+  const [blockedIps, setBlockedIps] = useState<string[]>([]);
+  const [deletedMsgIds, setDeletedMsgIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("buzzi_deleted_msg_ids");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [allDatabaseMessages, setAllDatabaseMessages] = useState<any[]>([]);
+  const [adminLogSearch, setAdminLogSearch] = useState<string>("");
+  const [adminLogReceiverFilter, setAdminLogReceiverFilter] = useState<string>("Alle");
+  const [myIpAddress, setMyIpAddress] = useState<string>("Detecteren...");
+
+  // Global Call & Game Intercept / Autostart states
+  const [activeCallInvite, setActiveCallInvite] = useState<any>(null);
+  const [activeGameInvite, setActiveGameInvite] = useState<any>(null);
+  const [autoStartCallId, setAutoStartCallId] = useState<string | undefined>(undefined);
+  const [autoStartGameId, setAutoStartGameId] = useState<string | undefined>(undefined);
+  const [autoStartGameType, setAutoStartGameType] = useState<string | undefined>(undefined);
 
   // Buzzi Clone interactive tools state
   const [generatedName, setGeneratedName] = useState("");
@@ -292,7 +332,7 @@ export default function App() {
   const [checking, setChecking] = useState(false);
 
   // Bug reporting variables
-  const [activeUtilityTab, setActiveUtilityTab] = useState<"tools" | "bugs">("tools");
+  const [activeUtilityTab, setActiveUtilityTab] = useState<"tools" | "bugs" | "admin">("tools");
   const [bugsList, setBugsList] = useState<any[]>([]);
   const [bugTitle, setBugTitle] = useState("");
   const [bugDescription, setBugDescription] = useState("");
@@ -690,8 +730,143 @@ exit
     }
   };
 
+  const fetchBlockedIps = async () => {
+    try {
+      const res = await fetch("/api/admin/blocked-ips");
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedIps(data);
+      }
+    } catch (err) {
+      console.warn("Error fetching blocked IPs:", err);
+    }
+  };
+
+  const handleBlockIp = async (ip: string) => {
+    try {
+      const res = await fetch("/api/admin/blocked-ips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip })
+      });
+      if (res.ok) {
+        await fetchBlockedIps();
+        setBuzziToast({
+          show: true,
+          title: "IP Geblokkeerd! 🚫",
+          message: `IP-adres ${ip} is nu succesvol geblokkeerd op Buzzi Messenger!`,
+          avatar: "👑"
+        });
+        hiveAudio.playHoneyPop();
+      }
+    } catch (err) {
+       console.warn("Error blocking IP:", err);
+    }
+  };
+
+  const handleUnblockIp = async (ip: string) => {
+    try {
+      const res = await fetch("/api/admin/blocked-ips", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip })
+      });
+      if (res.ok) {
+        await fetchBlockedIps();
+        setBuzziToast({
+          show: true,
+          title: "IP Gedeblokkeerd! 🔓",
+          message: `IP-adres ${ip} is succesvol gedeblokkeerd.`,
+          avatar: "👑"
+        });
+        hiveAudio.playHoneyPop();
+      }
+    } catch (err) {
+       console.warn("Error unblocking IP:", err);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string, name: string) => {
+    if (!window.confirm(`Weet je zeker dat je lid "${name}" permanent wilt verwijderen uit de Buzzi database?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/db/users/${uid}`, { method: "DELETE" });
+      if (res.ok) {
+        setRegisteredUsers(prev => prev.filter(u => u.id !== uid));
+        setBuzziToast({
+          show: true,
+          title: "Lid Verwijderd! 🗑️",
+          message: `Gebruiker ${name} is permanent verwijderd uit de database.`,
+          avatar: "👑"
+        });
+        hiveAudio.playHoneyPop();
+      }
+    } catch (err) {
+      console.error("Error deleting user:", err);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    try {
+      // Mark as deleted instantly in local state and localStorage
+      setDeletedMsgIds(prev => {
+        const next = [...prev, msgId];
+        localStorage.setItem("buzzi_deleted_msg_ids", JSON.stringify(next));
+        return next;
+      });
+
+      // Remove from local messages state immediately (optimistic deletion)
+      setMessages(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(chatId => {
+          next[chatId] = next[chatId].filter(m => m.id !== msgId);
+        });
+        return next;
+      });
+
+      // Filter from the global admin feed as well for instant feedback
+      setAllDatabaseMessages(prev => prev.filter(m => m.id !== msgId));
+
+      // Show toast and play sound immediately for positive feedback
+      setBuzziToast({
+        show: true,
+        title: "Bericht Verwijderd! 🗑️",
+        message: "Het bericht is succesvol en permanent verwijderd.",
+        avatar: "👑"
+      });
+      hiveAudio.playHoneyPop();
+
+      const res = await fetch(`/api/db/messages/${msgId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        try {
+          const data = await res.json();
+          console.warn(`Server status deletion failed or message only in static fallback list: ${data.error || "Onbekende fout"}`);
+        } catch {
+          console.warn("Server status deletion failed with non-json response.");
+        }
+      }
+    } catch (err: any) {
+      console.warn(`Failed backend delete: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchBlockedIps();
+  }, [currentUser]);
+
   useEffect(() => {
     checkDbStatus();
+    fetch("/api/me/ip")
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.ip) {
+          setMyIpAddress(data.ip);
+        }
+      })
+      .catch(() => setMyIpAddress("127.0.0.1"));
   }, []);
 
   // Automatic background reconnect loop for MongoDB database
@@ -1570,6 +1745,37 @@ exit
                 }
               }
             }
+            const isFreshNewMessage = !processedMessageIds.current.has(data.id);
+            if (isFreshNewMessage && isInitialSyncCompletedRef.current) {
+              if (data.senderId !== currentUser.uid) {
+                if (conversationKey !== activeId) {
+                  setUnreadCounts(prev => ({
+                    ...prev,
+                    [conversationKey]: (prev[conversationKey] || 0) + 1
+                  }));
+                }
+
+                // Check for incoming call/game duels to show beautiful global notification toasters!
+                if (data.isCallInvite) {
+                  setActiveCallInvite({
+                    id: data.id,
+                    senderId: data.senderId,
+                    senderName: data.senderName,
+                    senderAvatar: data.senderAvatar,
+                    callId: data.callId
+                  });
+                } else if (data.isGameDuel) {
+                  setActiveGameInvite({
+                    id: data.id,
+                    senderId: data.senderId,
+                    senderName: data.senderName,
+                    senderAvatar: data.senderAvatar,
+                    gameId: data.gameId,
+                    gameType: data.gameType
+                  });
+                }
+              }
+            }
             processedMessageIds.current.add(data.id);
             } else {
               processedMessageIds.current.add(data.id);
@@ -1579,17 +1785,16 @@ exit
               freshMessages[conversationKey] = [];
             }
             freshMessages[conversationKey].push({
-              id: data.id,
-              senderId: data.senderId,
-              senderName: data.senderName,
-              senderAvatar: data.senderAvatar,
-              text: data.text,
-              timestamp: data.timestamp,
+              ...data,
               isBuzz: data.isBuzz || false,
-              isWink: data.isWink || false,
-              winkId: data.winkId
+              isWink: data.isWink || false
             });
           });
+
+          if (isUserAnAdmin) {
+            setAllDatabaseMessages(finalMessagesList);
+          }
+          isInitialSyncCompletedRef.current = true;
 
           const merged: Record<string, Message[]> = {};
           const keys = Array.from(new Set([
@@ -1616,7 +1821,7 @@ exit
     syncMessages();
     const interval = setInterval(syncMessages, 4500); // Poll for new messages every 4.5s (relaxed from 3s)
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, isUserAnAdmin, activeId]);
 
   // Sync methods
   const handleUpdateDisplayName = (val: string) => {
@@ -2195,6 +2400,7 @@ exit
           activeId={activeId}
           activeType={activeType}
           siteLanguage={siteLanguage}
+          unreadCounts={unreadCounts}
           onSelectChannel={(cid) => {
             setActiveId(cid);
             setActiveType("channel");
@@ -2246,7 +2452,7 @@ exit
           activeType={activeType}
           activeChannel={activeChannel}
           activeContact={activeContact}
-          messages={messages[activeId] || []}
+          messages={(messages[activeId] || []).filter(m => !deletedMsgIds.includes(m.id))}
           isTyping={isCurrentChatPartnerTyping}
           onSendMessage={handleSendMessage}
           onBuzzIncoming={handleBuzzIncoming}
@@ -2259,6 +2465,18 @@ exit
           isUserPremium={isUserPremium}
           onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
           siteLanguage={siteLanguage}
+          onDeleteMessage={handleDeleteMessage}
+          onBlockIp={handleBlockIp}
+          onUnblockIp={handleUnblockIp}
+          blockedIps={blockedIps}
+          autoStartCallId={autoStartCallId}
+          autoStartGameId={autoStartGameId}
+          autoStartGameType={autoStartGameType}
+          onClearAutoStart={() => {
+            setAutoStartCallId(undefined);
+            setAutoStartGameId(undefined);
+            setAutoStartGameType(undefined);
+          }}
         />
       </div>
 
@@ -2299,6 +2517,22 @@ exit
                 </span>
               )}
             </button>
+            {isUserAnAdmin && (
+              <button
+                onClick={() => {
+                  setActiveUtilityTab("admin");
+                  hiveAudio.playHoneyPop();
+                }}
+                className={`flex-1 text-center py-1.5 rounded text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 relative ${
+                  activeUtilityTab === "admin"
+                    ? "bg-[#d97706] text-white shadow-sm border border-amber-500"
+                    : "text-amber-800 hover:bg-amber-100 bg-amber-50/50"
+                }`}
+                title="Systeem Administrator Beheerders Controlepaneel"
+              >
+                👑 Beheerder
+              </button>
+            )}
           </div>
 
           {activeUtilityTab === "tools" ? (
@@ -2443,6 +2677,55 @@ exit
                         className="w-full bg-[#f0f4f9] hover:bg-sky-50 text-sky-850 text-[10.5px] py-1.5 rounded border border-[#BAD0E3] font-bold flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span>✉️ Uitnodigen via E-mail</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Box 3.5: Download Android App */}
+              <div className="bg-gradient-to-b from-white to-[#f0f9ff] border border-[#abc4df] rounded-xl shadow-sm text-left overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-sky-500"></div>
+                
+                <div 
+                  onClick={() => {
+                    setIsAppsExpanded(!isAppsExpanded);
+                    hiveAudio.playHoneyPop();
+                  }}
+                  className="p-3.5 flex items-center justify-between cursor-pointer hover:brightness-95 bg-gradient-to-b from-sky-50 to-[#e0f2fe] select-none pb-3"
+                >
+                  <h3 className="font-sans font-extrabold text-sky-900 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <span className="text-sm">🤖</span>
+                    <span>Download Android App 📱</span>
+                  </h3>
+                  <span className="text-slate-500 font-mono text-xs font-bold">
+                    {isAppsExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {isAppsExpanded && (
+                  <div className="p-3.5 space-y-3 bg-[#f8fbfe] border-t border-[#d0e3f5] text-xs leading-relaxed text-slate-700">
+                    <p className="text-slate-600">
+                      Installeer de officiële <b>Buzzi Messenger Android app (.APK)</b> om overal verbinding te maken op je mobiel!
+                    </p>
+                    
+                    <button
+                      onClick={() => {
+                        setIsAndroidModalOpen(true);
+                        hiveAudio.playNotification();
+                      }}
+                      className="w-full bg-gradient-to-b from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white font-extrabold py-2.5 rounded-lg border-2 border-sky-700 shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <span>📖 Installatie Diashow & Download</span>
+                    </button>
+                    
+                    <div className="text-center">
+                      <a
+                        href="/api/download/apk"
+                        onClick={() => hiveAudio.playNotification()}
+                        className="text-[10.5px] font-bold text-sky-600 hover:text-sky-800 hover:underline inline-flex items-center gap-1"
+                      >
+                        ⚡ Directe .APK download (v1.2)
                       </a>
                     </div>
                   </div>
@@ -2647,14 +2930,10 @@ exit
                 </div>
               </div>
             </div>
-          ) : (
-            /* Bug Reporting panel */
+          ) : activeUtilityTab === "admin" ? (
+            /* Systeem Beheerder Administrator Panel */
             <div className="space-y-4 font-sans text-xs">
-              {/* Beheerders Controlepaneel Block */}
-              {((currentUser?.email || "").split("#pwd_")[0].trim().toLowerCase() === "prinsrobbin@gmail.com" || 
-                userDisplayName?.toLowerCase().includes("robbin") ||
-                userDisplayName?.toLowerCase().includes("admin") ||
-                userDisplayName?.toLowerCase().includes("operator")) && (
+              {isUserAnAdmin ? (
                 <div className="bg-[#FFFFED] border border-[#DE9E1F] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-[#DE9E1F]"></div>
                   
@@ -2723,17 +3002,237 @@ exit
                           <span className="truncate pr-1">👑 [Beheerder] {userDisplayName}</span>
                           <span className="shrink-0 text-[8.5px] font-bold text-amber-700 bg-amber-100 px-1 rounded">Admin</span>
                         </div>
-                        {registeredUsers.map((u: any) => (
-                          <div key={u.id} className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                            <span className="truncate pr-1" title={u.email}>{u.name || "Gast"} ({u.email ? u.email.split("@")[0] : "Gast"})</span>
-                            <span className={`shrink-0 text-[8px] font-bold px-1 rounded ${
-                              u.status === "online" ? "text-green-700 bg-green-50" : u.status === "bezet" ? "text-red-700 bg-red-50" : "text-slate-400 bg-slate-50"
-                            }`}>
-                              {u.status}
-                            </span>
-                          </div>
-                        ))}
+                        {registeredUsers.map((u: any) => {
+                          const userIp = u.ip;
+                          const isIpBlocked = userIp && blockedIps.includes(userIp);
+                          return (
+                            <div key={u.id} className="border-b border-slate-100 py-1 space-y-0.5">
+                              <div className="flex items-center justify-between">
+                                <span className="truncate pr-1 font-bold text-slate-700" title={u.email}>
+                                  {u.name || "Gast"} ({u.id.substring(0, 5)})
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className={`shrink-0 text-[8px] font-bold px-1 rounded ${
+                                    u.status === "online" ? "text-green-700 bg-green-50" : u.status === "bezet" ? "text-red-700 bg-red-50" : "text-slate-400 bg-slate-50"
+                                  }`}>
+                                    {u.status}
+                                  </span>
+                                  <button
+                                    onClick={() => handleDeleteUser(u.id, u.name || "Gast")}
+                                    className="text-red-600 hover:text-red-700 font-extrabold text-[8.5px] cursor-pointer hover:underline bg-red-50 border border-red-200 rounded px-1.5 py-0.5"
+                                    title="Lid permanent verwijderen"
+                                  >
+                                    🗑️ Verwijder
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-[8px] text-slate-500 font-mono">
+                                <span>Email: {u.email || "Geen"}</span>
+                                {userIp && (
+                                  <div className="flex items-center gap-1 font-mono">
+                                    <span className={isIpBlocked ? "text-red-600 font-bold" : "text-slate-600"}>IP: {userIp}</span>
+                                    {isIpBlocked ? (
+                                      <button
+                                        onClick={() => handleUnblockIp(userIp)}
+                                        className="text-emerald-600 hover:text-emerald-800 underline cursor-pointer font-bold text-[7.5px]"
+                                      >
+                                        [Vrij]
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleBlockIp(userIp)}
+                                        className="text-red-600 hover:text-red-800 font-bold text-[7.5px]"
+                                        title="Blokkeer dit IP-adres"
+                                      >
+                                        🚫 [Blok]
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                    </div>
+
+                    {/* Geblokkeerde IP-adressen Panel */}
+                    <div className="bg-red-50/90 border border-red-200 rounded p-2 text-[10px] text-red-950 space-y-1 shadow-2xs">
+                      <div className="font-extrabold text-red-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>🚫 Banned IP-adressen ({blockedIps.length})</span>
+                      </div>
+                      {blockedIps.length === 0 ? (
+                        <div className="text-[9px] text-slate-500 italic">Geen IP-adressen geblokkeerd.</div>
+                      ) : (
+                        <div className="max-h-[60px] overflow-y-auto space-y-1 font-mono text-[8.5px]">
+                          {blockedIps.map(ip => (
+                            <div key={ip} className="flex items-center justify-between border-b border-red-100/30 pb-0.5">
+                              <span>🔴 {ip}</span>
+                              <button
+                                onClick={() => handleUnblockIp(ip)}
+                                className="text-emerald-600 hover:text-emerald-800 font-bold cursor-pointer underline"
+                              >
+                                [Deblokkeer]
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const input = (e.currentTarget.elements.namedItem("manualIp") as HTMLInputElement);
+                          if (input && input.value.trim()) {
+                            handleBlockIp(input.value.trim());
+                            input.value = "";
+                          }
+                        }}
+                        className="flex gap-1 pt-1"
+                      >
+                        <input 
+                          type="text" 
+                          name="manualIp" 
+                          placeholder="IP blokken: bv 82.13.4.5"
+                          className="flex-1 bg-white border border-red-200 text-[8.5px] px-1.5 py-0.5 rounded focus:outline-hidden"
+                        />
+                        <button 
+                          type="submit" 
+                          className="bg-red-600 hover:bg-red-700 text-white font-bold text-[8.5px] px-2 rounded cursor-pointer"
+                        >
+                          Blok
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Live Message Logbook Panel */}
+                    <div className="bg-sky-50/95 border border-sky-200 rounded p-2 text-[10px] text-[#1d5c8a] space-y-2 shadow-2xs">
+                      <div className="font-extrabold text-sky-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>💬 Live Berichten Logboek ({allDatabaseMessages.length})</span>
+                        <span className="text-[8px] bg-sky-100 text-[#1d5c8a] px-1 rounded font-mono font-bold animate-pulse">Live</span>
+                      </div>
+
+                      {/* Filter Actions search & select */}
+                      <div className="space-y-1 bg-white/60 border border-sky-100 rounded p-1.5">
+                        <input
+                          type="text"
+                          value={adminLogSearch}
+                          onChange={(e) => setAdminLogSearch(e.target.value)}
+                          placeholder="Zoek op afzender, IP of tekst..."
+                          className="w-full bg-white border border-[#abc4df] rounded px-1.5 py-0.5 text-[9px] text-slate-800 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1">
+                          <span className="text-[8px] text-slate-500 font-bold shrink-0">Filter:</span>
+                          <div className="flex gap-1 flex-wrap">
+                            {["Alle", "Groepen", "Privé DMs", "Buzzi Bot"].map(f => (
+                              <button
+                                key={f}
+                                onClick={() => setAdminLogReceiverFilter(f)}
+                                className={`px-1 py-0.5 rounded text-[8px] font-black cursor-pointer ${
+                                  adminLogReceiverFilter === f
+                                    ? "bg-sky-600 text-white"
+                                    : "bg-sky-100 text-sky-800 hover:bg-sky-200"
+                                }`}
+                              >
+                                {f}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {allDatabaseMessages.length === 0 ? (
+                        <div className="text-[9px] text-slate-500 italic py-1">Geen live berichten gevonden in database.</div>
+                      ) : (
+                        (() => {
+                          const filteredLog = allDatabaseMessages.filter(m => {
+                            if (adminLogSearch.trim()) {
+                              const q = adminLogSearch.toLowerCase().trim();
+                              const nameMatch = (m.senderName || "").toLowerCase().includes(q);
+                              const ipMatch = m.ip && m.ip.toLowerCase().includes(q);
+                              const textMatch = (m.text || "").toLowerCase().includes(q);
+                              const receiverMatch = (m.receiverId || "").toLowerCase().includes(q);
+                              if (!nameMatch && !ipMatch && !textMatch && !receiverMatch) return false;
+                            }
+                            if (adminLogReceiverFilter !== "Alle") {
+                              if (adminLogReceiverFilter === "Groepen") {
+                                const isGroup = m.receiverId === "mensen-van-toen" || m.receiverId === "breezer-groep" || m.receiverId.startsWith("ch-");
+                                if (!isGroup) return false;
+                              } else if (adminLogReceiverFilter === "Privé DMs") {
+                                const isDm = m.receiverId !== "mensen-van-toen" && m.receiverId !== "breezer-groep" && !m.receiverId.startsWith("ch-") && m.receiverId !== "queen";
+                                if (!isDm) return false;
+                              } else if (adminLogReceiverFilter === "Buzzi Bot") {
+                                if (m.receiverId !== "queen") return false;
+                              }
+                            }
+                            return true;
+                          });
+
+                          if (filteredLog.length === 0) {
+                            return <div className="text-[9px] text-slate-400 italic text-center py-2">Geen resultaten gevonden voor filters.</div>;
+                          }
+
+                          return (
+                            <div className="max-h-[160px] overflow-y-auto space-y-2 custom-scrollbar pr-0.5">
+                              {filteredLog.slice(-25).reverse().map((m: any) => {
+                                const isMsgIpBlocked = m.ip && blockedIps.includes(m.ip);
+                                return (
+                                  <div key={m.id} className="bg-white border border-sky-100 rounded p-1.5 space-y-1 font-mono text-[8.5px] text-left relative">
+                                    <div className="flex items-center justify-between text-[8px] border-b border-sky-50 pb-1 text-slate-500">
+                                      <span className="font-bold text-[#1d5c8a] truncate shrink" title={`Sender UID: ${m.senderId}`}>
+                                        {m.senderName} ➡️ {m.receiverId}
+                                      </span>
+                                      <span className="shrink-0 text-slate-400">{m.timestamp || "Recent"}</span>
+                                    </div>
+                                    <div className="text-slate-800 break-words font-sans text-[9px] font-medium leading-relaxed">
+                                      {m.isBuzz ? "🚨 [NUDGE STUUR]" : m.isWink ? "😉 [KNIPOOG SENT]" : m.fileTransfer ? `📁 [Bestand: ${m.fileTransfer.name}]` : m.text}
+                                    </div>
+                                    <div className="flex items-center justify-between text-[8px] pt-1 text-slate-400">
+                                      <span>IP: <strong className={isMsgIpBlocked ? "text-red-600 animate-pulse font-bold" : "text-slate-700"}>{m.ip || "Onbekend"}</strong></span>
+                                      <div className="flex items-center gap-1 font-sans">
+                                        {m.ip && m.ip !== "127.0.0.1" && m.ip !== "::1" && (
+                                          isMsgIpBlocked ? (
+                                            <button 
+                                              onClick={() => handleUnblockIp(m.ip)} 
+                                              className="text-emerald-700 hover:text-emerald-800 font-extrabold cursor-pointer border border-emerald-200 bg-emerald-50 px-1 rounded py-0.5 leading-none"
+                                              title="Deblokkeer IP"
+                                            >
+                                              De-Blok
+                                            </button>
+                                          ) : (
+                                            <button 
+                                              onClick={() => {
+                                                if (window.confirm(`Weet je zeker dat je IP ${m.ip} wilt blokkeren?`)) {
+                                                  handleBlockIp(m.ip);
+                                                }
+                                              }} 
+                                              className="text-red-700 hover:text-red-800 font-extrabold cursor-pointer border border-red-200 bg-red-50 px-1 rounded py-0.5 leading-none"
+                                              title="Blokkeer IP"
+                                            >
+                                              🚫 Blok
+                                            </button>
+                                          )
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            if (window.confirm("Verwijder bericht permanent?")) {
+                                              handleDeleteMessage(m.id);
+                                            }
+                                          }}
+                                          className="text-red-500 hover:text-red-700 font-bold cursor-pointer underline ml-1"
+                                          title="Bericht permanent wissen"
+                                        >
+                                          Wis
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()
+                      )}
                     </div>
 
                     {/* Multi-action quick bar */}
@@ -2764,8 +3263,15 @@ exit
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 font-black text-center text-[11px]">
+                  ⚠️ Je bent momenteel geen beheerder of operator.
+                </div>
               )}
-
+            </div>
+          ) : (
+            /* Bug Reporting panel for general users */
+            <div className="space-y-4 font-sans text-xs">
               <div className="bg-white border border-[#abc4df] rounded-xl p-4 shadow-sm text-left relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#e43a3a]"></div>
 
@@ -3035,6 +3541,103 @@ exit
       {/* Buzzi Premium VIP Upgrade Modal is removed per user request */}
 
       <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
+      <AndroidInstallModal isOpen={isAndroidModalOpen} onClose={() => setIsAndroidModalOpen(false)} />
+
+      {/* Retro floating MSN Messenger style toast alert for incoming WebRTC video call or Game Duel */}
+      <AnimatePresence>
+        {activeCallInvite && (
+          <motion.div
+            initial={{ y: 80, x: 50, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, x: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 80, opacity: 0, scale: 0.9 }}
+            className="fixed bottom-4 right-4 z-50 max-w-sm bg-gradient-to-br from-sky-50 to-blue-100 border-2 border-sky-400 p-4 rounded-xl shadow-2xl font-sans text-xs flex flex-col gap-2.5 border-b-sky-600 border-r-sky-600"
+          >
+            <div className="flex items-center gap-2">
+              <div className="bg-sky-200 p-1.5 rounded-full text-sky-700 animate-bounce">
+                <Video className="w-5 h-5 text-sky-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-extrabold text-[#1c427f] text-[11px] uppercase tracking-wider">
+                  📞 INKOMEND VIDEO GESPREK!
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold">Oproep van {activeCallInvite.senderName}</div>
+              </div>
+            </div>
+            <p className="text-slate-700 leading-normal text-[11px] text-left">
+              Wil je opnemen en verbinding maken met de webcam van <strong>{activeCallInvite.senderName}</strong>?
+            </p>
+            <div className="flex justify-end gap-2 mt-1">
+              <button
+                onClick={() => {
+                  setActiveCallInvite(null);
+                }}
+                className="bg-white hover:bg-slate-50 text-slate-500 font-bold px-3 py-1.5 rounded-md border border-slate-300 shadow-xs cursor-pointer active:scale-95 transition-all text-[10px]"
+              >
+                Weigeren
+              </button>
+              <button
+                onClick={() => {
+                  setActiveId(activeCallInvite.senderId);
+                  setActiveType("dm");
+                  setAutoStartCallId(activeCallInvite.callId);
+                  setActiveCallInvite(null);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold px-3.5 py-1.5 rounded-md border-b-2 border-sky-800 text-[10px] active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-md"
+              >
+                📞 OPNEMEN
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {activeGameInvite && (
+          <motion.div
+            initial={{ y: 80, x: 50, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, x: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 80, opacity: 0, scale: 0.9 }}
+            className="fixed bottom-4 right-4 z-50 max-w-sm bg-gradient-to-br from-emerald-50 to-teal-100 border-2 border-emerald-400 p-4 rounded-xl shadow-2xl font-sans text-xs flex flex-col gap-2.5 border-b-emerald-600 border-r-emerald-600"
+          >
+            <div className="flex items-center gap-2">
+              <div className="bg-emerald-200 p-1.5 rounded-full text-emerald-700 animate-bounce">
+                <Gamepad2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-extrabold text-emerald-950 text-[11px] uppercase tracking-wider">
+                  🎮 SPEL DUEL UITNODIGING!
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold">Buzzi Duel van {activeGameInvite.senderName}</div>
+              </div>
+            </div>
+            <p className="text-slate-700 leading-normal text-[11px] text-left">
+              <strong>{activeGameInvite.senderName}</strong> daagt je uit voor een spannende retro match! Wil je meespelen?
+            </p>
+            <div className="flex justify-end gap-2 mt-1">
+              <button
+                onClick={() => {
+                  setActiveGameInvite(null);
+                }}
+                className="bg-white hover:bg-slate-50 text-slate-500 font-bold px-3 py-1.5 rounded-md border border-slate-300 shadow-xs cursor-pointer active:scale-95 transition-all text-[10px]"
+              >
+                Weigeren
+              </button>
+              <button
+                onClick={() => {
+                  setActiveId(activeGameInvite.senderId);
+                  setActiveType("dm");
+                  setAutoStartGameId(activeGameInvite.gameId);
+                  setAutoStartGameType(activeGameInvite.gameType);
+                  setActiveGameInvite(null);
+                  hiveAudio.playHoneyPop();
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3.5 py-1.5 rounded-md border-b-2 border-emerald-800 text-[10px] active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-md"
+              >
+                ⚔️ SPEEL NU!
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   </div>
 );

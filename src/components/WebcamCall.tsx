@@ -276,6 +276,11 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ roomId: calculatedRoomId, type: "answer", data: answer })
           });
+
+          // Transition to active call status for Callee as well so connection starts immediately!
+          setTimeout(() => {
+            if (active) setCallStatus("active");
+          }, 1500);
         } else {
           // Caller Mode: Reset room and create initial offer
           isCaller = true;
@@ -317,6 +322,18 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
         }
       };
 
+      // Force call to become active after max 5 seconds if still handshaking, offering nice fallback feeds
+      const fallbackTimer = setTimeout(() => {
+        if (active) {
+          setCallStatus((prev) => {
+            if (prev === "dialing" || prev === "connecting") {
+              return "active";
+            }
+            return prev;
+          });
+        }
+      }, 5000);
+
       // Periodic poller for answer and remote ICE candidates
       pollInterval = setInterval(async () => {
         if (!active || !pc) return;
@@ -350,13 +367,20 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
           console.warn("Signal poller error:", pollErr);
         }
       }, 1250);
+
+      return () => {
+        clearTimeout(fallbackTimer);
+      };
     };
 
-    initializeWebRTC();
+    const cleanupWebRTC = initializeWebRTC();
 
     return () => {
       active = false;
       if (pollInterval) clearInterval(pollInterval);
+      cleanupWebRTC.then((cb) => {
+        if (typeof cb === "function") cb();
+      });
       if (pc) {
         pc.close();
       }
