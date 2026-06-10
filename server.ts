@@ -15,9 +15,28 @@ const BUGS_FILE = path.join(process.cwd(), "data_bugs.json");
 const FRIEND_REQUESTS_FILE = path.join(process.cwd(), "data_friend_requests.json");
 const GAMES_FILE = path.join(process.cwd(), "data_games.json");
 const BLOCKED_IPS_FILE = path.join(process.cwd(), "data_blocked_ips.json");
+const BANNED_EMAILS_FILE = path.join(process.cwd(), "data_banned_emails.json");
 
 function getBlockedIps(): string[] {
   return readJsonFile<string[]>(BLOCKED_IPS_FILE, []);
+}
+
+function getBannedEmails(): string[] {
+  return readJsonFile<string[]>(BANNED_EMAILS_FILE, []);
+}
+
+function banEmail(email: string): void {
+  const emails = getBannedEmails();
+  if (!emails.includes(email)) {
+    emails.push(email);
+    writeJsonFile(BANNED_EMAILS_FILE, emails);
+  }
+}
+
+function unbanEmail(email: string): void {
+  const emails = getBannedEmails();
+  const filtered = emails.filter(item => item !== email);
+  writeJsonFile(BANNED_EMAILS_FILE, filtered);
 }
 
 function blockIp(ip: string): void {
@@ -109,16 +128,17 @@ function writeJsonFile<T>(filePath: string, data: T): void {
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
 let lastConnectAttempt = 0;
-const CONNECT_COOLDOWN_MS = 10000; // Overcooldown reduced to 10 seconds for faster automatic background recovery
+let connectionFailedPermanently = false; 
+const CONNECT_COOLDOWN_MS = 60000; // Increase cooldown to 1 minute
 
 async function getMongoDb(): Promise<Db | null> {
+  if (connectionFailedPermanently) return null;
   const uri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
 
   const now = Date.now();
   if (now - lastConnectAttempt < CONNECT_COOLDOWN_MS) {
-    // Under cooldown to keep backend snappy and avoid blocking incoming requests
     return null;
   }
   
@@ -129,20 +149,27 @@ async function getMongoDb(): Promise<Db | null> {
       connectTimeoutMS: 4000
     });
     await mongoClient.connect();
+    
+    // Test authentication immediately
+    await mongoClient.db("admin").command({ ping: 1 });
+    
     mongoDb = mongoClient.db("buzzi");
     console.log("Successfully connected to MongoDB Atlas!");
     
-    // Attempt to drop the restrictive or stale index 'naam_1' to prevent duplicate key errors
     try {
       await mongoDb.collection("users").dropIndex("naam_1");
       console.log("Successfully dropped stale index 'naam_1' from 'users' collection");
     } catch (indexErr: any) {
-      console.log("Did not drop index 'naam_1' (it may not exist, or permissions are restricted):", indexErr.message);
+      console.log("Did not drop index 'naam_1':", indexErr.message);
     }
 
     return mongoDb;
-  } catch (err) {
-    console.warn("MongoDB connection failed, falling back to local memory database:", err);
+  } catch (err: any) {
+    console.warn("MongoDB connection failed, falling back to local memory database:", err.message);
+    if (err.message.includes("auth")) {
+      console.error("CRITICAL: MongoDB authentication failed. Check your MONGODB_URI/MONGO_URL configuration.");
+      connectionFailedPermanently = true;
+    }
     return null;
   }
 }
@@ -540,14 +567,18 @@ exit
       if (dbInstance) {
         try {
           const users = await dbInstance.collection("users").find({}).toArray();
-          res.json(users);
+          const bannedEmails = getBannedEmails();
+          const filteredUsers = users.filter(u => !u.email || !bannedEmails.includes(u.email.split("#pwd_")[0]));
+          res.json(filteredUsers);
           return;
         } catch (mongoErr) {
           console.warn("MongoDB users query failed, falling back to local storage:", mongoErr);
         }
       }
       const users = readJsonFile<any[]>(USERS_FILE, []);
-      res.json(users);
+      const bannedEmails = getBannedEmails();
+      const filteredUsers = users.filter(u => !u.email || !bannedEmails.includes(u.email.split("#pwd_")[0]));
+      res.json(filteredUsers);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -661,6 +692,11 @@ exit
     res.json(getBlockedIps());
   });
 
+  // DB API: Get Banned Emails
+  app.get("/api/admin/banned-emails", (req, res) => {
+    res.json(getBannedEmails());
+  });
+
   // DB API: Get Current client IP address
   app.get("/api/me/ip", (req, res) => {
     const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim();
@@ -678,6 +714,17 @@ exit
     res.json({ success: true, message: `IP-adres ${ip} is geblokkeerd.` });
   });
 
+  // DB API: Ban Email
+  app.post("/api/admin/banned-emails", (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email is verplicht" });
+      return;
+    }
+    banEmail(email);
+    res.json({ success: true, message: `E-mailadres ${email} is geblokkeerd.` });
+  });
+
   // DB API: Unblock IP
   app.delete("/api/admin/blocked-ips", (req, res) => {
     const { ip } = req.body;
@@ -687,6 +734,17 @@ exit
     }
     unblockIp(ip);
     res.json({ success: true, message: `IP-adres ${ip} is gedeblokkeerd.` });
+  });
+
+  // DB API: Delete Banned Emails
+  app.delete("/api/admin/banned-emails", (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email is verplicht" });
+      return;
+    }
+    unbanEmail(email);
+    res.json({ success: true, message: `E-mailadres ${email} is gedeblokkeerd.` });
   });
 
   // INITIAL CHANNELS fallback for first boot

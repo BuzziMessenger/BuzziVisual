@@ -304,6 +304,7 @@ export default function App() {
   const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
   const [blockedIps, setBlockedIps] = useState<string[]>([]);
+  const [bannedEmails, setBannedEmails] = useState<string[]>([]);
   const [deletedMsgIds, setDeletedMsgIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem("buzzi_deleted_msg_ids");
@@ -786,6 +787,62 @@ exit
     }
   };
 
+  const fetchBannedEmails = async () => {
+    try {
+      const res = await fetch("/api/admin/banned-emails");
+      if (res.ok) {
+        const data = await res.json();
+        setBannedEmails(data);
+      }
+    } catch (err) {
+      console.warn("Error fetching banned emails:", err);
+    }
+  };
+
+  const handleBanEmail = async (email: string) => {
+    try {
+      const res = await fetch("/api/admin/banned-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (res.ok) {
+        await fetchBannedEmails();
+        setBuzziToast({
+          show: true,
+          title: "Email Geblokkeerd! 🚫",
+          message: `E-mailadres ${email} is nu succesvol geblokkeerd op Buzzi Messenger!`,
+          avatar: "👑"
+        });
+        hiveAudio.playHoneyPop();
+      }
+    } catch (err) {
+       console.warn("Error banning email:", err);
+    }
+  };
+
+  const handleUnbanEmail = async (email: string) => {
+    try {
+      const res = await fetch("/api/admin/banned-emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (res.ok) {
+        await fetchBannedEmails();
+        setBuzziToast({
+          show: true,
+          title: "Email Gedeblokkeerd! 🔓",
+          message: `E-mailadres ${email} is succesvol gedeblokkeerd.`,
+          avatar: "👑"
+        });
+        hiveAudio.playHoneyPop();
+      }
+    } catch (err) {
+       console.warn("Error unbanning email:", err);
+    }
+  };
+
   const handleDeleteUser = async (uid: string, name: string) => {
     if (!window.confirm(`Weet je zeker dat je lid "${name}" permanent wilt verwijderen uit de Buzzi database?`)) {
       return;
@@ -855,6 +912,7 @@ exit
 
   useEffect(() => {
     fetchBlockedIps();
+    fetchBannedEmails();
   }, [currentUser]);
 
   useEffect(() => {
@@ -3109,6 +3167,50 @@ exit
                         >
                           Blok
                         </button>
+                      </form>
+                    </div>
+
+                    {/* Geblokkeerde E-mailadressen Panel */}
+                    <div className="bg-red-50/90 border border-red-200 rounded p-2 text-[10px] text-red-950 space-y-1 shadow-2xs mt-2">
+                      <div className="font-extrabold text-red-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>🚫 Banned E-mailadressen ({bannedEmails.length})</span>
+                      </div>
+                      {bannedEmails.length === 0 ? (
+                        <div className="text-[9px] text-slate-500 italic">Geen e-mailadressen geblokkeerd.</div>
+                      ) : (
+                        <div className="max-h-[60px] overflow-y-auto space-y-1 font-mono text-[8.5px]">
+                          {bannedEmails.map(email => (
+                            <div key={email} className="flex items-center justify-between border-b border-red-100/30 pb-0.5">
+                              <span>🔴 {email}</span>
+                              <button
+                                onClick={() => handleUnbanEmail(email)}
+                                className="text-emerald-600 hover:text-emerald-800 font-bold cursor-pointer underline"
+                              >
+                                [Deblokkeer]
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const input = (e.currentTarget.elements.namedItem("manualEmail") as HTMLInputElement);
+                          if (input && input.value.trim()) {
+                            handleBanEmail(input.value.trim());
+                            input.value = "";
+                          }
+                        }}
+                        className="flex gap-1 pt-1"
+                      >
+                        <input 
+                          type="text" 
+                          name="manualEmail" 
+                          placeholder="E-mail blokken: bv email@test.nl" 
+                          className="flex-1 bg-white border border-red-200 text-[8.5px] px-1.5 py-0.5 rounded focus:outline-hidden"
+                        />
+                        <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold text-[8.5px] px-2 rounded cursor-pointer">Ban</button>
                       </form>
                     </div>
 
