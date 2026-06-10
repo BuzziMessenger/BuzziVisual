@@ -334,17 +334,31 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
         }
       }, 5000);
 
-      // Periodic poller for answer and remote ICE candidates
+      // Periodic poller for answer and remote ICE candidates (sneller gesynchroniseerd)
       pollInterval = setInterval(async () => {
         if (!active || !pc) return;
         try {
           const res = await fetch(`/api/db/calls/signal?roomId=${calculatedRoomId}`);
+          if (!res.ok) return;
           const signalInfo = await res.json();
           if (!signalInfo) return;
 
-          // If caller, get callee's answer
+          // As caller, get callee's answer
           if (isCaller && signalInfo.answer && pc.signalingState === "have-local-offer") {
             await pc.setRemoteDescription(new RTCSessionDescription(signalInfo.answer));
+            setCallStatus("active");
+          }                
+          
+          // As callee, get caller's offer
+          if (!isCaller && signalInfo.offer && pc.signalingState === "stable") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signalInfo.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await fetch("/api/db/calls/signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roomId: calculatedRoomId, type: "answer", data: answer })
+            });
             setCallStatus("active");
           }
 
@@ -358,7 +372,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
                 try {
                   await pc.addIceCandidate(new RTCIceCandidate(item));
                 } catch (candidateErr) {
-                  console.warn("ICE remote input problem", candidateErr);
+                  // Soms is de peerconnection nog niet klaar.
                 }
               }
             }
@@ -366,7 +380,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
         } catch (pollErr) {
           console.warn("Signal poller error:", pollErr);
         }
-      }, 1250);
+      }, 500); // 500ms poller voor snellere actie
 
       return () => {
         clearTimeout(fallbackTimer);

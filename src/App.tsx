@@ -113,16 +113,7 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
       timestamp: "15:40"
     }
   ],
-  "queen": [
-    {
-      id: "q1",
-      senderId: "queen",
-      senderName: "🤖 Buzzi Bot (H)",
-      senderAvatar: "🤖",
-      text: "🤖 *PING!* W00t! Welkom op mijn Buzzi Messenger-kanaal! Ik ben aangedreven door Buzzi AI en spreek vloeiend 2004 Buzzi Messenger-slang! Vraag me over inbelverbindingen, retro-muziek of stuur me een 'Nudge' (duwtje) met de rode knop! :-D",
-      timestamp: "16:15"
-    }
-  ],
+  "queen": [],
   "wouter": [
     {
       id: "w1",
@@ -1327,7 +1318,7 @@ exit
   
   const currentBuddies = (isDemoUser
     ? [
-        ...INITIAL_CONTACTS,
+        ...INITIAL_CONTACTS.filter(c => c.id !== "sanne"),
         ...registeredUsers.filter(u => {
           const cleanUEmail = (u.email || "").split("#pwd_")[0].trim().toLowerCase();
           return !INITIAL_CONTACTS.some(ic => ic.email === u.email) &&
@@ -3236,13 +3227,14 @@ exit
                                       const res = await fetch("/api/db/users", {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ ...u, uid: u.id, name: newName }) // Assumes u has all required fields
+                                        body: JSON.stringify({ id: u.id, name: newName })
                                       });
                                       if (res.ok) {
                                         setRegisteredUsers(prev => prev.map(user => user.id === u.id ? { ...user, name: newName } : user));
                                         alert("Naam succesvol gewijzigd!");
                                       } else {
-                                        alert("Fout bij het wijzigen van de naam.");
+                                        const errData = await res.json();
+                                        alert("Fout bij het wijzigen: " + (errData.error || "Onbekend"));
                                       }
                                     } catch (err) {
                                       console.error("Error updating user:", err);

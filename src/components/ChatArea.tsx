@@ -788,6 +788,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               type="button"
               onClick={() => {
                 const callId = `call-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                if (!myUserId || myUserId.startsWith("guest")) {
+                  alert("Videobellen en spellen spelen is alleen beschikbaar voor ingelogde gebruikers.");
+                  return;
+                }
                 onSendMessage(
                   "📹 Wil een videoverbinding met je starten!",
                   false,
@@ -835,6 +839,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (!myUserId || myUserId.startsWith("guest")) {
+                  alert("Videobellen en spellen spelen is alleen beschikbaar voor ingelogde gebruikers.");
+                  return;
+                }
                 setShowGameDuel(true);
                 setShowWebcamCall(false);
                 hiveAudio.playHoneyPop();
@@ -1095,7 +1103,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               }
 
               // Custom Retro Buzzi Webcampopp calling Invitation Card
-              if (msg.isCallInvite) {
+              if (msg.isCallInvite && msg.senderName !== "Buzzi Bot") {
                 return (
                   <motion.div
                     key={msg.id}

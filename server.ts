@@ -589,7 +589,8 @@ exit
     try {
       const dbInstance = await getMongoDb();
       const userData = req.body;
-      if (!userData || !userData.uid) {
+      const userId = userData.id || userData.uid;
+      if (!userData || !userId) {
         res.status(400).json({ error: "Invalid user data payload" });
         return;
       }
@@ -609,13 +610,13 @@ exit
       let savedOk = false;
       if (dbInstance) {
         try {
-          console.log(`[DB] Saving profile for UID ${userData.uid} (Name: ${userData.name}) to MongoDB...`);
+          console.log(`[DB] Saving profile for ID/UID ${userId} (Name: ${userData.name}) to MongoDB...`);
           await dbInstance.collection("users").updateOne(
-            { uid: userData.uid },
+            { $or: [{ id: userId }, { uid: userId }] },
             { $set: docToInsert },
             { upsert: true }
           );
-          console.log(`[DB] Successfully saved profile for UID ${userData.uid} to MongoDB.`);
+          console.log(`[DB] Successfully saved profile for ID/UID ${userId} to MongoDB.`);
           savedOk = true;
         } catch (mongoErr: any) {
           console.warn("[DB] MongoDB save user failed with error:", mongoErr.message || mongoErr);
@@ -625,7 +626,7 @@ exit
 
       if (!savedOk) {
         const users = readJsonFile<any[]>(USERS_FILE, []);
-        const idx = users.findIndex(u => u.uid === userData.uid);
+        const idx = users.findIndex(u => u.id === userId || u.uid === userId);
         if (idx >= 0) {
           users[idx] = { ...users[idx], ...docToInsert };
         } else {
