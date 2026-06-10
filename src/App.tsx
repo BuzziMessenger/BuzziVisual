@@ -857,6 +857,9 @@ exit
 
   const handleDeleteMessage = async (msgId: string) => {
     try {
+      // Backend permanent deletion
+      await fetch(`/api/db/messages/${msgId}`, { method: "DELETE" });
+
       // Mark as deleted instantly in local state and localStorage
       setDeletedMsgIds(prev => {
         const next = [...prev, msgId];
@@ -1318,14 +1321,8 @@ exit
   
   const currentBuddies = (isDemoUser
     ? [
-        ...INITIAL_CONTACTS.filter(c => c.id !== "sanne"),
-        ...registeredUsers.filter(u => {
-          const cleanUEmail = (u.email || "").split("#pwd_")[0].trim().toLowerCase();
-          return !INITIAL_CONTACTS.some(ic => ic.email === u.email) &&
-            cleanUEmail !== cleanCurrentUserEmail &&
-            !u.name?.toLowerCase().includes("robbin") &&
-            !u.email?.toLowerCase().includes("robbin");
-        })
+        // Guest users: only show Buzzi Bot, Wouter, Kelly, Danny (from INITIAL_CONTACTS)
+        ...INITIAL_CONTACTS.filter(c => ["queen", "wouter", "kelly", "danny"].includes(c.id))
       ]
     : [
         INITIAL_CONTACTS[0], // Keep Buzzi Bot!

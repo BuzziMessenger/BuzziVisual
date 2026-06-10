@@ -590,6 +590,7 @@ exit
       const dbInstance = await getMongoDb();
       const userData = req.body;
       const userId = userData.id || userData.uid;
+      console.log("[DB DEBUG] User update request:", userData, "resolved userId:", userId);
       if (!userData || !userId) {
         res.status(400).json({ error: "Invalid user data payload" });
         return;
@@ -659,6 +660,34 @@ exit
       writeJsonFile(MESSAGES_FILE, filtered);
       
       res.json({ success: true, message: `Bericht ${id} succesvol verwijderd.` });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Bulk Delete Messages (Admin control)
+  app.post("/api/db/messages/bulk-delete", async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids)) {
+        res.status(400).json({ error: "Invalid IDs provided" });
+        return;
+      }
+      const dbInstance = await getMongoDb();
+      
+      if (dbInstance) {
+        try {
+          await dbInstance.collection("messages").deleteMany({ id: { $in: ids } });
+        } catch (mongoErr) {
+          console.warn("MongoDB bulk message delete failed, falling back local:", mongoErr);
+        }
+      }
+      
+      const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
+      const filtered = messages.filter(m => !ids.includes(m.id));
+      writeJsonFile(MESSAGES_FILE, filtered);
+      
+      res.json({ success: true, message: `Berichten succesvol verwijderd.` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

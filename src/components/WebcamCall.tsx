@@ -252,8 +252,11 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
 
       // Handle receiving remote media stream
       pc.ontrack = (event) => {
-        if (event.streams && event.streams[0] && active) {
-          setRemoteStream(event.streams[0]);
+        // Robust track handling: some browsers don't give event.streams[0]
+        const stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+        
+        if (active) {
+          setRemoteStream(stream);
           setCallStatus("active");
         }
       };
