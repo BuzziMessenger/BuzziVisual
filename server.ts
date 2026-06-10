@@ -1091,77 +1091,121 @@ exit
   });
 
   // ========== WEB RTC CALL SIGNALING FOR REAL-TIME VIDEO CALLING ==========
-  const callSignals: Record<string, {
-    roomId: string;
-    offer?: any;
-    answer?: any;
-    callerCandidates: any[];
-    calleeCandidates: any[];
-    updatedAt: number;
-  }> = {};
+  // Now stored in MongoDB for persistence across server restarts
+  // In-memory fallback for when MongoDB is unavailable
+  const callSignals: Record<string, any> = {};
 
-  // Clean stale signals periodically (older than 10 mins)
-  setInterval(() => {
-    const now = Date.now();
-    for (const id in callSignals) {
-      if (now - callSignals[id].updatedAt > 600000) {
-        delete callSignals[id];
+  app.get("/api/db/calls/signal", async (req, res) => {
+    try {
+      const { roomId } = req.query;
+      if (!roomId) {
+        res.status(400).json({ error: "Missing roomId" });
+        return;
       }
+      const rId = roomId as string;
+      const dbInstance = await getMongoDb();
+      
+      if (dbInstance) {
+        try {
+          const room = await dbInstance.collection("call_signals").findOne({ roomId: rId });
+          if (room) {
+            res.json(room);
+            return;
+          }
+        } catch (mongoErr) {
+          console.warn("MongoDB call signal read failed:", mongoErr);
+        }
+      }
+      
+      // In-memory fallback if MongoDB unavailable
+      if (!callSignals[rId]) {
+        callSignals[rId] = { roomId: rId, callerCandidates: [], calleeCandidates: [], updatedAt: Date.now() };
+      }
+      res.json(callSignals[rId]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-  }, 60000);
-
-  app.get("/api/db/calls/signal", (req, res) => {
-    const { roomId } = req.query;
-    if (!roomId) {
-      res.status(400).json({ error: "Missing roomId" });
-      return;
-    }
-    const rId = roomId as string;
-    if (!callSignals[rId]) {
-      callSignals[rId] = { roomId: rId, callerCandidates: [], calleeCandidates: [], updatedAt: Date.now() };
-    }
-    res.json(callSignals[rId]);
   });
 
-  app.post("/api/db/calls/signal", (req, res) => {
-    const { roomId, type, data } = req.body;
-    if (!roomId || !type) {
-      res.status(400).json({ error: "Missing roomId or type" });
-      return;
-    }
-    const rId = roomId as string;
-    if (!callSignals[rId]) {
-      callSignals[rId] = { roomId: rId, callerCandidates: [], calleeCandidates: [], updatedAt: Date.now() };
-    }
-    const room = callSignals[rId];
-    room.updatedAt = Date.now();
-
-    if (type === "offer") {
-      room.offer = data;
-    } else if (type === "answer") {
-      room.answer = data;
-    } else if (type === "caller_candidate") {
-      if (data) {
-        const strVal = JSON.stringify(data);
-        if (!room.callerCandidates.some(c => JSON.stringify(c) === strVal)) {
-          room.callerCandidates.push(data);
+  app.post("/api/db/calls/signal", async (req, res) => {
+    try {
+      const { roomId, type, data } = req.body;
+      if (!roomId || !type) {
+        res.status(400).json({ error: "Missing roomId or type" });
+        return;
+      }
+      const rId = roomId as string;
+      const dbInstance = await getMongoDb();
+      
+      // Try MongoDB first
+      if (dbInstance) {
+        try {
+          let updateOp: any = { $set: { updatedAt: Date.now() } };
+          
+          if (type === "offer") {
+            updateOp.$set.offer = data;
+          } else if (type === "answer") {
+            updateOp.$set.answer = data;
+          } else if (type === "caller_candidate") {
+            if (data) {
+              updateOp.$addToSet = { callerCandidates: data };
+            }
+          } else if (type === "callee_candidate") {
+            if (data) {
+              updateOp.$addToSet = { calleeCandidates: data };
+            }
+          } else if (type === "reset") {
+            updateOp.$set = { offer: null, answer: null, callerCandidates: [], calleeCandidates: [], updatedAt: Date.now() };
+          }
+          
+          await dbInstance.collection("call_signals").updateOne(
+            { roomId: rId },
+            { ...updateOp, $setOnInsert: { roomId: rId } },
+            { upsert: true }
+          );
+          res.json({ success: true });
+          return;
+        } catch (mongoErr) {
+          console.warn("MongoDB call signal save failed, using in-memory:", mongoErr);
         }
       }
-    } else if (type === "callee_candidate") {
-      if (data) {
-        const strVal = JSON.stringify(data);
-        if (!room.calleeCandidates.some(c => JSON.stringify(c) === strVal)) {
-          room.calleeCandidates.push(data);
-        }
+      
+      // In-memory fallback
+      if (!callSignals[rId]) {
+        callSignals[rId] = { roomId: rId, callerCandidates: [], calleeCandidates: [], updatedAt: Date.now() };
       }
-    } else if (type === "reset") {
-      room.offer = undefined;
-      room.answer = undefined;
-      room.callerCandidates = [];
-      room.calleeCandidates = [];
-    }
+      const room = callSignals[rId];
+      room.updatedAt = Date.now();
 
-    res.json({ success: true });
+      if (type === "offer") {
+        room.offer = data;
+      } else if (type === "answer") {
+        room.answer = data;
+      } else if (type === "caller_candidate") {
+        if (data) {
+          const strVal = JSON.stringify(data);
+          if (!room.callerCandidates.some((c: any) => JSON.stringify(c) === strVal)) {
+            room.callerCandidates.push(data);
+          }
+        }
+      } else if (type === "callee_candidate") {
+        if (data) {
+          const strVal = JSON.stringify(data);
+          if (!room.calleeCandidates.some((c: any) => JSON.stringify(c) === strVal)) {
+            room.calleeCandidates.push(data);
+          }
+        }
+      } else if (type === "reset") {
+        room.offer = undefined;
+        room.answer = undefined;
+        room.callerCandidates = [];
+        room.calleeCandidates = [];
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
   // =========================================================================
 
