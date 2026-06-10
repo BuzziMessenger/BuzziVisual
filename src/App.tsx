@@ -1845,6 +1845,11 @@ exit
   const handleUpdateAvatar = (val: string) => {
     setUserAvatar(val);
     updateProfileInDatabase({ avatar: val });
+    if (currentUser) {
+      const updatedUser = { ...currentUser, avatar: val };
+      localStorage.setItem("buzzi_user", JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+    }
   };
   const handleUpdateListeningTo = (val: string) => {
     setUserListeningTo(val);
@@ -2438,6 +2443,7 @@ exit
           isUserPremium={isUserPremium}
           onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
           onToggleBlockContact={handleToggleBlockContact}
+          isUserAnAdmin={isUserAnAdmin}
           isSyncMusicEnabled={isSyncMusicEnabled}
           onToggleSyncMusic={handleToggleSyncMusic}
           isReconnectingDb={isReconnectingDb}
@@ -2463,6 +2469,7 @@ exit
           isBlocked={blockedContactIds.includes(activeId)}
           onToggleBlock={() => handleToggleBlockContact(activeId)}
           isUserPremium={isUserPremium}
+          isUserAnAdmin={isUserAnAdmin}
           onOpenPremiumModal={() => setIsPremiumModalOpen(true)}
           siteLanguage={siteLanguage}
           onDeleteMessage={handleDeleteMessage}
@@ -3105,12 +3112,50 @@ exit
                       </form>
                     </div>
 
-                    {/* Live Message Logbook Panel */}
-                    <div className="bg-sky-50/95 border border-sky-200 rounded p-2 text-[10px] text-[#1d5c8a] space-y-2 shadow-2xs">
-                      <div className="font-extrabold text-sky-800 uppercase tracking-wider flex items-center justify-between">
-                        <span>💬 Live Berichten Logboek ({allDatabaseMessages.length})</span>
-                        <span className="text-[8px] bg-sky-100 text-[#1d5c8a] px-1 rounded font-mono font-bold animate-pulse">Live</span>
+                    {/* User Management Section */}
+                    <div className="bg-white border border-sky-200 rounded p-3 text-[10px] text-slate-800 shadow-sm mt-4">
+                      <div className="font-extrabold text-sky-800 uppercase tracking-wider mb-2">
+                        👥 Gebruikersbeheer ({registeredUsers.length})
                       </div>
+                      <div className="max-h-[200px] overflow-y-auto space-y-1">
+                        {registeredUsers.map(u => (
+                          <div key={u.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border border-slate-100">
+                             <div className="flex flex-col">
+                               <span className="font-bold">{u.name}</span>
+                               <span className="text-[8px] text-slate-500">{u.email}</span>
+                             </div>
+                             <div className="flex gap-1">
+                              <button
+                                onClick={async () => {
+                                  const newName = prompt("Nieuwe naam voor " + u.name + ":", u.name);
+                                  if (newName && newName !== u.name) {
+                                    try {
+                                      const res = await fetch("/api/db/users", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ ...u, uid: u.id, name: newName }) // Assumes u has all required fields
+                                      });
+                                      if (res.ok) {
+                                        setRegisteredUsers(prev => prev.map(user => user.id === u.id ? { ...user, name: newName } : user));
+                                        alert("Naam succesvol gewijzigd!");
+                                      } else {
+                                        alert("Fout bij het wijzigen van de naam.");
+                                      }
+                                    } catch (err) {
+                                      console.error("Error updating user:", err);
+                                      alert("Er ging iets mis bij het wijzigen.");
+                                    }
+                                  }
+                                }}
+                                className="bg-sky-500 text-white px-2 py-0.5 rounded cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
                       {/* Filter Actions search & select */}
                       <div className="space-y-1 bg-white/60 border border-sky-100 rounded p-1.5">
@@ -3262,7 +3307,6 @@ exit
                       🧹 Bulk Wis Alle Foutmeldingen
                     </button>
                   </div>
-                </div>
               ) : (
                 <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 font-black text-center text-[11px]">
                   ⚠️ Je bent momenteel geen beheerder of operator.
@@ -3281,12 +3325,12 @@ exit
                 </h3>
 
                 <p className="text-[11px] text-slate-500 mt-1.5 leading-normal">
-                  Werkt er iets niet (bijv. een radiozender)? Meld het direct! Robbin zal hier melding van krijgen op zijn beeldscherm.
+                  Werkt er iets niet (bijv. een radiozender)? Meld het direct! De beheerder zal hier melding van krijgen op zijn beeldscherm.
                 </p>
 
                 {bugSuccess ? (
                   <div className="mt-3.5 bg-emerald-50 border border-emerald-300 rounded p-3 text-center text-emerald-950 font-black text-[11px] animate-bounce">
-                    🎉 Melding verstuurd naar Robbin! Bedankt voor de hulp!
+                    🎉 Melding verstuurd naar de beheerder! Bedankt voor de hulp!
                   </div>
                 ) : (
                   <form onSubmit={handleSendBugReport} className="mt-3.5 space-y-3">

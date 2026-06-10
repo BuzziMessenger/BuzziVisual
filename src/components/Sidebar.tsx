@@ -177,6 +177,7 @@ interface SidebarProps {
   isUserPremium?: boolean;
   onOpenPremiumModal?: () => void;
   onToggleBlockContact?: (contactId: string) => void;
+  isUserAnAdmin?: boolean;
 
   isSyncMusicEnabled?: boolean;
   onToggleSyncMusic?: () => void;
@@ -216,6 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isUserPremium = false,
   onOpenPremiumModal,
   onToggleBlockContact,
+  isUserAnAdmin = false,
   isSyncMusicEnabled = false,
   onToggleSyncMusic,
   siteLanguage = "NL",
@@ -1039,7 +1041,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 w-full">
                           <span className="text-xs font-bold text-slate-800 truncate block">
-                            {contact.name} <span className="text-sky-600 text-[10px] font-normal font-mono">({contact.email.split("#pwd_")[0]})</span>
+                            {contact.name} {isUserAnAdmin && <span className="text-sky-600 text-[10px] font-normal font-mono">({contact.email.split("#pwd_")[0]})</span>}
                           </span>
                           {unreadCounts[contact.id] > 0 && (
                             <span className="bg-[#FF5A00] text-white font-mono rounded-full text-[9px] px-1.5 py-0.5 leading-none shrink-0 font-extrabold animate-pulse shadow-sm min-w-[16px] text-center" title={`${unreadCounts[contact.id]} ongelezen berichten`}>
@@ -1212,7 +1214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>
+                        {isUserAnAdmin && <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5">({contact.email.split("#pwd_")[0]})</p>}
                       </div>
                     </button>
 

@@ -34,11 +34,36 @@ function unblockIp(ip: string): void {
   writeJsonFile(BLOCKED_IPS_FILE, filtered);
 }
 
-const isVercel = !!process.env.VERCEL;
+async function sendPushNotification(userId: string, title: string, message: string) {
+  const appId = process.env.ONESIGNAL_APP_ID;
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+  if (!appId || !apiKey) return;
+
+  try {
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${apiKey}`
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        contents: { en: message },
+        headings: { en: title },
+        include_external_user_ids: [userId]
+      })
+    });
+  } catch (err) {
+    console.error("Error sending push notification:", err);
+  }
+}
+
 const inMemoryCache: Record<string, any> = {};
 
 // In-memory store for active typing statuses: senderUid -> { typingTo, lastActive: number }
 const activeTypingState: Record<string, { typingTo: string; lastActive: number }> = {};
+
+const isVercel = !!process.env.VERCEL;
 
 function readJsonFile<T>(filePath: string, defaultVal: T): T {
   if (isVercel) {
@@ -362,6 +387,11 @@ exit
         }
         writeJsonFile(MESSAGES_FILE, messages);
       }
+
+      if (docToInsert.receiverId && docToInsert.text) {
+        sendPushNotification(docToInsert.receiverId, docToInsert.senderName || "Nieuw bericht", docToInsert.text);
+      }
+      
       res.json({ success: true, message: "Bericht succesvol opgeslagen." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1260,11 +1290,11 @@ exit
         Voeg typische Buzzi emoticons toe in je tekst, zoals: :-D, (H), (A), (L), (K), (W), :P, (f), (S), :-O.
         Houd antwoorden enthousiast, nostalgisch, grappig en korter dan 3 alinea's. Moedig de gebruiker aan om je een 'Nudge' (duwtje) te sturen!`;
 
-      // Helper function to censor/block any remaining traces of the word MSN
-      const censorMsn = (str: string) => {
+      const censorBannedWords = (str: string) => {
         return str
           .replace(/\bmsn\b/gi, "Buzzi")
-          .replace(/msn/gi, "Buzzi");
+          .replace(/msn/gi, "Buzzi")
+          .replace(/\bkanker\b/gi, "Buzzi");
       };
 
       // Structure histories if provided for multi-turn chat
@@ -1311,7 +1341,7 @@ exit
       }
 
       const textValue = response?.text || "🤖 *PING!* Ik weet even niks te zeggen... mss is de lijn bezet! :-D";
-      res.json({ reply: censorMsn(textValue) });
+      res.json({ reply: censorBannedWords(textValue) });
     } catch (error: any) {
       console.error("Express /api/chat Error:", error);
       res.json({

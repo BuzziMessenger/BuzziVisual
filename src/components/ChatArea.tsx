@@ -66,6 +66,7 @@ interface ChatAreaProps {
   isBlocked?: boolean;
   onToggleBlock?: () => void;
   isUserPremium?: boolean;
+  isUserAnAdmin?: boolean;
   onOpenPremiumModal?: () => void;
   siteLanguage?: string;
   onDeleteMessage?: (id: string) => void;
@@ -157,7 +158,10 @@ const WINKS_LIST = [
   { id: "pinguin", title: "Dansende Buzzi Pinguïn", icon: "🐧", desc: "De legendarische retro dansende Linux pinguïn swingt zijn heupen!" },
   { id: "heartbreaker", title: "Buzzi Heartbreaker", icon: "💔", desc: "Een pijnlijk gebroken hart dat over je scherm barst!" },
   { id: "matrix", title: "Retro Matrix Rain", icon: "👾", desc: "Hack het chatvenster met vallende groene cryptische Buzzi matrixcodes!" },
-  { id: "bee", title: "Buzzi Honingbij", icon: "🐝", desc: "Een maffe bij die zoemend het scherm vult met zoete glinsterhoning!" }
+  { id: "bee", title: "Buzzi Honingbij", icon: "🐝", desc: "Een maffe bij die zoemend het scherm vult met zoete glinsterhoning!" },
+  { id: "heartbox", title: "Buzzi Cadeaudoos", icon: "🎁", desc: "Open een mysterieus Buzzi-cadeautje vol hartjes!" },
+  { id: "star", title: "Glinster Ster", icon: "🌟", desc: "Laat je Buzzi-chat oplichten met een glinsterende sterrenregen!" },
+  { id: "sunglasses", title: "Cool Buzzi", icon: "😎", desc: "Een Buzzi-gezichtje met de coolste zwarte zonnebril ooit!" }
 ];
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -176,6 +180,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isBlocked = false,
   onToggleBlock,
   isUserPremium = false,
+  isUserAnAdmin = false,
   onOpenPremiumModal,
   siteLanguage = "NL",
   onDeleteMessage,
@@ -191,10 +196,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return translateUI(siteLanguage, key);
   };
 
-  const isViewingUserAdmin = myDisplayName?.toLowerCase().includes("robbin") || 
-                             myDisplayName?.toLowerCase().includes("admin") || 
-                             myDisplayName?.toLowerCase().includes("operator") || 
-                             myDisplayName === "Robbin";
+  const isViewingUserAdmin = isUserAnAdmin;
 
   const [inputText, setInputText] = useState("");
   const [isShaking, setIsShaking] = useState(false);
