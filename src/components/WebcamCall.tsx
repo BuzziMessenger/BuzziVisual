@@ -227,6 +227,11 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
       return;
     }
 
+    // Prevent double initialization
+    if (pcRef.current) {
+      return;
+    }
+
     const calculatedRoomId = [myUserId, activeContactId].sort().join("-");
     setRoomId(calculatedRoomId);
 
