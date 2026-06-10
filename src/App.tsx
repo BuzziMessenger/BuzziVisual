@@ -858,7 +858,10 @@ exit
   const handleDeleteMessage = async (msgId: string) => {
     try {
       // Backend permanent deletion
-      await fetch(`/api/db/messages/${msgId}`, { method: "DELETE" });
+      const res = await fetch(`/api/db/messages/${msgId}`, { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error("Failed to delete message on backend");
+      }
 
       // Mark as deleted instantly in local state and localStorage
       setDeletedMsgIds(prev => {
@@ -888,19 +891,9 @@ exit
       });
       hiveAudio.playHoneyPop();
 
-      const res = await fetch(`/api/db/messages/${msgId}`, {
-        method: "DELETE"
-      });
-      if (!res.ok) {
-        try {
-          const data = await res.json();
-          console.warn(`Server status deletion failed or message only in static fallback list: ${data.error || "Onbekende fout"}`);
-        } catch {
-          console.warn("Server status deletion failed with non-json response.");
-        }
-      }
     } catch (err: any) {
-      console.warn(`Failed backend delete: ${err.message}`);
+      console.error(`[Admin] Failed backend delete for ${msgId}:`, err.message);
+      alert(`Fout bij verwijderen: ${err.message}`);
     }
   };
 
@@ -3109,6 +3102,63 @@ exit
                       </div>
                     </div>
 
+                    {/* Send Message to Specific User */}
+                    <div className="bg-sky-50 border border-sky-200 rounded p-2 text-[10px] text-sky-900 space-y-1 shadow-2xs mt-2">
+                      <div className="font-extrabold text-sky-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>💬 Bericht naar Gebruiker</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <select id="admin_select_user" className="w-full bg-white border border-sky-200 rounded px-1.5 py-0.5 text-[10px]">
+                          {registeredUsers.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                        </select>
+                        <input type="text" id="admin_msg_body" placeholder="Bericht..." className="w-full bg-white border border-sky-200 rounded px-1.5 py-0.5 text-[10px]" />
+                        <button 
+                          onClick={async () => {
+                            const uId = (document.getElementById("admin_select_user") as HTMLSelectElement).value;
+                            const msg = (document.getElementById("admin_msg_body") as HTMLInputElement).value;
+                            if (uId && msg) {
+                                await fetch("/api/admin/message-to-user", {
+                                    method: "POST",
+                                    headers:{"Content-Type": "application/json"},
+                                    body: JSON.stringify({ userId: uId, messageBody: msg })
+                                });
+                                alert("Bericht verzonden");
+                                (document.getElementById("admin_msg_body") as HTMLInputElement).value = "";
+                            }
+                          }}
+                          className="bg-sky-600 text-white rounded font-bold py-0.5 hover:bg-sky-700 cursor-pointer"
+                        >Verstuur</button>
+                      </div>
+                    </div>
+
+                    {/* Push Notification to All */}
+                    <div className="bg-violet-50 border border-violet-200 rounded p-2 text-[10px] text-violet-900 space-y-1 shadow-2xs mt-2">
+                      <div className="font-extrabold text-violet-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>🔔 Push naar Iedereen</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <input type="text" id="admin_push_title" placeholder="Titel..." className="w-full bg-white border border-violet-200 rounded px-1.5 py-0.5 text-[10px]" />
+                        <input type="text" id="admin_push_msg" placeholder="Bericht..." className="w-full bg-white border border-violet-200 rounded px-1.5 py-0.5 text-[10px]" />
+                        <button 
+                          onClick={async () => {
+                            const title = (document.getElementById("admin_push_title") as HTMLInputElement).value;
+                            const msg = (document.getElementById("admin_push_msg") as HTMLInputElement).value;
+                            if (title && msg) {
+                                await fetch("/api/admin/push-to-all", {
+                                    method: "POST",
+                                    headers:{"Content-Type": "application/json"},
+                                    body: JSON.stringify({ title, message: msg })
+                                });
+                                alert("Push verzonden naar alle gebruikers.");
+                                (document.getElementById("admin_push_title") as HTMLInputElement).value = "";
+                                (document.getElementById("admin_push_msg") as HTMLInputElement).value = "";
+                            }
+                          }}
+                          className="bg-violet-600 text-white rounded font-bold py-0.5 hover:bg-violet-700 cursor-pointer"
+                        >Verstuur Push</button>
+                      </div>
+                    </div>
+
                     {/* Geblokkeerde IP-adressen Panel */}
                     <div className="bg-red-50/90 border border-red-200 rounded p-2 text-[10px] text-red-950 space-y-1 shadow-2xs">
                       <div className="font-extrabold text-red-800 uppercase tracking-wider flex items-center justify-between">
@@ -3227,7 +3277,13 @@ exit
                                         body: JSON.stringify({ id: u.id, name: newName })
                                       });
                                       if (res.ok) {
-                                        setRegisteredUsers(prev => prev.map(user => user.id === u.id ? { ...user, name: newName } : user));
+                                        console.log("[UI DEBUG] User update success, id:", u.id, "new name:", newName);
+                                        setRegisteredUsers(prev => {
+                                          console.log("[UI DEBUG] Previous users:", prev);
+                                          const next = prev.map(user => user.id === u.id ? { ...user, name: newName } : user);
+                                          console.log("[UI DEBUG] Next users:", next);
+                                          return next;
+                                        });
                                         alert("Naam succesvol gewijzigd!");
                                       } else {
                                         const errData = await res.json();

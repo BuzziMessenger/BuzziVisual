@@ -717,6 +717,70 @@ exit
     }
   });
 
+  // DB API: Admin - Send message to specific user
+  app.post("/api/admin/message-to-user", async (req, res) => {
+    try {
+      const { userId, messageBody } = req.body;
+      if (!userId || !messageBody) {
+        res.status(400).json({ error: "userId en messageBody zijn verplicht" });
+        return;
+      }
+
+      const dbInstance = await getMongoDb();
+      const newMessage = {
+        id: "sys-" + Math.random().toString(36).substring(2, 11),
+        senderId: "system",
+        senderName: "Buzzi Systeem",
+        receiverId: userId,
+        text: messageBody,
+        createdAtTimestamp: Date.now()
+      };
+      
+      if (dbInstance) {
+        await dbInstance.collection("messages").insertOne(newMessage);
+      } else {
+        const messages = readJsonFile<any[]>(MESSAGES_FILE, []);
+        messages.push(newMessage);
+        writeJsonFile(MESSAGES_FILE, messages);
+      }
+      
+      sendPushNotification(userId, "Nieuw Systeembericht", messageBody);
+      
+      res.json({ success: true, message: "Bericht verstuurd." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DB API: Admin - Send push notification to all
+  app.post("/api/admin/push-to-all", async (req, res) => {
+    try {
+      const { title, message } = req.body;
+      if (!title || !message) {
+        res.status(400).json({ error: "Title en message zijn verplicht" });
+        return;
+      }
+      
+      const dbInstance = await getMongoDb();
+      let users: any[] = [];
+      if (dbInstance) {
+        users = await dbInstance.collection("users").find({}).toArray();
+      } else {
+        users = readJsonFile<any[]>(USERS_FILE, []);
+      }
+      
+      for (const u of users) {
+        if (u.id || u.uid) {
+          sendPushNotification(u.id || u.uid, title, message);
+        }
+      }
+      
+      res.json({ success: true, message: `Push verstuurd naar ${users.length} gebruikers.` });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // DB API: Get Blocked IPs
   app.get("/api/admin/blocked-ips", (req, res) => {
     res.json(getBlockedIps());
