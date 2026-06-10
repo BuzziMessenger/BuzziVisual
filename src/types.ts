@@ -29,6 +29,10 @@ export interface Message {
     status: "sending" | "completed" | "failed";
     dataUrl?: string;
   };
+  voiceMessage?: {
+    audioDataUrl: string; // base64 data URL of the recorded audio
+    duration: number; // duration in seconds
+  };
 }
 
 export type StatusType = "online" | "bezet" | "afwezig" | "offline";

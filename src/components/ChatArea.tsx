@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Message, Contact, Channel } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { translateUI } from "../translations";
-import { 
+  import { 
   Send, 
   Volume2, 
   Smile, 
@@ -27,12 +27,14 @@ import {
   Headphones,
   Video,
   Paperclip,
-  Gamepad2
+  Gamepad2,
+  Mic
 } from "lucide-react";
 import { hiveAudio } from "../utils/audio";
 import { WebcamCall } from "./WebcamCall";
 import { ChatGameDuel } from "./ChatGameDuel";
 import { FileTransfer } from "./FileTransfer";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 const isCustomAvatar = (avatar: string) => {
   if (!avatar) return false;
@@ -271,6 +273,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showGameDuel, setShowGameDuel] = useState(false);
   const [currentGameId, setCurrentGameId] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
 
   useEffect(() => {
     // Reset webcam call en game duel bij gespreks-wisseling
@@ -631,6 +634,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setInputText("");
     setShowEmoticonPicker(false);
     setShowWinksPicker(false);
+  };
+
+  const handleSendVoiceMessage = (audioDataUrl: string, duration: number) => {
+    // Create a voice message with empty text but with voiceMessage data
+    onSendMessage(`🎤 Spraakbericht (${duration}s)`, false, false, undefined, undefined, false, undefined, undefined, false, undefined);
+    setShowVoiceRecorder(false);
+    hiveAudio.playNotification();
   };
 
   const handleSendWink = (winkId: string, title: string) => {
@@ -1247,6 +1257,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         }
                       }}
                     />
+                  ) : msg.voiceMessage ? (
+                    <div className="pl-4 pr-1 my-1">
+                      <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${
+                        isMe 
+                          ? "bg-purple-50 border-purple-200" 
+                          : "bg-sky-50 border-sky-200"
+                      }`}>
+                        <Mic className={`w-4 h-4 ${isMe ? "text-purple-600" : "text-sky-600"}`} />
+                        <audio controls src={msg.voiceMessage.audioDataUrl} className="h-6" style={{ width: "180px" }} />
+                        <span className="text-[9px] text-slate-400 font-mono">{msg.voiceMessage.duration}s</span>
+                      </div>
+                    </div>
                   ) : (
                     <div 
                       className="text-sm pl-4 pr-1 break-words whitespace-pre-wrap selection:bg-amber-200"
@@ -2043,10 +2065,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
+      {/* Voice Recorder Panel */}
+      {showVoiceRecorder && (
+        <VoiceRecorder
+          onSendVoice={handleSendVoiceMessage}
+          onCancel={() => setShowVoiceRecorder(false)}
+        />
+      )}
+
       {/* Input Action Panel (Separated into rich area text in MSI clone) */}
       <div className="p-4 bg-white border-t border-[#bad0e3] shadow-inner-lg">
         <div className="max-w-4xl mx-auto flex items-end gap-3">
           
+          {/* Voice Recorder button */}
+          {activeType === "dm" && (
+            <button
+              type="button"
+              onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+              disabled={isBlocked}
+              className={`p-3 rounded-xl border transition-all focus:outline-none flex-shrink-0 active:scale-90 ${
+                showVoiceRecorder
+                  ? "bg-red-100 text-red-600 border-red-300"
+                  : isBlocked
+                    ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed"
+                    : "bg-purple-50 hover:bg-purple-100 hover:text-purple-700 text-purple-500 border border-purple-200 cursor-pointer"
+              }`}
+              title={isBlocked ? "Gedeblokkeerd vereist" : "Spraakbericht opnemen"}
+            >
+              <Mic className={`w-5 h-5 ${showVoiceRecorder ? "animate-pulse" : ""}`} />
+            </button>
+          )}
+
           {/* Quick-action trigger */}
           <button 
             type="button"
