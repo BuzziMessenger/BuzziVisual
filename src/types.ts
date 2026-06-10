@@ -42,6 +42,9 @@ export interface Contact {
   personalMessage: string;
   listeningTo?: string; // Buzzi Music feature: "Luistert nu naar: ..."
   isPremium?: boolean;
+  isBlocked?: boolean; // Whether this contact is blocked by the current user
+  ip?: string; // User's IP address (admin view)
+  updatedAtTimestamp?: number; // Last profile update timestamp
 }
 
 export interface Channel {
