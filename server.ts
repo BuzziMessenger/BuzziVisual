@@ -133,7 +133,7 @@ const CONNECT_COOLDOWN_MS = 60000; // Increase cooldown to 1 minute
 
 async function getMongoDb(): Promise<Db | null> {
   if (connectionFailedPermanently) return null;
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://BuzziVisual:BuzziVisual@buzzivisual.pn5h8bf.mongodb.net/?appName=BuzziVisual";
   if (!uri) return null;
   if (mongoDb) return mongoDb;
 
@@ -219,7 +219,7 @@ app.get("/api/db/status", async (req, res) => {
         lastConnectAttempt = 0;
       }
       const dbInstance = await getMongoDb();
-      const rawUri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://Buzzi:BuzziMessenger@buzzimessenger.yoprloo.mongodb.net/?appName=BuzziMessenger";
+      const rawUri = process.env.MONGODB_URI || process.env.MONGO_URL || "mongodb+srv://BuzziVisual:BuzziVisual@buzzivisual.pn5h8bf.mongodb.net/?appName=BuzziVisual";
       res.json({
         mongodb: {
           configured: !!rawUri,

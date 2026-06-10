@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "id": "m-1781122201848-170",
+    "senderId": "u_h_pxyhrm",
+    "senderName": "Buzzi Gast #520788",
+    "senderAvatar": "🧑‍🚀",
+    "text": "🚨 DUWTJE! Directe aandacht vereist!",
+    "timestamp": "22:10",
+    "createdAtLocal": "10-06-2026, 22:10:01",
+    "isBuzz": true,
+    "isWink": false,
+    "winkId": "",
+    "isGameDuel": false,
+    "gameId": "",
+    "isCallInvite": false,
+    "callId": "",
+    "receiverId": "queen",
+    "createdAt": "2026-06-10T20:10:01.864Z",
+    "ip": "127.0.0.1",
+    "createdAtTimestamp": 1781122201873
+  }
+]

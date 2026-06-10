@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+data_*.json
+tmp_files/
+*.bat
