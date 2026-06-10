@@ -3123,6 +3123,7 @@ exit
                              <div className="flex flex-col">
                                <span className="font-bold">{u.name}</span>
                                <span className="text-[8px] text-slate-500">{u.email}</span>
+                               {u.ip && <span className="text-[8px] font-mono text-slate-600 block">IP: {u.ip} {blockedIps.includes(u.ip) ? " (🚫)" : ""}</span>}
                              </div>
                              <div className="flex gap-1">
                               <button

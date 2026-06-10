@@ -567,7 +567,6 @@ exit
       const docToInsert = {
         ...userData,
         ip: clientIp,
-        naam: userData.uid,
         updatedAtTimestamp: Date.now()
       };
       
