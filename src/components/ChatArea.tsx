@@ -204,6 +204,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isShaking, setIsShaking] = useState(false);
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [showWinksPicker, setShowWinksPicker] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [reactionTargetId, setReactionTargetId] = useState<string | null>(null);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -642,7 +644,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const handleSendVoiceMessage = (audioDataUrl: string, duration: number) => {
     // Create a voice message with empty text but with voiceMessage data
-    onSendMessage(`🎤 Spraakbericht (${duration}s)`, false, false, undefined, undefined, false, undefined, undefined, false, undefined);
+    onSendMessage(`🎤 Spraakbericht (${duration}s)`, false, false, undefined, undefined, false, undefined, undefined, false, undefined, undefined, undefined, undefined, undefined, undefined, {
+      audioDataUrl,
+      duration
+    });
     setShowVoiceRecorder(false);
     hiveAudio.playNotification();
   };

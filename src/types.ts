@@ -28,11 +28,18 @@ export interface Message {
     progress: number; // 0-100
     status: "sending" | "completed" | "failed";
     dataUrl?: string;
+    mimeType?: string;
   };
   voiceMessage?: {
     audioDataUrl: string; // base64 data URL of the recorded audio
     duration: number; // duration in seconds
   };
+  reactions?: Array<{
+    userId: string;
+    userName: string;
+    emoji: string;
+    timestamp: string;
+  }>;
 }
 
 export type StatusType = "online" | "bezet" | "afwezig" | "offline";
