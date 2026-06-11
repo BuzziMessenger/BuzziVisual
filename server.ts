@@ -1677,6 +1677,19 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Buzzi Server running on http://localhost:${PORT}`);
+    
+    // Keep-alive ping to prevent Render free tier from sleeping
+    if (process.env.NODE_ENV === "production") {
+      const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+      setInterval(() => {
+        https.get(keepAliveUrl, (res) => {
+          console.log(`[Keep-Alive] Ping sent - Status: ${res.statusCode}`);
+        }).on("error", (err) => {
+          console.error(`[Keep-Alive] Ping failed:`, err.message);
+        });
+      }, 14 * 60 * 1000); // Every 14 minutes
+      console.log(`[Keep-Alive] Ping interval set to 14 minutes`);
+    }
   });
 }
 
