@@ -1399,7 +1399,7 @@ exit
 
     const interval = setInterval(() => {
       updateProfileInDatabase({});
-    }, 8000); // 8 seconds pulse
+    }, 60000); // 60 seconds pulse (reduced from 8s to prevent MongoDB spam)
 
     return () => clearInterval(interval);
   }, [currentUser, profileInitialized, userDisplayName, userAvatar, userStatus, userPersonalMessage, userListeningTo]);
