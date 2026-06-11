@@ -340,15 +340,6 @@ export default function App() {
     avatar?: string;
   } | null>(null);
 
-  // MSN Messenger online/offline notification state
-  const [msnToast, setMsnToast] = useState<{
-    show: boolean;
-    name: string;
-    avatar: string;
-    event: "online" | "offline";
-    email?: string;
-  } | null>(null);
-
   // Overridden status of contacts for the XP sign-in notification simulation
   const [buddiesStatusOverride, setBuddiesStatusOverride] = useState<Record<string, StatusType>>({});
 
@@ -1337,7 +1328,7 @@ exit
         isBlocked: blockedContactIds.includes(c.id)
       })).filter(c => !deletedContactIds.includes(c.id));
 
-  // Refs to track previous buddy statuses for real-time MSN alerts
+  // Refs to track previous buddy statuses for real-time Buzzi alerts
   const lastBuddiesStatusRef = useRef<Record<string, StatusType>>({});
   const initialSyncRef = useRef<boolean>(true);
 
@@ -1371,37 +1362,25 @@ exit
 
           if (wasOffline && !isOffline) {
             hiveAudio.playOnlineAlert();
-            setMsnToast({
+            setBuzziToast({
               show: true,
-              name: buddy.name,
-              avatar: buddy.avatar,
-              event: "online",
-              email: subtitle
+              title: `${buddy.name} is online!`,
+              message: `${buddy.name} is zojuist online gegaan!`,
+              avatar: buddy.avatar
             });
             setTimeout(() => {
-              setMsnToast(curr => {
-                if (curr && curr.name === buddy.name && curr.event === "online") {
-                  return { ...curr, show: false };
-                }
-                return curr;
-              });
+              setBuzziToast(curr => curr ? { ...curr, show: false } : null);
             }, 6000);
           } else if (!wasOffline && isOffline) {
             hiveAudio.playOfflineAlert();
-            setMsnToast({
+            setBuzziToast({
               show: true,
-              name: buddy.name,
-              avatar: buddy.avatar,
-              event: "offline",
-              email: subtitle
+              title: `${buddy.name} is offline`,
+              message: `${buddy.name} is zojuist offline gegaan.`,
+              avatar: buddy.avatar
             });
             setTimeout(() => {
-              setMsnToast(curr => {
-                if (curr && curr.name === buddy.name && curr.event === "offline") {
-                  return { ...curr, show: false };
-                }
-                return curr;
-              });
+              setBuzziToast(curr => curr ? { ...curr, show: false } : null);
             }, 6000);
           }
         }
@@ -3679,63 +3658,12 @@ exit
         </div>
       )}
 
-      {/* Authentic MSN Messenger Toaster notification */}
-      {msnToast && msnToast.show && (
-        <div 
-          className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-[99999] w-[275px] sm:w-[310px] bg-[#fdfdfd] border-2 border-[#1253a4] rounded-lg shadow-2xl overflow-hidden font-sans select-none animate-slide-up"
-          style={{
-            background: "linear-gradient(to bottom, #f0f7fe 0%, #d3e5f7 15%, #ecf4fd 100%)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.6)"
-          }}
-        >
-          {/* Top header strip characteristic of MSN notifications */}
-          <div className="bg-gradient-to-r from-[#1d62b5] to-[#4c92eb] text-white text-[10px] uppercase font-extrabold px-2.5 py-1.5 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[12px] animate-pulse">🐝</span>
-              <span>Buzzi Messenger</span>
-            </div>
-            <button 
-              onClick={() => setMsnToast(prev => prev ? { ...prev, show: false } : null)}
-              className="text-sky-100 hover:text-white font-black text-[11px] px-1 hover:bg-white/15 rounded cursor-pointer leading-none"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="p-3.5 flex items-start gap-3">
-            {/* MSN Messenger custom/classic blue circular bubble for avatar status */}
-            <div className="relative shrink-0 flex items-center justify-center p-1.5 bg-white border border-[#96b8e2] rounded-full shadow-inner w-12 h-12">
-              <span className="text-3xl select-none">{msnToast.avatar}</span>
-              {/* Status indicator bubble */}
-              <span className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
-                msnToast.event === "online" ? "bg-emerald-500" : "bg-slate-400"
-              }`} />
-            </div>
-
-            <div className="flex-1 min-w-0 text-left">
-              <p className="text-[11.5px] text-[#2c5384] font-black truncate leading-tight select-all">
-                {msnToast.name}
-              </p>
-              <p className="text-[10.5px] text-slate-700 font-bold mt-1 leading-snug">
-                {msnToast.event === "online" 
-                  ? "is zojuist online gegaan!" 
-                  : "is zojuist offline gegaan."
-                }
-              </p>
-              <p className="text-[9px] text-[#4d6d9c] italic truncate mt-1 max-width-[100%] leading-none">
-                {msnToast.email}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Buzzi Premium VIP Upgrade Modal is removed per user request */}
 
       <LegalModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
       <AndroidInstallModal isOpen={isAndroidModalOpen} onClose={() => setIsAndroidModalOpen(false)} />
 
-      {/* Retro floating MSN Messenger style toast alert for incoming WebRTC video call or Game Duel */}
+      {/* Retro floating Buzzi Messenger style toast alert for incoming WebRTC video call or Game Duel */}
       <AnimatePresence>
         {activeCallInvite && (
           <motion.div

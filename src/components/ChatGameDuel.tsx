@@ -1,7 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * Buzzi Chat Spelletjes Duel Component (Nostalgische MSN Games 2004 Clone)
+ * Buzzi Chat Spelletjes Duel Component (Nostalgische Games 2004 Clone)
  * fully updated with real-time multiplayer capability.
  */
 
@@ -1122,7 +1122,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
   return (
     <div className="absolute inset-x-4 top-16 bottom-[140px] z-40 bg-[#cbdcf0] border-2 border-[#15a13c] rounded-lg shadow-2xl flex flex-col overflow-hidden font-sans select-none animate-fade-in">
       
-      {/* Title Bar MSN Spelletjes */}
+      {/* Title Bar Buzzi Spelletjes */}
       <div className="bg-gradient-to-r from-[#15a13c] via-[#21bf4a] to-[#0f842d] px-3.5 py-2 flex items-center justify-between text-white border-b border-[#0f7d2a]">
         <div className="flex items-center gap-2">
           <Gamepad2 className="w-4 h-4 text-emerald-100 animate-bounce" />
@@ -1641,7 +1641,7 @@ export const ChatGameDuel: React.FC<ChatGameDuelProps> = ({
             </div>
           </div>
 
-          {/* MSN Chatter balloons (only for AI mode, or simple status in multiplayer) */}
+          {/* Buzzi Chatter balloons (only for AI mode, or simple status in multiplayer) */}
           <div className="bg-white border border-slate-300 rounded p-2 text-[9.5px] leading-normal text-slate-600 relative mt-2 shrink-0">
             <div className="absolute -left-1.5 top-5 w-0 h-0 border-t-4 border-r-4 border-b-4 border-transparent border-r-white z-10" />
             <div className="font-bold text-slate-400 pb-0.5 border-b border-dashed border-slate-100 flex items-center gap-1">

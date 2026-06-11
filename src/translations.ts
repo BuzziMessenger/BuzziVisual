@@ -1,4 +1,4 @@
-// Global UI Translations dictionary for Buzzi Messenger (Nostalgic 2004 MSN Messenger clone)
+// Global UI Translations dictionary for Buzzi Messenger (Nostalgic 2004 Messenger clone)
 // Supported languages: Nederlands (NL), English (EN), Deutsch (DE), Français (FR), Español (ES), Italiano (IT)
 
 export const UI_TRANSLATIONS: Record<string, Record<string, string>> = {

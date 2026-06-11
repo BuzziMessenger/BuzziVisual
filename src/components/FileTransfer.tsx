@@ -84,7 +84,7 @@ export const FileTransfer: React.FC<FileTransferProps> = ({
         if (totalProgress % 4 === 0) {
           playPulsebeep(523.25, 0.05);
         }
-        // MSN style random KB transfer calculation
+        // Buzzi style random KB transfer calculation
         const randSpeed = (Math.random() * 45 + 12).toFixed(1);
         setSpeed(`${randSpeed} KB/s`);
       }
@@ -196,7 +196,7 @@ export const FileTransfer: React.FC<FileTransferProps> = ({
               <span className="font-extrabold text-[#2c659e]">{progress}%</span>
             </div>
 
-            {/* Simulated MSN progress bar */}
+            {/* Simulated Buzzi progress bar */}
             <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden shadow-inner flex border border-slate-300">
               <div 
                 className="bg-gradient-to-r from-[#20aa44] via-[#7fe05f] to-[#20aa44] h-full shadow-inner transition-all duration-300" 

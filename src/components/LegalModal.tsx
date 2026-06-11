@@ -11,7 +11,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   NL: {
     title: "Buzzi Juridische Voorwaarden & Privacy",
     disclaimerTitle: "⚠️ Belangrijke Disclaimer & Certificering",
-    disclaimerText: "Buzzi Messenger is een onafhankelijk kunst- en parodieproject. Dit platform heeft geen enkele commerciële, officiële of juridische band met Microsoft Corporation, MSN, MSN Messenger, Skype, Windows of enig ander origineel handelsmerk.",
+    disclaimerText: "Buzzi Messenger is een onafhankelijk kunst- en parodieproject. Dit platform heeft geen enkele commerciële, officiële of juridische band met Microsoft Corporation, Skype, Windows, of enig ander origineel handelsmerk van derden. Alle gelijkenissen met bestaande berichtenplatformen zijn uitsluitend bedoeld als nostalgische hommage.",
     sec1Title: "1. Juridische Status & Intellectueel Eigendom",
     sec1Text: "Dit platform fungegaat puur als een educatieve en nostalgische simulatie. Alle retro geluidseffecten (chimes, nudges, inlognotificaties) worden in realtime in de browser gesynthetiseerd met behulp van de Web Audio API (Web-synthesizer). Er worden geen auteursrechtelijk beschermde audiobestanden, merknamen of bedrijfseigendommen van derden gedistribueerd of gehost op onze servers.",
     sec2Title: "2. Privacyverklaring & Gegevensopslag",
@@ -34,7 +34,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   EN: {
     title: "Buzzi Legal Conditions & Privacy",
     disclaimerTitle: "⚠️ Important Disclaimer & Certification",
-    disclaimerText: "Buzzi Messenger is an independent art and parody project. This platform has absolutely NO commercial, official, or legal affiliation with Microsoft Corporation, MSN, MSN Messenger, Skype, Windows, or any other original trademark.",
+    disclaimerText: "Buzzi Messenger is an independent art and parody project. This platform has absolutely NO commercial, official, or legal affiliation with Microsoft Corporation, Skype, Windows, or any other original third-party trademark. Any resemblance to existing messaging platforms is purely intended as nostalgic homage.",
     sec1Title: "1. Legal Status & Intellectual Property",
     sec1Text: "This platform functions purely as an educational and nostalgic simulation. All retro sound effects (chimes, nudges, login notifications) are synthesized in real-time in the browser using the Web Audio API. No copyrighted audio, trademarks, or proprietary third-party assets are hosted or distributed on our servers.",
     sec2Title: "2. Privacy Policy & Data Storage",
@@ -57,7 +57,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   DE: {
     title: "Buzzi Rechtliche Hinweise & Datenschutz",
     disclaimerTitle: "⚠️ Wichtiger Haftungsausschluss",
-    disclaimerText: "Buzzi Messenger is ein unabhängiges Kunst- und Parodieprojekt. Diese Plattform steht in keinerlei kommerzieller, offizieller oder rechtlicher Verbindung mit der Microsoft Corporation, MSN, Skype, Windows oder anderen Marken.",
+    disclaimerText: "Buzzi Messenger ist ein unabhängiges Kunst- und Parodieprojekt. Diese Plattform steht in keinerlei kommerzieller, offizieller oder rechtlicher Verbindung mit der Microsoft Corporation, Skype, Windows oder anderen Marken Dritter. Jegliche Ähnlichkeiten mit bestehenden Nachrichtenplattformen dienen ausschließlich als nostalgische Hommage.",
     sec1Title: "1. Rechtlicher Status & Geistiges Eigentum",
     sec1Text: "Diese Plattform dient ausschließlich als nostalgische und pädagogische Simulation. Alle Retro-Soundeffekte werden in Echtzeit über die Web Audio API im Browser synthetisiert. Es werden keine urheberrechtlich geschützten Audio- oder Markenressourcen auf unseren Servern gehostet.",
     sec2Title: "2. Datenschutzerklärung & Datenspeicherung",
@@ -80,7 +80,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   FR: {
     title: "Conditions Juridiques & Confidentialité Buzzi",
     disclaimerTitle: "⚠️ Clause de non-responsabilité importante",
-    disclaimerText: "Buzzi Messenger est un projet artistique et de parodie indépendant. Cette plateforme n'a aucun lien commercial, officiel ou juridique avec Microsoft Corporation, MSN, Skype, Windows ou toute autre marque d'origine.",
+    disclaimerText: "Buzzi Messenger est un projet artistique et de parodie indépendant. Cette plateforme n'a aucun lien commercial, officiel ou juridique avec Microsoft Corporation, Skype, Windows ou toute autre marque d'origine tierce. Toute ressemblance avec des plateformes de messagerie existantes est exclusivement une hommage nostalgique.",
     sec1Title: "1. Statut juridique et propriété intellectuelle",
     sec1Text: "Cette plateforme fonctionne uniquement comme une simulation éducative et nostalgique. Tous les effets sonores rétro sont synthétisés en temps réel dans le navigateur via l'API Web Audio. Aucun contenu audio ou propriété de tiers n'est hébergé ou distribué sur nos serveurs.",
     sec2Title: "2. Déclaration de confidentialité & Stockage des données",
@@ -103,7 +103,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   ES: {
     title: "Condiciones Legales & Privacidad de Buzzi",
     disclaimerTitle: "⚠️ Descargo de responsabilidad importante",
-    disclaimerText: "Buzzi Messenger es un proyecto independiente de arte y parodia. Esta plataforma no tiene ninguna afiliación comercial, oficial o legal con Microsoft Corporation, MSN, Skype, Windows o marcas originales.",
+    disclaimerText: "Buzzi Messenger es un proyecto independiente de arte y parodia. Esta plataforma no tiene ninguna afiliación comercial, oficial o legal con Microsoft Corporation, Skype, Windows o marcas originales de terceros. Cualquier similitud con plataformas de mensajería existentes es exclusivamente un homenaje nostálgico.",
     sec1Title: "1. Estatus Legal y Propiedad Intelectual",
     sec1Text: "Esta plataforma funciona únicamente como una simulación educativa y nostálgica. Todos los efectos de sonido se sintetizan en tiempo real en la Web Audio API del navegador. No se hospeda ni distribuye audios protegidos.",
     sec2Title: "2. Declaración de Privacidad & Datos",
@@ -126,7 +126,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   IT: {
     title: "Condizioni Legali & Privacy di Buzzi",
     disclaimerTitle: "⚠️ Dichiarazione di limitazione di responsabilità",
-    disclaimerText: "Buzzi Messenger è un progetto artistico e parodia indipendente. Questa piattaforma non ha alcuna affiliazione commerciale, ufficiale o legale con Microsoft Corporation, MSN, Skype, Windows o marchi originali.",
+    disclaimerText: "Buzzi Messenger è un progetto artistico e parodia indipendente. Questa piattaforma non ha alcuna affiliazione commerciale, ufficiale o legale con Microsoft Corporation, Skype, Windows o marchi originali di terze parti. Qualsiasi somiglianza con piattaforme di messaggeria esistenti è esclusivamente un omaggio nostalgico.",
     sec1Title: "1. Stato legale e Proprietà Intellettuale",
     sec1Text: "Questa piattaforma funge esclusivamente da simulazione nostalgica ed educativa. Tutti gli effetti sonori retro sono sintetizzati in tempo reale tramite la Web Audio API. Nessun contenuto protetto è ospitato sui nostri server.",
     sec2Title: "2. Informativa sulla Privacy & Salvataggio Dati",

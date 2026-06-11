@@ -106,7 +106,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
         exit={{ scale: 0.95, opacity: 0 }}
         className="bg-[#f0f4f9] w-full max-w-xl rounded-2xl border-4 border-[#3b82f6] shadow-2xl flex flex-col overflow-hidden max-h-[90vh]"
       >
-        {/* MSN style blue header */}
+        {/* Buzzi style blue header */}
         <div className="bg-[#1e3a8a] bg-gradient-to-r from-[#1e40af] to-[#3b82f6] px-4 py-3 flex items-center justify-between border-b-2 border-[#1d4ed8]">
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
@@ -194,7 +194,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
           </div>
         </div>
 
-        {/* MSN Bottom Toolbar */}
+        {/* Buzzi Bottom Toolbar */}
         <div className="bg-[#e9f2fc] border-t-2 border-[#bad0e3] px-5 py-4 flex items-center justify-between select-none">
           <button
             onClick={handlePrev}

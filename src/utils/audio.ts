@@ -1005,7 +1005,7 @@ class BuzziAudioSynthesizer {
       const now = actx.currentTime;
 
       if (scheme === "classic_messenger") {
-        // Beautiful descending chime arpeggio - classic offline MSN sound!
+        // Beautiful descending chime arpeggio - classic offline Buzzi sound!
         const notes = [1975.53, 1567.98, 1318.51, 987.77, 783.99, 659.25];
         notes.forEach((freq, idx) => {
           const t = now + (idx * 0.038);

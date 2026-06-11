@@ -274,6 +274,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [currentGameId, setCurrentGameId] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [chatBgTheme, setChatBgTheme] = useState<string>(() => {
+    return localStorage.getItem("buzzi_chat_bg_theme") || "default";
+  });
+  const [showThemePicker, setShowThemePicker] = useState(false);
 
   useEffect(() => {
     // Reset webcam call en game duel bij gespreks-wisseling
@@ -945,6 +949,62 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           >
             A
           </button>
+
+          <div className="w-px h-4 bg-slate-300 mx-1" />
+
+          {/* Chat Background Theme Selector */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowThemePicker(!showThemePicker);
+                hiveAudio.playHoneyPop();
+              }}
+              className="hover:bg-[#cfe1f5] text-slate-700 px-2 py-1 rounded text-xs flex items-center gap-1 cursor-pointer border border-[#bad0e3]/40"
+              title="Wissel de achtergrond van het chatvenster"
+            >
+              <span className="text-sm">🎨</span>
+              <span className="font-semibold text-[10px]">Achtergrond</span>
+            </button>
+
+            {showThemePicker && (
+              <div className="absolute left-0 top-full mt-1.5 bg-white border border-[#8da7c1] rounded-md shadow-xl p-2.5 w-52 z-50 animate-fade-in">
+                <div className="text-[10px] text-slate-400 font-bold border-b border-slate-100 pb-1 mb-2">
+                  Kies chat achtergrond:
+                </div>
+                {[
+                  { id: "default", name: "Standaard", emoji: "⬜", color: "bg-slate-100" },
+                  { id: "ocean", name: "🌊 Oceaan", emoji: "🌊", color: "bg-gradient-to-r from-sky-100 to-cyan-100" },
+                  { id: "sunset", name: "🌅 Zonsondergang", emoji: "🌅", color: "bg-gradient-to-r from-orange-100 to-amber-100" },
+                  { id: "forest", name: "🌿 Bos", emoji: "🌿", color: "bg-gradient-to-r from-emerald-100 to-teal-100" },
+                  { id: "night", name: "🌙 Nacht", emoji: "🌙", color: "bg-gradient-to-r from-slate-800 to-indigo-950" },
+                  { id: "lavender", name: "💜 Lavendel", emoji: "💜", color: "bg-gradient-to-r from-purple-100 to-fuchsia-100" },
+                  { id: "honey", name: "🍯 Honing", emoji: "🍯", color: "bg-gradient-to-r from-amber-100 to-orange-100" },
+                  { id: "retro", name: "🟤 Retro", emoji: "🟤", color: "bg-gradient-to-r from-amber-200 to-orange-200" },
+                ].map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      setChatBgTheme(theme.id);
+                      localStorage.setItem("buzzi_chat_bg_theme", theme.id);
+                      setShowThemePicker(false);
+                      hiveAudio.playHoneyPop();
+                    }}
+                    className={`w-full flex items-center gap-2 p-1.5 rounded text-left transition-all cursor-pointer ${
+                      chatBgTheme === theme.id
+                        ? "bg-[#e4ecf7] border border-[#9ebcd1]"
+                        : "hover:bg-slate-50 border border-transparent"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded border border-slate-200 shrink-0 ${theme.color}`} />
+                    <span className="text-[11px] font-semibold text-slate-700">{theme.name}</span>
+                    {chatBgTheme === theme.id && (
+                      <span className="ml-auto text-[10px] text-[#1d5c8a] font-bold">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Emoticon list trigger */}
@@ -1028,7 +1088,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Two-Column Chat Canvas: Message Feed on the Left, Display Avatars on the Right */}
-      <div className="flex-1 flex overflow-hidden bg-slate-50 relative">
+      <div className={`flex-1 flex overflow-hidden relative ${
+        chatBgTheme === "default" ? "bg-slate-50" :
+        chatBgTheme === "ocean" ? "bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100" :
+        chatBgTheme === "sunset" ? "bg-gradient-to-br from-orange-50 via-rose-50 to-amber-100" :
+        chatBgTheme === "forest" ? "bg-gradient-to-br from-emerald-50 via-green-50 to-teal-100" :
+        chatBgTheme === "night" ? "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-800" :
+        chatBgTheme === "lavender" ? "bg-gradient-to-br from-purple-50 via-violet-50 to-fuchsia-100" :
+        chatBgTheme === "honey" ? "bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-100" :
+        chatBgTheme === "retro" ? "bg-gradient-to-br from-[#e8d5b7] via-[#f0e6d3] to-[#d4c4a8]" :
+        "bg-slate-50"
+      }`}>
 
         {/* Column 1: Messaging Feed */}
         <div 
@@ -1036,7 +1106,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
         >
-          <div className="text-[10px] text-slate-400 text-center select-none font-sans py-1 border-b border-dashed border-slate-100">
+          <div className={`text-[10px] text-center select-none font-sans py-1 border-b border-dashed ${
+            chatBgTheme === "night" ? "text-slate-500 border-slate-700" : "text-slate-400 border-slate-100"
+          }`}>
             Gespreksbeveiliging is actief. Je chats worden beveiligd bewaard.
           </div>
 
@@ -1066,7 +1138,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 );
               }
 
-              // Custom Retro Buzzi MSN Game Invitation Card
+              // Custom Retro Buzzi Game Invitation Card
               if (msg.isGameDuel) {
                 const DutchGameName = msg.gameType === "tictactoe" 
                   ? "Boter-Kaas-en-Eieren" 

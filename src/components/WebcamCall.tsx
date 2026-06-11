@@ -1,7 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * Buzzi Webcamgesprek Component (MSN Messenger 2004 Videobellen Clone)
+ * Buzzi Webcamgesprek Component (Videobellen Clone)
  */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -438,7 +438,7 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
   return (
     <div className="absolute inset-x-4 top-16 bottom-[140px] z-40 bg-[#cbdcf0] border-2 border-[#1d5c8a] rounded-lg shadow-2xl flex flex-col overflow-hidden font-sans animate-fade-in select-none">
       
-      {/* Title Bar Windows XP MSN design */}
+      {/* Title Bar Windows XP design */}
       <div className="bg-gradient-to-r from-[#1d5fb0] via-[#2473cf] to-[#124d8f] px-3.5 py-1.8 flex items-center justify-between text-white border-b border-[#0f448c]">
         <div className="flex items-center gap-2">
           <Video className="w-4 h-4 text-sky-200 animate-pulse" />
