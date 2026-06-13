@@ -178,11 +178,6 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
           setCallStatus("active");
         }, 1800);
 
-        return () => clearTimeout(connectTimer);
-      }, 3200);
-    }
-
-    // Initialize media capture
     const startCamera = async () => {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -195,9 +190,16 @@ export const WebcamCall: React.FC<WebcamCallProps> = ({
             if (localVideoRef.current) {
               localVideoRef.current.srcObject = stream;
             }
+            // For demo purposes, mirror local stream as remote
+            setRemoteStream(stream);
           }
         } else {
           if (active) setCameraError("Browser ondersteunt geen webcam media APIs.");
+        }
+      } catch (e) {
+        if (active) setCameraError("Fout bij het openen van de webcam: " + e);
+      }
+    };
         }
       } catch (err: any) {
         console.warn("Could not start local camera", err);

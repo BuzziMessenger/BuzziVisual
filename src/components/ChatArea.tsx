@@ -201,7 +201,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const isViewingUserAdmin = isUserAnAdmin;
 
   const [inputText, setInputText] = useState("");
-  const [isShaking, setIsShaking] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const stored = localStorage.getItem("buzzi_favorites");
+    return stored ? JSON.parse(stored) : [];
+  });
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [showWinksPicker, setShowWinksPicker] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
